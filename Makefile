@@ -1,8 +1,14 @@
 run:
 	gcc *.c util/*.c -Wall -o BloodOrange
 	./BloodOrange test/*.orng
+
 verbose:
 	gcc *.c util/*.c -Wall -o BloodOrange -DVERBOSE
 	./BloodOrange test/*.orng
+
+git-commit:
+	git add .
+	git commit -m "$(msg)"
+
 clean:
 	rm BloodOrange
