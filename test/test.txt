@@ -1,0 +1,1133 @@
+#include <iostream>
+#include <exception>
+#include <algorithm>
+#include <fstream>
+#include <map>
+#include <list>
+#include <string>
+#include <queue>
+#include <regex>
+#include <stack>
+using namespace std;
+
+/*
+print
+void main()
+repeat
+variables
+input
+<, is, >, and or + - * / rand() % || floor()
+while
+from to
+if,
+else,
+arrays (not lists)
+functions, return
+use block
+API stuff
+Modules
+Enums
+Structs
+
+--tentative--
+Operator overloading
+For each
+*/
+
+class Thing {
+public:
+	string type;
+	void* data;
+	Thing(string type) {
+		this->type = type;
+	}
+};
+
+enum TokenType {
+	LPAREN, RPAREN, LBRACE, RBRACE, LSQUARE, RSQUARE,
+	// Punctuation
+	SEMICOLON, COMMA, DOT, SWITCH,
+	// Literals
+	IDENTIFIER, NUMLITERAL, LISTLITERAL, FUNCTIONCALL, STRINGLITERAL,
+	// Math operators
+	PLUS, MINUS, MULTIPLY, DIVIDE, RIGHTSHIFT, LEFTSHIFT, MODULUS, EXPONENT,
+	// Branch operators
+	EQUALS, NOTEQUALS, GREATER, GREATEREQUALS, LESSER, LESSEREQUALS, IN,
+	// Boolean operators
+	AND, OR, XOR,
+	// Misc. operators
+	INDEX, MAGNITUDE,
+	// Assignment
+	ASSIGN, PLUSASSIGN, MINUSASSIGN, MULTIPLYASSIGN, DIVIDEASSIGN,
+	// Keywords
+	PRINT, RETURN, IF, ELSE, WHILE, ISTYPE, IMPORT, CONTINUE, BREAK, CONST, NULLPTR, TRUE, FALSE, OPOVERLOAD
+};
+
+string tokenTypeToName(TokenType type) {
+	switch(type) {
+		case LPAREN:
+			return "(";
+		case RPAREN:
+			return ")";
+		case LBRACE:
+			return "{";
+		case RBRACE:
+			return "}";
+		case LSQUARE:
+			return "[";
+		case RSQUARE:
+			return "]";
+		case SEMICOLON:
+			return ";";
+		case COMMA:
+			return ",";
+		case DOT:
+			return ".";
+		case SWITCH:
+			return "|";
+		case IDENTIFIER:
+			return "IDENTIFIER";
+		case NUMLITERAL:
+			return "LITERAL";
+		case LISTLITERAL:
+			return "LISTLITERAL";
+		case FUNCTIONCALL:
+			return "FUNCTIONCALL";
+		case STRINGLITERAL:
+			return "LITERAL";
+		case PLUS:
+			return "+";
+		case MINUS:
+			return "-";
+		case MULTIPLY:
+			return "*";
+		case DIVIDE:
+			return "/";
+		case RIGHTSHIFT:
+			return "<<";
+		case LEFTSHIFT:
+			return ">>";
+		case MODULUS:
+			return "%";
+		case EXPONENT:
+			return "^";
+		case EQUALS:
+			return "is";
+		case NOTEQUALS:
+			return "isnt";
+		case GREATER:
+			return ">";
+		case GREATEREQUALS:
+			return ">=";
+		case LESSER:
+			return "<";
+		case LESSEREQUALS:
+			return "<=";
+		case IN:
+			return "in";
+		case AND:
+			return "and";
+		case OR:
+			return "or";
+		case XOR:
+			return "xor";
+		case INDEX:
+			return "INDEX";
+		case MAGNITUDE:
+			return "MAGNITUDE";
+		case ASSIGN:
+			return "=";
+		case PLUSASSIGN:
+			return "+=";
+		case MINUSASSIGN:
+			return "-=";
+		case MULTIPLYASSIGN:
+			return "*=";
+		case DIVIDEASSIGN:
+			return "/=";
+		case PRINT:
+			return "print";
+		case RETURN:
+			return "return";
+		case IF:
+			return "if";
+		case ELSE:
+			return "else";
+		case WHILE:
+			return "while";
+		case ISTYPE:
+			return "istype";
+		case IMPORT:
+			return "import";
+		case CONTINUE:
+			return "continue";
+		case BREAK:
+			return "break";
+		case CONST:
+			return "const";
+		case NULLPTR:
+			return "null";
+		case TRUE:
+			return "true";
+		case FALSE:
+			return "false";
+		case OPOVERLOAD:
+			return "operator";
+		default:
+			return "ERROR!";
+	}
+}
+
+class Token {
+public:
+	TokenType type;
+	string value;
+	list<Token> inner;
+	Token (TokenType type, string value) {
+		this->type = type;
+		this->value = value;
+	}
+	int precedence();
+};
+
+Token::precedence() {
+	switch (type) {
+		case PLUSASSIGN:
+		case MINUSASSIGN:
+		case DIVIDEASSIGN:
+		case MULTIPLYASSIGN:
+		case ASSIGN:
+			return 1;
+		case OR:
+			return 2;
+		case AND:
+			return 3;
+		case NOTEQUALS:
+		case EQUALS:
+		case IN:
+			return 4;
+		case ISTYPE:
+		case GREATER:
+		case LESSER:
+		case GREATEREQUALS:
+		case LESSEREQUALS:
+			return 5;
+		case LEFTSHIFT:
+		case RIGHTSHIFT:
+			return 6;
+		case PLUS:
+		case MINUS:
+			return 7;
+		case MODULUS:
+		case MULTIPLY:
+		case DIVIDE:
+			return 8;
+		case EXPONENT:
+			return 9;
+		case DOT:
+		case INDEX:
+			return 10;
+		default:
+			return 0;
+	}
+}
+
+// Structure signatures
+const TokenType functionSignature[] = {IDENTIFIER, IDENTIFIER, LPAREN};
+const TokenType structSignature[] = {IDENTIFIER, LPAREN};
+const TokenType importSignature[] = {IMPORT};
+const TokenType constSignature[] = {CONST, IDENTIFIER, IDENTIFIER, ASSIGN};
+const TokenType overloadSignature[] = {OPOVERLOAD, IDENTIFIER, IDENTIFIER, LPAREN};
+
+// Instruction signatures
+const TokenType blockSignature[] = {LBRACE};
+const TokenType varAssignSignature[] = {IDENTIFIER, IDENTIFIER, ASSIGN};
+const TokenType varCreateSignature[] = {IDENTIFIER, IDENTIFIER};
+const TokenType printSignature[] = {PRINT};
+const TokenType returnSignature[] = {RETURN};
+const TokenType ifSignature[] = {IF};
+const TokenType elseSignature[] = {ELSE};
+const TokenType whileSignature[] = {WHILE};
+const TokenType breakSignature[] = {BREAK};
+const TokenType continueSignature[] = {CONTINUE};
+
+namespace AST {
+	enum Type {
+		// StatementNode types
+		BLOCK, VARASSIGN, VARCREATE, PRINT, RETURN, IF, WHILE, BREAK, CONTINUE,
+		// ExpressionNode types
+		PLUS, MINUS, MULTIPLY, DIVIDE, MODULUS, EXPONENT, AND, OR, XOR, GREATER, LESSER, GREATEREQUALS, LESSEREQUALS,
+		LEFTSHIFT, RIGHTSHIFT, EQUALS, NOTEQUALS, ASSIGN, INDEX, LIST, LITERAL, MAGNITUDE, FUNCTIONCALL, VAR, ISTYPE,
+		DOT, IN
+	};
+}
+
+string astToString(AST::Type type) {
+	switch(type) {
+		case AST::BLOCK: 
+			return "BLOCK";
+		case AST::VARASSIGN:
+			return "VARASSIGN";
+		case AST::VARCREATE:
+			return "VARCREATE";
+		case AST::PRINT:
+			return "PRINT";
+		case AST::RETURN:
+			return "RETURN";
+		case AST::IF:
+			return "IF";
+		case AST::WHILE:
+			return "ELSE";
+		case AST::BREAK:
+			return "BREAK";
+		case AST::CONTINUE:
+			return "CONTINUE";
+		case AST::PLUS:
+			return "PLUS";
+		case AST::MINUS:
+			return "MINUS";
+		case AST::MULTIPLY:
+			return "MULTIPLY";
+		case AST::DIVIDE:
+			return "DIVIDE";
+		case AST::MODULUS:
+			return "MODULUS";
+		case AST::EXPONENT:
+			return "EXPONENT";
+		case AST::AND:
+			return "ADD";
+		case AST::OR:
+			return "OR";
+		case AST::GREATER:
+			return "GREATER";
+		case AST::LESSER:
+			return "LESSER";
+		case AST::GREATEREQUALS:
+			return "GREATEREQUALS";
+		case AST::LESSEREQUALS:
+			return "LESSEREQUALS";
+		case AST::LEFTSHIFT:
+			return "LEFTSHIFT"; 
+		case AST::RIGHTSHIFT:
+			return "RIGHTSHIFT";
+		case AST::EQUALS:
+			return "EQUALS";
+		case AST::NOTEQUALS:
+			return "NOTEQUALS";
+		case AST::ASSIGN:
+			return "ASSIGN";
+		case AST::INDEX:
+			return "INDEX";
+		case AST::LIST:
+			return "LIST";
+		case AST::LITERAL:
+			return "NUMLITERAL";
+		case AST::MAGNITUDE:
+			return "MAGNITUDE";
+		case AST::FUNCTIONCALL:
+			return "FUNCTIONCALL";
+		case AST::VAR:
+			return "VAR";
+		case AST::ISTYPE:
+			return "ISTYPE";
+		case AST::DOT:
+			return "DOT";
+		case AST::IN:
+			return "IN";
+		default:
+			return "ERROR!";
+	}
+}
+
+class AbstractSyntaxNode {
+public:
+	AST::Type type;
+	list<AbstractSyntaxNode*> children;
+	list<Thing*> data;
+	AbstractSyntaxNode (AST::Type type) {
+		this->type = type;
+	}
+	Thing* evaluate();
+	void print(int level=0);
+	friend ostream& operator<<(ostream& os, const AbstractSyntaxNode& ast);
+};
+
+Thing* AbstractSyntaxNode::evaluate() {
+	Thing* retval = NULL;
+	return retval;
+}
+
+ostream& operator<<(ostream& os, const AbstractSyntaxNode& ast) {
+    return os << ast.type;
+}
+
+void AbstractSyntaxNode::print(int level) {
+	for(int i = 0; i < level; i++) {
+		cout << "| ";
+	}
+	if(!this->data.empty()) {
+		int value = *(int*)(this->data.front()->data);
+		cout << astToString(this->type) << " " << value << endl;
+	} else {
+		cout << astToString(this->type) << endl;
+	}
+	level++;
+	for (auto const& i : this->children) {
+		i->print(level);
+	}
+}
+
+class Struct {
+public:
+	list<string> paramTypes;
+	list<string> paramNames;
+	string name;
+};
+
+class Function {
+public:
+	AbstractSyntaxNode *instruction;
+	list<string> paramTypes;
+	list<string> paramNames;
+	string returnType;
+	string name;
+};
+
+class Module {
+public:
+	list<Function*> functions;
+	map<string, Thing*> constants;
+	string name;
+	string document;
+};
+
+class Program {
+public:
+	map<string, Module*> modules;
+	map<string, Struct*> structs;
+	list<Function*> overloads;
+};
+
+/*
+Opens file and returns string of text, without new lines
+*/
+string openFile(string filename) {
+	string retval = "", tempLine;
+	ifstream file(filename);
+	while (getline(file, tempLine)) {
+		retval += tempLine;
+	}
+	file.close();
+	return retval;
+}
+
+static const char oneCharTokens[19] = {'{', '}', '[', ']', '(', ')', ';', ',', '.', '+', '-', '*', '/', '^', '>', '<', '=', '|', '"'};
+
+int charIsToken(char c) {
+	for(int i = 0; i < 19; i++) {
+		if (oneCharTokens[i] == c) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+Finds the index of the next token in an input string
+*/
+int indexNextToken(string input) {
+	enum TokenState {
+		FRESH, WORD, NUMBER
+	};
+	TokenState state = FRESH;
+	char nextChar;
+
+	for (int i = 0; i < input.length(); i++) {
+		nextChar = input[i];
+		if (state == FRESH) {
+			// CHECK ONE-SYMBOL TOKENS
+			if (charIsToken(nextChar)) {
+				return i + 1;
+			} 
+			// CHECK KEYWORD/IDENTIFIER
+			else if (isalpha(nextChar)) {
+				state = WORD;
+			} 
+			// CHECK NUMBER
+			else if (isdigit(nextChar)) {
+				state = NUMBER;
+			}
+		}
+		// IDENTIFIER, CHECK ENDING (non alphanumeric)
+		else if (state == WORD) {
+			if (!isalpha(nextChar) && !isdigit(nextChar)) {
+				return i;
+			}
+		} 
+		// INTLITERAL, CHECK ENDING (non digit)
+		else if (state == NUMBER) {
+			if (!isdigit(nextChar)) {
+				return i;
+			}
+		}
+	}
+
+	return -1;
+}
+
+// trim from start (in place)
+static inline void ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+// trim from end (in place)
+static inline void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
+// trim from both ends (in place)
+static inline void trim(std::string &s) {
+    ltrim(s);
+    rtrim(s);
+}
+
+/*
+Takes in a string representing a file, seperates into tokens and places them
+*/
+queue<Token>* tokenize(string file) {
+	int nextIndex;
+	queue<Token>* retval = new queue<Token>();
+	string token;
+	TokenType type;
+
+	// Find index of next token
+	while ((nextIndex = indexNextToken(file)) != -1) {
+		// Set token to the first half, file to second half
+		token = file.substr(0, nextIndex);
+		file = file.substr(nextIndex);
+		trim(file);
+
+		// Interpret token type
+		{
+		if(token.compare("(") == 0) {
+			type = LPAREN;
+		} else if(token.compare(")") == 0) {
+			type = RPAREN;
+		} else if(token.compare("{") == 0) {
+			type = LBRACE;
+		} else if(token.compare("}") == 0) {
+			type = RBRACE;
+		} else if(token.compare("[") == 0) {
+			type = LSQUARE;
+		} else if(token.compare("]") == 0) {
+			type = RSQUARE;
+		} else if(token.compare(";") == 0) {
+			type = SEMICOLON;
+		} else if(token.compare(",") == 0) {
+			type = COMMA;
+		} else if(token.compare(".") == 0) {
+			type = DOT;
+		} else if(token.compare("|") == 0) {
+			type = SWITCH;
+		} else if(token.compare("+") == 0) {
+			type = PLUS;
+		} else if(token.compare("-") == 0) {
+			type = MINUS;
+		} else if(token.compare("*") == 0) {
+			type = MULTIPLY;
+		} else if(token.compare("/") == 0) {
+			type = DIVIDE;
+		} else if(token.compare("%") == 0) {
+			type = MODULUS;
+		} else if(token.compare("^") == 0) {
+			type = EXPONENT;
+		} else if(token.compare("is") == 0) {
+			type = EQUALS;
+		} else if(token.compare("isnt") == 0) {
+			type = NOTEQUALS;
+		} else if(token.compare(">") == 0) {
+			type = GREATER;
+		} else if(token.compare("<") == 0) {
+			type = LESSER;
+		} else if(token.compare("in") == 0) {
+			type = IN;
+		} else if(token.compare("and") == 0) {
+			type = AND;
+		} else if(token.compare("or") == 0) {
+			type = OR;
+		} else if(token.compare("xor") == 0) {
+			type = XOR;
+		} else if(token.compare("=") == 0) {
+			type = ASSIGN;
+		} else if(token.compare("print") == 0) {
+			type = PRINT;
+		} else if(token.compare("return") == 0) {
+			type = RETURN;
+		} else if(token.compare("if") == 0) {
+			type = IF;
+		} else if(token.compare("else") == 0) {
+			type = ELSE;
+		} else if(token.compare("while") == 0) {
+			type = WHILE;
+		} else if(token.compare("istype") == 0) {
+			type = ISTYPE;
+		} else if(token.compare("import") == 0) {
+			type = IMPORT;
+		} else if(token.compare("continue") == 0) {
+			type = CONTINUE;
+		} else if(token.compare("break") == 0) {
+			type = BREAK;
+		} else if(token.compare("const") == 0) {
+			type = CONST;
+		} else if(token.compare("null") == 0) {
+			type = NULLPTR;
+		} else if(token.compare("true") == 0) {
+			type = TRUE;
+		} else if(token.compare("false") == 0) {
+			type = FALSE;
+		} else if(token.compare("operator") == 0) {
+			type = OPOVERLOAD;
+		} else if(isdigit(token[0])) {
+			type = NUMLITERAL;
+		} else {
+			type = IDENTIFIER;
+		}
+		}
+		retval->push(Token(type, token));
+	}
+	return retval;
+}
+
+/*
+Pulls out the tokens representing the expression at the front of a token queue.
+*/
+queue<Token>* extractExpression(queue<Token>* tokens) {
+    queue<Token>* expression = new queue<Token>();
+    int level = 0;
+    while (!tokens->empty()) {
+        int nextType = tokens->front().type;
+        if(nextType == LPAREN || nextType == LSQUARE) {
+            level++; // push
+        } else if(nextType == RPAREN || nextType == RSQUARE) {
+            level--; // pop
+        }
+		// COMMA EXIT
+        if(level == 0 && nextType == COMMA){
+            break;
+        }
+		// SEMICOLON EXIT
+        if(nextType == SEMICOLON){
+            break;
+        }
+		// LEVEL EXIT
+        if (level < 0){
+            break;
+        }
+		expression->push(tokens->front());
+		tokens->pop();
+    }
+    return expression;
+}
+
+/*
+Creates a list literal token from a token queue
+
+LSQUARE and RSQUARE of outer list will NOT be included
+Commas will be included
+*/
+Token createListLiteral(queue<Token>* infix) {
+	Token listLiteral = Token(LISTLITERAL, "");
+	while(!infix->empty()) {
+		Token t = infix->front();
+		infix->pop();
+		if(t.type == LSQUARE) {
+			listLiteral.inner.push_back(createListLiteral(infix));
+			continue;
+		} else if (t.type == RSQUARE) {
+			break;
+		}
+		listLiteral.inner.push_back(t);
+	}
+	return listLiteral;
+}
+
+/*
+Converts a list of tokens representing an expression from regular infix 
+notation to postfix notation. 
+For example:
+x + 5 * 4
+becomes:
+5 4 * x +
+
+Which is easier for the program to compute
+*/
+queue<Token>* infixToPostfix(queue<Token>* infix) {
+	queue<Token>* postfix = new queue<Token>;
+	stack<Token> opStack;
+
+	while(!infix->empty()) {
+		Token t = infix->front();
+		infix->pop();
+		// MAGNITUDE
+		if(t.type == SWITCH) {
+			Token magnitude = Token(MAGNITUDE, "");
+			while (!infix->empty() && infix->front().type != SWITCH) {
+				magnitude.inner.push_back(infix->front());
+				infix->pop();
+			}
+			infix->pop(); // remove |
+			postfix->push(magnitude);
+		} 
+		// FUNCTION CALL
+		else if (t.type == IDENTIFIER && infix->empty() && infix->front().type == LPAREN) {
+			Token functionCall = Token(FUNCTIONCALL, t.value);
+			infix->pop(); // Skip the '('
+			/*
+			 * Inject the innertokens queue with the tokens between the parenthesis of the
+			 * function call. Do not include the parenthesis, and check that you're in the
+			 * right parenthesis layer before exiting the while loop
+			 */
+			int parenthesis = 0;
+			while (!infix->empty()) {
+				if (infix->front().type == LPAREN)
+					parenthesis++;
+				if (infix->front().type == RPAREN)
+					parenthesis--;
+				if (parenthesis < 0)
+					break;
+				functionCall.inner.push_back(infix->front());
+				infix->pop();
+			}
+			infix->pop(); // Remove the final ')'
+			postfix->push(functionCall);
+		} 
+		// INDEX
+		else if (t.type == IDENTIFIER && !infix->empty() && infix->front().type == LSQUARE) {
+			postfix->push(t);
+			while (!infix->empty() && infix->front().type == LSQUARE) {
+				infix->pop(); // Remove the '['
+				queue<Token> index;
+				while (!infix->empty() && infix->front().type != RSQUARE) {
+					index.push(infix->front());
+					infix->pop();
+				}
+				infix->pop(); // Remove the ']'
+				while (!index.empty()) {
+					postfix->push(index.front());
+					index.pop();
+				}
+			}
+
+			while (!opStack.empty() && t.precedence() > opStack.top().precedence()) {
+				postfix->push(opStack.top());
+				opStack.pop();
+			}
+			opStack.push(Token(INDEX, ""));
+		}
+		// LITERAL
+		else if (t.type == NUMLITERAL || t.type == IDENTIFIER || 
+				t.type == STRINGLITERAL || t.type == LISTLITERAL || 
+				t.type == NULLPTR || t.type == TRUE || t.type == FALSE) {
+			postfix->push(t);
+		}
+		// LISTLITERAL
+		else if (t.type == LSQUARE) {
+			Token listLiteral = createListLiteral(infix);
+			postfix->push(listLiteral);
+		}
+		// OPEN PAREN
+		else if (t.type == LPAREN) {
+			opStack.push(t);
+		}
+		// CLOSE PAREN
+		else if (t.type == RPAREN) {
+			while (!opStack.empty() && opStack.top().type != LPAREN){
+				postfix->push(opStack.top());
+				opStack.pop();
+			}
+
+			opStack.pop();
+		}
+		// OPERATOR
+		else {
+			while (!opStack.empty() && t.precedence() <= opStack.top().precedence()) {
+				postfix->push(opStack.top());
+				opStack.pop();
+			}
+			opStack.push(t);
+		}
+	}
+	// pop all the operators from the stack
+	while (!opStack.empty()) {
+		postfix->push(opStack.top());
+		opStack.pop();
+	}
+
+	return postfix;
+}
+
+/*
+Checks to see if the front of the queue matches a signature
+*/
+bool match(const queue<Token>* tokens, const TokenType signature[], int length) {
+	queue<Token> copy = *tokens;
+	int i = 0;
+	while (i < length) {
+		if(signature[i] != copy.front().type) {
+			return false;
+		} else {
+			copy.pop();
+			i++;
+		}
+	}
+	return true;
+}
+
+AST::Type tokenToAST(TokenType type) {
+	switch(type) {
+		case PLUS:
+			return AST::PLUS;
+		case MINUS:
+			return AST::MINUS;
+		case MULTIPLY:
+			return AST::MULTIPLY;
+		case DIVIDE:
+			return AST::DIVIDE;
+		case AND:
+			return AST::AND;
+		case OR:
+			return AST::OR;
+		case XOR:
+			return AST::XOR;
+		case NUMLITERAL:
+			return AST::LITERAL;
+		case STRINGLITERAL:
+			return AST::LITERAL;
+		case ASSIGN:
+			return AST::ASSIGN;
+		case EQUALS:
+			return AST::EQUALS;
+		case NOTEQUALS:
+			return AST::NOTEQUALS;
+		case LESSER:
+			return AST::LESSER;
+		case GREATER:
+			return AST::GREATER;
+		case ISTYPE:
+			return AST::ISTYPE;
+		case DOT:
+			return AST::DOT;
+		case GREATEREQUALS:
+			return AST::GREATEREQUALS;
+		case LESSEREQUALS:
+			return AST::LESSEREQUALS;
+		case LEFTSHIFT:
+			return AST::LEFTSHIFT;
+		case RIGHTSHIFT:
+			return AST::RIGHTSHIFT;
+		case MODULUS:
+			return AST::MODULUS;
+		case EXPONENT:
+			return AST::EXPONENT;
+		case INDEX:
+			return AST::INDEX;
+		case IN:
+			return AST::IN;
+		default:
+			cout << "WARNING: TOKEN TYPE " << type << " HAS NO AST NODE EQUIVALENT" << endl;
+			return AST::BLOCK;
+	}
+}
+
+AbstractSyntaxNode* createExpression(queue<Token>* tokens) {
+	AbstractSyntaxNode* node;
+	queue<Token>* expression = infixToPostfix(extractExpression(tokens));
+	stack<AbstractSyntaxNode*> argStack;
+
+	while(!(expression->empty())) {
+		Token token = expression->front();
+		cout << tokenTypeToName(token.type) << endl;
+		expression->pop();
+		node = new AbstractSyntaxNode(AST::LITERAL);
+
+		if(token.type == NUMLITERAL) {
+			node->type = AST::LITERAL;
+
+			Thing* thng = new Thing("int");
+			int* x = (int*) malloc(sizeof(int));
+			*x = stoi(token.value);
+			thng->data = (void*) x;
+			node->data.push_back(thng);
+			
+			argStack.push(node);
+		} else if(token.type == STRINGLITERAL) {
+			node->type = AST::LITERAL;
+
+			Thing* thng = new Thing("string");
+			string* x = (string*) malloc(sizeof(string));
+			*x = token.value;
+			thng->data = (void*) x;
+			node->data.push_back(thng);
+
+			argStack.push(node);
+		} else if(token.type == NULLPTR) {
+			node->type = AST::LITERAL;
+			Thing* thng = new Thing("null");
+			thng->data = NULL;
+			node->data.push_back(thng);
+
+			argStack.push(node);
+		} else if(token.type == TRUE) {
+			node->type = AST::LITERAL;
+
+			Thing* thng = new Thing("boolean");
+			int* x = (int*)malloc(sizeof(int));
+			*x = 1; // NUMERIC VALUE OF TRUE
+			thng->data = (void*) x;
+			node->data.push_back(thng);
+
+			argStack.push(node);
+		} else if(token.type == FALSE) {
+			node->type = AST::LITERAL;
+
+			Thing* thng = new Thing("boolean");
+			int* x = (int*)malloc(sizeof(int));
+			*x = 0; // NUMERIC VALUE OF FALSE
+			thng->data = (void*) x;
+			node->data.push_back(thng);
+
+			argStack.push(node);
+		} else if(token.type == LISTLITERAL) {
+			// TODO: Implement arrays instead
+		} else if(token.type == IDENTIFIER) {
+			node->type = AST::VAR;
+
+			Thing* thng = new Thing("var");
+			string* x = (string*)malloc(sizeof(string));
+			*x = token.value; 
+			thng->data = (void*) x;
+			node->data.push_back(thng);
+
+			argStack.push(node);
+		} else if(token.type == FUNCTIONCALL) {
+
+		} else if(token.type == MAGNITUDE) {
+
+		} 
+		// Operations
+		else {
+			node->type = tokenToAST(token.type);
+			node->children.push_back(argStack.top()); // Right
+			argStack.pop();
+			node->children.push_back(argStack.top()); // Left
+			argStack.pop();
+			
+			argStack.push(node);
+		}
+	}
+
+	return argStack.top();
+}
+
+// TODO
+AbstractSyntaxNode* createAST(queue<Token>* tokens) {
+	AbstractSyntaxNode* node = new AbstractSyntaxNode(AST::LITERAL);
+	if(match(tokens, blockSignature, 1)) {
+		node->type = AST::BLOCK;
+		tokens->pop(); // Remove the {
+		while (tokens->front().type != RBRACE) {
+			node->children.push_back(createAST(tokens));
+		}
+		tokens->pop(); // Remove the }
+	} else 
+	if(match(tokens, varAssignSignature, 3)) {
+		node->type = AST::VARASSIGN;
+		Thing* thng = new Thing("type");
+		thng->data = &tokens->front().value; // TYPE
+		node->data.push_back(thng);
+		tokens->pop();
+		thng = new Thing("name");
+		thng->data = &tokens->front().value; // NAME
+		node->data.push_back(thng);
+		tokens->pop();
+		tokens->pop(); // Remove the =
+		node->children.push_back(createExpression(tokens));
+		tokens->pop(); // Remove the ;
+	} else 
+	if(match(tokens, varCreateSignature, 2)) {
+		node->type = AST::VARCREATE;
+		Thing* thng = new Thing("type"); 
+		thng->data = &tokens->front().value; // TYPE
+		node->data.push_back(thng);
+		tokens->pop();
+		thng = new Thing("name");
+		thng->data = &tokens->front().value; // NAME
+		node->data.push_back(thng);
+		tokens->pop();
+		tokens->pop(); // Remove the ;
+	} else 
+	if(match(tokens, printSignature, 1)) {
+		node->type = AST::PRINT;
+		tokens->pop(); // Remove the print
+		node->children.push_back(createExpression(tokens));
+		tokens->pop(); // Remove the ;
+	} else 
+	if(match(tokens, returnSignature, 1)) {
+		node->type = AST::RETURN;
+		tokens->pop(); // Remove the return
+		node->children.push_back(createExpression(tokens));
+		tokens->pop(); // Remove the ;
+	} else 
+	if(match(tokens, ifSignature, 1)) {
+		node->type = AST::IF;
+		tokens->pop(); // Remove the if
+		node->children.push_back(createExpression(tokens)); // CONDITION
+		tokens->pop(); // Remove the ,
+		node->children.push_back(createAST(tokens)); // IF BRANCH
+		if(tokens->front().type == ELSE) {
+			tokens->pop(); // Remove the else
+			node->children.push_back(createAST(tokens)); // ELSE BRANCH
+		}
+	} else
+	if(match(tokens, whileSignature, 1)) {
+		node->type = AST::WHILE;
+		tokens->pop(); // Remove the while
+		node->children.push_back(createExpression(tokens)); // CONDITION
+		tokens->pop(); // Remove the ,
+		node->children.push_back(createAST(tokens)); // INSTRUCTION
+	} else {
+		cout << tokens->empty() << endl;
+		cout << "LOL" << endl;
+	}
+	return node;
+}
+
+/*
+Creates a function and pops off the corresponding tokens from the token queue
+*/
+Function* createFunction(queue<Token>* tokens, Module *module) {
+	Function* retval = new Function();
+	retval->returnType = tokens->front().value;
+	tokens->pop();
+	retval->name = tokens->front().value;
+	tokens->pop();
+	tokens->pop(); // Remove the (
+	
+	while (tokens->front().type != RPAREN){
+		retval->paramTypes.push_back(tokens->front().value);
+		tokens->pop();
+		retval->paramNames.push_back(tokens->front().value);
+		tokens->pop();
+		if(tokens->front().type == COMMA) {
+			tokens->pop(); // Remove the ,
+		}
+	}
+	tokens->pop(); // Remove the )
+	retval->instruction = createAST(tokens);
+	return retval;
+}
+
+Struct* createStruct(queue<Token>* tokens) {
+	Struct* retval = new Struct();
+	retval->name = tokens->front().value;
+	tokens->pop();
+	tokens->pop(); // Remove the (
+	
+	while (tokens->front().type != RPAREN){
+		retval->paramTypes.push_back(tokens->front().value);
+		tokens->pop();
+		retval->paramNames.push_back(tokens->front().value);
+		tokens->pop();
+		if(tokens->front().type == COMMA) {
+			tokens->pop(); // Remove the ,
+		}
+	}
+	tokens->pop(); // Remove the )
+	tokens->pop(); // Remove the ;
+	return retval;
+}
+
+
+bool checkListContainsFunction(list<Function*> testList, Function* test) {
+	for (auto const& i : testList) {
+		if(i->name == test->name && i->paramTypes == test->paramTypes){
+			return true;
+		}
+	}
+	return false;
+}
+
+Function* getFunction(list<Function*> testList, string name, list<string> paramTypes) {
+	for (auto const& i : testList) {
+		if(i->name == name && i->paramTypes == paramTypes){
+			return i;
+		}
+	}
+	return nullptr;
+}
+
+/*
+Creates a module, functions, instructions, structs, constants, and operator 
+overloads given a name, program, and document
+*/
+Module* createModule(string moduleName, Program* program, string document) {
+	Module* retval = new Module();
+	retval->document = document;
+	retval->name = moduleName;
+	queue<Token>* tokens = tokenize(document);
+
+	program->modules.insert(make_pair(moduleName, retval)); // Map module
+	while(!tokens->empty()) {
+		if(match(tokens, functionSignature, 3)) {
+			Function* function = createFunction(tokens, retval);
+			if (!checkListContainsFunction(retval->functions, function)) {
+				retval->functions.push_back(function);
+			}
+		} else if (match(tokens, structSignature, 2)) {
+			Struct* struct_ = createStruct(tokens);
+			program->structs[struct_->name] = struct_;
+		} else if (match(tokens, importSignature, 1)) {
+			Token importToken = tokens->front();
+			tokens->pop(); // Remove the import
+			if(program->modules.find(importToken.value) != program->modules.end()) {
+				// TODO
+			}
+		} else if (match(tokens, constSignature, 4)) {
+			tokens->pop();
+			string type = tokens->front().value;
+			tokens->pop();
+			string name = tokens->front().value;
+			tokens->pop();
+			tokens->pop(); // Remove the =
+			Thing* result = (createAST(tokens))->evaluate();
+			if(result != NULL) {
+				result->type = type;
+				retval->constants.insert(make_pair(name, result));
+			}
+			tokens->pop(); // Remove the ;
+		} else if (match(tokens, overloadSignature, 4)) {
+			Function* function = createFunction(tokens, retval);
+			if (!checkListContainsFunction(program->overloads, function)) {
+				program->overloads.push_back(function);
+			}
+		} else {
+			if(!tokens->empty()) {
+				tokens->pop();
+			}
+		}
+	}
+	return retval;
+}
+
+// TODO
+int main() {
+	Program program;
+	Module* module = createModule("main", &program, openFile("test.orng"));
+	Function* mainFunction = getFunction(module->functions, "main", list<string>());
+	mainFunction->instruction->print();
+	cout << "Succees!" << endl;
+}

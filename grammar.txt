@@ -1,0 +1,83 @@
+Expression:
+    bunch a bowlshit
+
+
+Local variable declaration:
+    TYPE <pointer|array>* NAME < = [expression] >
+
+
+If:
+    when [expression] \n [line]* end \n
+
+
+While:
+    while [expression] \n [line]* end \n
+
+
+! Function:
+    <private> TYPE NAME ( < [args] > ) \n [line]* end \n
+
+
+! Global const:
+    <private> const TYPE NAME = [compile time expression]
+
+
+! Package variable:
+    <private> TYPE NAME < = [compile time expression]>
+
+
+! Struct definition:
+    <private> TYPENAME ( [args] )
+
+
+! Package declaration:
+    package PACKAGE_NAME
+
+
+! Module import:
+    import PACKAGE_NAME:MODULE_NAME
+
+
+! Package import:
+    import PACKAGE_NAME
+
+
+Comment:
+    -- Anything in here is commented out --
+
+
+-- Test program --
+
+package Apricot
+
+import BloodOrange:Token
+import BloodOrange:AST
+
+private TokenWithType <Token>
+    int type
+    char pointer name
+end
+
+to start(int argn, char pointer array argv)
+    Token token = Token:create(Token:NUMLITERAL)
+    printAST(token)
+    int i = 4
+    if i < 3
+        ...
+    else i < 3
+        ...
+    end
+end
+
+to printAST(Token token)
+    int tokenToAST(int tokenType)
+        switch(tokenType)
+        case Token:NUMLITERAL
+            return AST:NUMLITERAL
+        case Token:PLUS
+            return AST:PLUS
+        end
+    end
+    
+    printf(tokenToAST(token));
+end

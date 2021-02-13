@@ -1,0 +1,52 @@
+module test
+    function boolean main(int argn, char argv)
+        int i = 0
+        while i < argn
+            System.print(argv[i])
+            i = i + 1
+        end
+
+        return false
+    end
+
+    function boolean main(int argn, char argv)
+        int i = 0
+        while i < argn
+            System.print(argv[i])
+            i = i + 1
+        end
+
+        return false
+    end
+
+    function boolean main(int argn, char argv)
+        int i = 0
+        while i < argn
+            System.print(argv[i])
+            i = i + 1
+        end
+
+        return false
+
+        int i = 0
+        while i < argn
+            System.print(argv[i])
+            i = i + 1
+        end
+
+        return false
+    end
+end
+
+module System
+    function boolean print(char str)
+        int i = 0
+
+        while str[i] isnt 0
+            VGA_START[(cursor + i) * 2] = str[i]
+            VGA_START[(cursor + i) * 2 + 1] = 080
+
+            i = i + 1
+        end
+    end
+end
