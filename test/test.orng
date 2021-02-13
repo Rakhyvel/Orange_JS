@@ -8,34 +8,6 @@ module test
 
         return false
     end
-
-    function boolean main(int argn, char argv)
-        int i = 0
-        while i < argn
-            System.print(argv[i])
-            i = i + 1
-        end
-
-        return false
-    end
-
-    function boolean main(int argn, char argv)
-        int i = 0
-        while i < argn
-            System.print(argv[i])
-            i = i + 1
-        end
-
-        return false
-
-        int i = 0
-        while i < argn
-            System.print(argv[i])
-            i = i + 1
-        end
-
-        return false
-    end
 end
 
 module System

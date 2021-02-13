@@ -11,7 +11,7 @@
     - address off operator
     - dereference operator
     - sizeof operator
-    - character literals
+    - character literal
     - string literal
     - struct definitions
     - struct extention
