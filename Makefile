@@ -10,5 +10,8 @@ git-commit:
 	git add .
 	git commit -m "$(msg)"
 
+git-push:
+	git push origin master
+
 clean:
 	rm BloodOrange
