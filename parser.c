@@ -27,7 +27,9 @@ static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType INDEX[] = {TOKEN_IDENTIFIER, TOKEN_LSQUARE};
+static const enum tokenType ARRAY_LITERAL[] = {TOKEN_LSQUARE};
 
+// Private functions
 static void rejectUselessNewLines(struct list*);
 static void copyNextTokenString(struct list*, char*);
 static struct astNode* createBlockAST(struct list*);
@@ -262,6 +264,8 @@ char* parser_astToString(enum astType type) {
         return "astType.INDEX";
     case AST_NUMLITERAL: 
         return "astType:NUMLITERAL";
+    case AST_ARRAYLITERAL: 
+        return "astType:ARRAYLITERAL";
     case AST_CALL:
         return "astType.CALL";
     case AST_VAR: 
@@ -357,24 +361,22 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         astNode = createAST(AST_NOP);
         int* intData;
         char* charData;
+        astNode->type = tokenToAST(token->type);
 
         switch(token->type) {
         case TOKEN_NUMLITERAL:
-            astNode->type = AST_NUMLITERAL;
             intData = (int*)malloc(sizeof(int));
             *intData = atoi(token->data);
             queue_push(astNode->children, intData);
             stack_push(argStack, astNode);
             break;
         case TOKEN_IDENTIFIER:
-            astNode->type = AST_VAR;
             charData = (char*)malloc(sizeof(char) * 255);
             strncpy(charData, token->data, 254);
             queue_push(astNode->children, charData);
             stack_push(argStack, astNode);
             break;
         case TOKEN_CALL:
-            astNode->type = AST_CALL;
             // Add args of call token (which are already ASTs) to new AST node's children
             for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
                 queue_push(astNode->children, (struct astNode*)elem->data);
@@ -382,8 +384,14 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             strncpy(astNode->varName, token->data, 254);
             stack_push(argStack, astNode);
             break;
+        case TOKEN_ARRAYLITERAL:
+            // Add args of call token (which are already ASTs) to new AST node's children
+            for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
+                queue_push(astNode->children, (struct astNode*)elem->data);
+            }
+            stack_push(argStack, astNode);
+            break;
         default: // Assume operator
-            astNode->type = tokenToAST(token->type);
             queue_push(astNode->children, stack_pop(argStack)); // Right
             queue_push(astNode->children, stack_pop(argStack)); // Left
             stack_push(argStack, astNode);
@@ -475,6 +483,23 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
 
             free(queue_pop(tokenQueue)); // Remove ]
             queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")"));
+        } else if(matchTokens(tokenQueue, ARRAY_LITERAL, 1)) {
+            struct token* array = lexer_createToken(TOKEN_ARRAYLITERAL, "");
+
+            free(queue_pop(tokenQueue)); // Remove [
+            
+            // Go through each argument, create AST representing it
+            while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RSQUARE) {
+                struct astNode* argAST = createExpressionAST(tokenQueue);
+                queue_push(array->list, argAST);
+
+                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
+                    free(queue_pop(tokenQueue));
+                }
+            }
+            queue_pop(tokenQueue); // Remove ]
+
+            queue_push(retval, array);
         } else {
             queue_push(retval, queue_pop(tokenQueue));
         }
@@ -494,7 +519,8 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
     while(!list_isEmpty(tokenQueue)) {
         token = ((struct token*) queue_pop(tokenQueue));
         // VALUE
-        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL || token->type == TOKEN_CALL) {
+        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL 
+            || token->type == TOKEN_CALL || token->type == TOKEN_ARRAYLITERAL) {
             queue_push(retval, token);
         } 
         // OPEN PARENTHESIS
@@ -565,6 +591,10 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_DOT;
     case TOKEN_INDEX:
         return AST_INDEX;
+    case TOKEN_NUMLITERAL:
+        return AST_NUMLITERAL;
+    case TOKEN_ARRAYLITERAL:
+        return AST_ARRAYLITERAL;
     default:
         printf("Cannot convert %s to AST\n", lexer_tokenToString(type));
         NOT_REACHED();

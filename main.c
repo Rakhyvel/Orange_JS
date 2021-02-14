@@ -5,7 +5,7 @@
 
     Todo:
     x indexing operator
-    - array literals
+    x array literals
     - array type modifier
     - pointer type modifier
     - address off operator

@@ -25,6 +25,7 @@ static const char oneCharTokens[21] = {'{', '}', '[', ']', '(', ')', ';', ',',
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
                                       '=', '"', '\'', '\n', '~'};
 
+// Private functions
 static bool charIsToken(char);
 static int nextToken(const char*, int);
 static int nextNonWhitespace(const char*, int);
@@ -229,6 +230,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:IDENTFIER";
     case TOKEN_NUMLITERAL:
         return "token:NUMLITERAL";
+    case TOKEN_ARRAYLITERAL:
+        return "token:ARRAYLITERAL";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 
