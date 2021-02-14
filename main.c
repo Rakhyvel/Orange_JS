@@ -1,7 +1,7 @@
 /*  main.c
 
-    1. Simple on face-value, complex possibilites
-    2. 
+    1. Simple components, complex combinations
+    2. Lower level control
 
     Todo:
     x indexing operator

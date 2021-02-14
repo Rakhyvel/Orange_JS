@@ -78,4 +78,6 @@ void parser_addFunctions(struct module*, struct list*);
 struct astNode* parser_createAST(struct list*);
 void parser_printAST(struct astNode*, int);
 
+char* parser_astToString(enum astType);
+
 #endif

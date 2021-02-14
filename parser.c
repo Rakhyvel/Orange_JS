@@ -28,17 +28,16 @@ static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType INDEX[] = {TOKEN_IDENTIFIER, TOKEN_LSQUARE};
 
-void rejectUselessNewLines(struct list*);
-void copyNextTokenString(struct list*, char*);
-struct astNode* createBlockAST(struct list*);
-int matchTokens(struct list*, const enum tokenType[], int);
-struct astNode* createAST(enum astType);
-struct astNode* createExpression(struct list*);
-struct list* extractExpression(struct list*);
-struct list* simplifyTokens(struct list*);
-struct list* infixToPostfix(struct list*);
-enum astType tokenToAST(enum tokenType);
-char* parser_astToString(enum astType);
+static void rejectUselessNewLines(struct list*);
+static void copyNextTokenString(struct list*, char*);
+static struct astNode* createBlockAST(struct list*);
+static int matchTokens(struct list*, const enum tokenType[], int);
+static struct astNode* createAST(enum astType);
+static struct astNode* createExpressionAST(struct list*);
+static struct list* nextExpression(struct list*);
+static struct list* simplifyTokens(struct list*);
+static struct list* infixToPostfix(struct list*);
+static enum astType tokenToAST(enum tokenType);
 
 /*
     Allocates and initializes the program struct */
@@ -184,36 +183,19 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
     }
     // EXPRESSION
     else {
-        retval = createExpression(tokenQueue);
+        retval = createExpressionAST(tokenQueue);
         free(queue_pop(tokenQueue)); // Remove \n
     }
     return retval;
 }
 
 /*
-    Takes in a queue of tokens, and rejects all newlines that are at the front.
-    
-    It is up to the caller to use this apropiately, and not damage the 
-    structure of the code, since formatting matters in this language. */
-void rejectUselessNewLines(struct list* tokenQueue) {
-    while(((struct token*) queue_peek(tokenQueue))->type == TOKEN_NEWLINE) {
-        free(queue_pop(tokenQueue)); // Remove \n
-    }
-}
-
-/*
-    Pops a token off from the front of a queue, copies the string data of that
-    token into a given string. Max size is 255 characters, including null term. */
-void copyNextTokenString(struct list* tokenQueue, char* dest) {
-    struct token* nextToken = (struct token*) queue_pop(tokenQueue);
-    strncpy(dest, nextToken->data, 254);
-    free(nextToken);
-}
-
-/*
     If VERBOSE is defined, prints out a given Abstract Syntax Tree */
 void parser_printAST(struct astNode* node, int n) {
-    #ifdef VERBOSE
+    #ifndef VERBOSE
+    return;
+    #endif
+
     for(int i = 0; i < n; i++) printf("  "); // print spaces
     LOG("%s", parser_astToString(node->type));
     if(node->varType[0] != '\0' || node->varName[0] != '\0') {
@@ -237,279 +219,8 @@ void parser_printAST(struct astNode* node, int n) {
             parser_printAST(((struct astNode*)elem->data), n+1);
         }
     }
-    #endif
 }
 
-/*
-    Takes in a token queue, parses out a block of statements which end with an 
-    end token */
-struct astNode* createBlockAST(struct list* tokenQueue) {
-    struct astNode* block = createAST(AST_BLOCK);
-    
-    // Go through statements in token queue until an end token is found
-    while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END) {
-        queue_push(block->children, parser_createAST(tokenQueue));
-        rejectUselessNewLines(tokenQueue);
-    }
-    free(queue_pop(tokenQueue)); // Remove "end"
-    return block;
-}
-
-/*
-    Determines if a given token signature matches what is at the front of a 
-    tokenQueue.
-    
-    Does NOT run off edge of tokenQueue, instead returns false. */
-int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
-    int i = 0;
-    struct listElem* elem;
-    for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue) && i < nTokens; elem = list_next(elem), i++) {
-        struct token* token = (struct token*) (elem->data);
-        if(token->type != sig[i]) {
-            return 0;
-        }
-    }
-    return i == nTokens;
-}
-
-/*
-    Allocates and initializes an Abstract Syntax Tree node, with the proper type */
-struct astNode* createAST(enum astType type) {
-    struct astNode* retval = (struct astNode*) malloc(sizeof(struct astNode));
-    retval->type = type;
-    retval->children = list_create();
-    return retval;
-}
-
-/*
-    Given a token queue, extracts the front expression, parses it into an
-    Abstract Syntax Tree. */
-struct astNode* createExpression(struct list* tokenQueue) {
-    ASSERT(tokenQueue != NULL);
-    struct astNode* astNode = NULL;
-    struct token* token = NULL;
-    struct list* expression = infixToPostfix(simplifyTokens(extractExpression(tokenQueue)));
-    struct list* argStack = list_create();
-    
-    while (!list_isEmpty(expression)) {
-        struct listElem* elem = NULL;
-        token = (struct token*)queue_pop(expression);
-        astNode = createAST(AST_NOP);
-        int* intData;
-        char* charData;
-
-        switch(token->type) {
-        case TOKEN_NUMLITERAL:
-            astNode->type = AST_NUMLITERAL;
-            intData = (int*)malloc(sizeof(int));
-            *intData = atoi(token->data);
-            queue_push(astNode->children, intData);
-            stack_push(argStack, astNode);
-            break;
-        case TOKEN_IDENTIFIER:
-            astNode->type = AST_VAR;
-            charData = (char*)malloc(sizeof(char) * 255);
-            strncpy(charData, token->data, 254);
-            queue_push(astNode->children, charData);
-            stack_push(argStack, astNode);
-            break;
-        case TOKEN_CALL:
-            astNode->type = AST_CALL;
-            // Add args of call token (which are already ASTs) to new AST node's children
-            for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
-                queue_push(astNode->children, (struct astNode*)elem->data);
-            }
-            strncpy(astNode->varName, token->data, 254);
-            stack_push(argStack, astNode);
-            break;
-        default: // Assume operator
-            astNode->type = tokenToAST(token->type);
-            queue_push(astNode->children, stack_pop(argStack)); // Right
-            queue_push(astNode->children, stack_pop(argStack)); // Left
-            stack_push(argStack, astNode);
-            break;
-        }
-        free(token);
-    }
-    return stack_peek(argStack);
-}
-
-/*
-    Takes a queue of tokens, pops off the first expression and returns as a new
-    queue. */
-struct list* extractExpression(struct list* tokenQueue) {
-    ASSERT(tokenQueue != NULL);
-
-    struct list* retval = list_create();
-    int depth = 0;
-    enum tokenType nextType;
-
-    // Go through tokens, pick out the first expression. Stop when state determines expression is over
-    while(!list_isEmpty(tokenQueue)) {
-        nextType = ((struct token*)queue_peek(tokenQueue))->type;
-        if(nextType == TOKEN_LPAREN || nextType == TOKEN_LSQUARE) {
-            depth++;
-        } else if(nextType == TOKEN_RPAREN || nextType == TOKEN_RSQUARE) {
-            depth--;
-        }
-        // COMMA EXIT
-        if(depth == 0 && nextType == TOKEN_COMMA) {
-            break;
-        }
-        // NEWLINE EXIT
-        if(nextType == TOKEN_NEWLINE) {
-            break;
-        }
-        // END OF FILE EXIT
-        if(nextType == TOKEN_EOF) {
-            break;
-        }
-        // DEPTH EXIT
-        if(depth < 0) {
-            break;
-        }
-        queue_push(retval, queue_pop(tokenQueue));
-    }
-    return retval;
-}
-
-/*
-    Takes in a queue representing an expression, and if it can, transforms 
-    function calls into proper call tokens */
-struct list* simplifyTokens(struct list* tokenQueue) {
-    struct list* retval = list_create();
-
-    // Go through each token in given expression token queue, add/reject/parse to retval
-    while(!list_isEmpty(tokenQueue)) {
-        if(matchTokens(tokenQueue, CALL, 2)) {
-            struct token* callName = ((struct token*)queue_pop(tokenQueue));
-            struct token* call = lexer_createToken(TOKEN_CALL, callName->data);
-            free(callName);
-
-            free(queue_pop(tokenQueue)); // Remove (
-            
-            // Go through each argument, create AST representing it
-            while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
-                struct astNode* argAST = createExpression(tokenQueue);
-                queue_push(call->list, argAST);
-
-                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
-                    free(queue_pop(tokenQueue));
-                }
-            }
-            queue_pop(tokenQueue); // Remove )
-
-            queue_push(retval, call);
-        } else if(matchTokens(tokenQueue, INDEX, 2)) {
-            queue_push(retval, queue_pop(tokenQueue)); // move identifier
-            queue_push(retval, lexer_createToken(TOKEN_INDEX, ""));
-            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "("));
-            free(queue_pop(tokenQueue)); // Remove [
-
-            // extract expression for index, add to retval list, between anonymous parens
-            struct list* innerExpression = extractExpression(tokenQueue);
-            struct listElem* elem;
-            for(elem = list_begin(innerExpression); elem != list_end(innerExpression); elem=list_next(elem)) {
-                queue_push(retval, elem->data);
-            }
-
-            free(queue_pop(tokenQueue)); // Remove ]
-            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")"));
-        } else {
-            queue_push(retval, queue_pop(tokenQueue));
-        }
-    }
-    return retval;
-}
-
-/*
-    Consumes a queue of tokens representing an expression in infix order, 
-    converts it to postfix order */
-struct list* infixToPostfix(struct list* tokenQueue) {
-    struct list* retval = list_create();
-    struct list* opStack = list_create();
-    struct token* token = NULL;
-
-    // Go through each token in expression token queue, rearrange to form postfix expression token queue
-    while(!list_isEmpty(tokenQueue)) {
-        token = ((struct token*) queue_pop(tokenQueue));
-        // VALUE
-        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL || token->type == TOKEN_CALL) {
-            queue_push(retval, token);
-        } 
-        // OPEN PARENTHESIS
-        else if (token->type == TOKEN_LPAREN) {
-            stack_push(opStack, token);
-        } 
-        // CLOSE PARENTHESIS
-        else if (token->type == TOKEN_RPAREN) {
-            // Pop all operations from opstack to retval until original ( paren is found
-            while(!list_isEmpty(opStack) && ((struct token*)stack_peek(opStack))->type != TOKEN_LPAREN) {
-                queue_push(retval, stack_pop(opStack));
-            }
-            stack_pop(opStack); // Remove (
-        } 
-        // OPERATOR
-        else {
-            // Pop all operations from opstack until an operation of lower precedence is found
-            while(!list_isEmpty(opStack) && 
-            lexer_getTokenPrecedence(token->type) <= lexer_getTokenPrecedence(((struct token*)stack_peek(opStack))->type)) {
-                queue_push(retval, stack_pop(opStack));
-            }
-            stack_push(opStack, token);
-        }
-    }
-
-    // Push all remaining operators to queue
-    while(!list_isEmpty(opStack)) {
-        queue_push(retval, stack_pop(opStack));
-    }
-
-    return retval;
-}
-
-/*
-    Used to convert between token types for operators, and ast types for 
-    operators 
-    
-    Called by createExpression to convert operator tokens into ASTs */
-enum astType tokenToAST(enum tokenType type) {
-    switch(type) {
-    case TOKEN_PLUS:
-        return AST_PLUS;
-    case TOKEN_MINUS: 
-        return AST_MINUS;
-    case TOKEN_MULTIPLY: 
-        return AST_MULTIPLY;
-    case TOKEN_DIVIDE: 
-        return AST_DIVIDE;
-    case TOKEN_ASSIGN:
-        return AST_ASSIGN;
-	case TOKEN_IS: 
-        return AST_IS;
-    case TOKEN_ISNT: 
-        return AST_ISNT;
-    case TOKEN_GREATER: 
-        return AST_GREATER;
-    case TOKEN_LESSER:
-        return AST_LESSER;
-	case TOKEN_AND: 
-        return AST_AND;
-    case TOKEN_OR:
-        return AST_OR;
-    case TOKEN_IDENTIFIER:
-        return AST_VAR;
-    case TOKEN_CALL:
-        return AST_CALL;
-    case TOKEN_DOT:
-        return AST_DOT;
-    case TOKEN_INDEX:
-        return AST_INDEX;
-    default:
-        printf("Cannot convert %s to AST\n", lexer_tokenToString(type));
-        NOT_REACHED();
-    }
-}
 
 /*
     Converts an AST type to a string */
@@ -567,4 +278,295 @@ char* parser_astToString(enum astType type) {
     printf("Unknown astType: %d\n", type);
     NOT_REACHED();
     return "";
+}
+
+/*
+    Takes in a queue of tokens, and rejects all newlines that are at the front.
+    
+    It is up to the caller to use this apropiately, and not damage the 
+    structure of the code, since formatting matters in this language. */
+static void rejectUselessNewLines(struct list* tokenQueue) {
+    while(((struct token*) queue_peek(tokenQueue))->type == TOKEN_NEWLINE) {
+        free(queue_pop(tokenQueue)); // Remove \n
+    }
+}
+
+/*
+    Pops a token off from the front of a queue, copies the string data of that
+    token into a given string. Max size is 255 characters, including null term. */
+static void copyNextTokenString(struct list* tokenQueue, char* dest) {
+    struct token* nextToken = (struct token*) queue_pop(tokenQueue);
+    strncpy(dest, nextToken->data, 254);
+    free(nextToken);
+}
+
+/*
+    Takes in a token queue, parses out a block of statements which end with an 
+    end token */
+static struct astNode* createBlockAST(struct list* tokenQueue) {
+    struct astNode* block = createAST(AST_BLOCK);
+    
+    // Go through statements in token queue until an end token is found
+    while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END) {
+        queue_push(block->children, parser_createAST(tokenQueue));
+        rejectUselessNewLines(tokenQueue);
+    }
+    free(queue_pop(tokenQueue)); // Remove "end"
+    return block;
+}
+
+/*
+    Determines if a given token signature matches what is at the front of a 
+    tokenQueue.
+    
+    Does NOT run off edge of tokenQueue, instead returns false. */
+static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
+    int i = 0;
+    struct listElem* elem;
+    for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue) && i < nTokens; elem = list_next(elem), i++) {
+        struct token* token = (struct token*) (elem->data);
+        if(token->type != sig[i]) {
+            return 0;
+        }
+    }
+    return i == nTokens;
+}
+
+/*
+    Allocates and initializes an Abstract Syntax Tree node, with the proper type */
+static struct astNode* createAST(enum astType type) {
+    struct astNode* retval = (struct astNode*) malloc(sizeof(struct astNode));
+    retval->type = type;
+    retval->children = list_create();
+    return retval;
+}
+
+/*
+    Given a token queue, extracts the front expression, parses it into an
+    Abstract Syntax Tree. */
+static struct astNode* createExpressionAST(struct list* tokenQueue) {
+    ASSERT(tokenQueue != NULL);
+    struct astNode* astNode = NULL;
+    struct token* token = NULL;
+    struct list* expression = infixToPostfix(simplifyTokens(nextExpression(tokenQueue)));
+    struct list* argStack = list_create();
+    
+    while (!list_isEmpty(expression)) {
+        struct listElem* elem = NULL;
+        token = (struct token*)queue_pop(expression);
+        astNode = createAST(AST_NOP);
+        int* intData;
+        char* charData;
+
+        switch(token->type) {
+        case TOKEN_NUMLITERAL:
+            astNode->type = AST_NUMLITERAL;
+            intData = (int*)malloc(sizeof(int));
+            *intData = atoi(token->data);
+            queue_push(astNode->children, intData);
+            stack_push(argStack, astNode);
+            break;
+        case TOKEN_IDENTIFIER:
+            astNode->type = AST_VAR;
+            charData = (char*)malloc(sizeof(char) * 255);
+            strncpy(charData, token->data, 254);
+            queue_push(astNode->children, charData);
+            stack_push(argStack, astNode);
+            break;
+        case TOKEN_CALL:
+            astNode->type = AST_CALL;
+            // Add args of call token (which are already ASTs) to new AST node's children
+            for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
+                queue_push(astNode->children, (struct astNode*)elem->data);
+            }
+            strncpy(astNode->varName, token->data, 254);
+            stack_push(argStack, astNode);
+            break;
+        default: // Assume operator
+            astNode->type = tokenToAST(token->type);
+            queue_push(astNode->children, stack_pop(argStack)); // Right
+            queue_push(astNode->children, stack_pop(argStack)); // Left
+            stack_push(argStack, astNode);
+            break;
+        }
+        free(token);
+    }
+    return stack_peek(argStack);
+}
+
+/*
+    Takes a queue of tokens, pops off the first expression and returns as a new
+    queue. */
+static struct list* nextExpression(struct list* tokenQueue) {
+    ASSERT(tokenQueue != NULL);
+
+    struct list* retval = list_create();
+    int depth = 0;
+    enum tokenType nextType;
+
+    // Go through tokens, pick out the first expression. Stop when state determines expression is over
+    while(!list_isEmpty(tokenQueue)) {
+        nextType = ((struct token*)queue_peek(tokenQueue))->type;
+        if(nextType == TOKEN_LPAREN || nextType == TOKEN_LSQUARE) {
+            depth++;
+        } else if(nextType == TOKEN_RPAREN || nextType == TOKEN_RSQUARE) {
+            depth--;
+        }
+        // COMMA EXIT
+        if(depth == 0 && nextType == TOKEN_COMMA) {
+            break;
+        }
+        // NEWLINE EXIT
+        if(nextType == TOKEN_NEWLINE) {
+            break;
+        }
+        // END OF FILE EXIT
+        if(nextType == TOKEN_EOF) {
+            break;
+        }
+        // DEPTH EXIT
+        if(depth < 0) {
+            break;
+        }
+        queue_push(retval, queue_pop(tokenQueue));
+    }
+    return retval;
+}
+
+/*
+    Takes in a queue representing an expression, and if it can, transforms 
+    function calls/index token structures into proper call/index tokens */
+static struct list* simplifyTokens(struct list* tokenQueue) {
+    struct list* retval = list_create();
+
+    // Go through each token in given expression token queue, add/reject/parse to retval
+    while(!list_isEmpty(tokenQueue)) {
+        if(matchTokens(tokenQueue, CALL, 2)) {
+            struct token* callName = ((struct token*)queue_pop(tokenQueue));
+            struct token* call = lexer_createToken(TOKEN_CALL, callName->data);
+            free(callName);
+
+            free(queue_pop(tokenQueue)); // Remove (
+            
+            // Go through each argument, create AST representing it
+            while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
+                struct astNode* argAST = createExpressionAST(tokenQueue);
+                queue_push(call->list, argAST);
+
+                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
+                    free(queue_pop(tokenQueue));
+                }
+            }
+            queue_pop(tokenQueue); // Remove )
+
+            queue_push(retval, call);
+        } else if(matchTokens(tokenQueue, INDEX, 2)) {
+            queue_push(retval, queue_pop(tokenQueue)); // move identifier
+            queue_push(retval, lexer_createToken(TOKEN_INDEX, ""));
+            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "("));
+            free(queue_pop(tokenQueue)); // Remove [
+
+            // extract expression for index, add to retval list, between anonymous parens
+            struct list* innerExpression = nextExpression(tokenQueue);
+            struct listElem* elem;
+            for(elem = list_begin(innerExpression); elem != list_end(innerExpression); elem=list_next(elem)) {
+                queue_push(retval, elem->data);
+            }
+
+            free(queue_pop(tokenQueue)); // Remove ]
+            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")"));
+        } else {
+            queue_push(retval, queue_pop(tokenQueue));
+        }
+    }
+    return retval;
+}
+
+/*
+    Consumes a queue of tokens representing an expression in infix order, 
+    converts it to postfix order */
+static struct list* infixToPostfix(struct list* tokenQueue) {
+    struct list* retval = list_create();
+    struct list* opStack = list_create();
+    struct token* token = NULL;
+
+    // Go through each token in expression token queue, rearrange to form postfix expression token queue
+    while(!list_isEmpty(tokenQueue)) {
+        token = ((struct token*) queue_pop(tokenQueue));
+        // VALUE
+        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL || token->type == TOKEN_CALL) {
+            queue_push(retval, token);
+        } 
+        // OPEN PARENTHESIS
+        else if (token->type == TOKEN_LPAREN) {
+            stack_push(opStack, token);
+        } 
+        // CLOSE PARENTHESIS
+        else if (token->type == TOKEN_RPAREN) {
+            // Pop all operations from opstack to retval until original ( paren is found
+            while(!list_isEmpty(opStack) && ((struct token*)stack_peek(opStack))->type != TOKEN_LPAREN) {
+                queue_push(retval, stack_pop(opStack));
+            }
+            stack_pop(opStack); // Remove (
+        } 
+        // OPERATOR
+        else {
+            // Pop all operations from opstack until an operation of lower precedence is found
+            while(!list_isEmpty(opStack) && 
+            lexer_getTokenPrecedence(token->type) <= lexer_getTokenPrecedence(((struct token*)stack_peek(opStack))->type)) {
+                queue_push(retval, stack_pop(opStack));
+            }
+            stack_push(opStack, token);
+        }
+    }
+
+    // Push all remaining operators to queue
+    while(!list_isEmpty(opStack)) {
+        queue_push(retval, stack_pop(opStack));
+    }
+
+    return retval;
+}
+
+/*
+    Used to convert between token types for operators, and ast types for 
+    operators 
+    
+    Called by createExpression to convert operator tokens into ASTs */
+static enum astType tokenToAST(enum tokenType type) {
+    switch(type) {
+    case TOKEN_PLUS:
+        return AST_PLUS;
+    case TOKEN_MINUS: 
+        return AST_MINUS;
+    case TOKEN_MULTIPLY: 
+        return AST_MULTIPLY;
+    case TOKEN_DIVIDE: 
+        return AST_DIVIDE;
+    case TOKEN_ASSIGN:
+        return AST_ASSIGN;
+	case TOKEN_IS: 
+        return AST_IS;
+    case TOKEN_ISNT: 
+        return AST_ISNT;
+    case TOKEN_GREATER: 
+        return AST_GREATER;
+    case TOKEN_LESSER:
+        return AST_LESSER;
+	case TOKEN_AND: 
+        return AST_AND;
+    case TOKEN_OR:
+        return AST_OR;
+    case TOKEN_IDENTIFIER:
+        return AST_VAR;
+    case TOKEN_CALL:
+        return AST_CALL;
+    case TOKEN_DOT:
+        return AST_DOT;
+    case TOKEN_INDEX:
+        return AST_INDEX;
+    default:
+        printf("Cannot convert %s to AST\n", lexer_tokenToString(type));
+        NOT_REACHED();
+    }
 }

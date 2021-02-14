@@ -25,11 +25,11 @@ static const char oneCharTokens[21] = {'{', '}', '[', ']', '(', ')', ';', ',',
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
                                       '=', '"', '\'', '\n', '~'};
 
-bool charIsToken(char);
-int nextToken(const char*, int);
-int nextNonWhitespace(const char*, int);
-void copyToken(const char* src, char* dst, int start, int end);
-int matchComment(struct list* list, struct listElem* elem);
+static bool charIsToken(char);
+static int nextToken(const char*, int);
+static int nextNonWhitespace(const char*, int);
+static void copyToken(const char* src, char* dst, int start, int end);
+static int matchComment(struct list* list, struct listElem* elem);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -305,7 +305,7 @@ void lexer_removeComments(struct list* tokenQueue) {
 }
 
 /* Determines if the given character is a token all on it's own */
-bool charIsToken(char c) {
+static bool charIsToken(char c) {
     for(int i = 0; i < sizeof(oneCharTokens); i++) {
         if(c == oneCharTokens[i]) return true;
     }
@@ -315,7 +315,7 @@ bool charIsToken(char c) {
 /*
     Advances the start of the character stream until a non-whitespace 
     character is found */
-int nextNonWhitespace(const char* file, int start) {
+static int nextNonWhitespace(const char* file, int start) {
     char nextChar = file[start];
     while (nextChar != '\0') {
         nextChar = file[start];
@@ -335,7 +335,7 @@ int nextNonWhitespace(const char* file, int start) {
     Numbers contain only digits
     
     Returns the index of the begining of the next token */
-int nextToken(const char* file, int start) {
+static int nextToken(const char* file, int start) {
     enum TokenState {
         BEGIN, TEXT, NUMBER
     };
@@ -375,7 +375,7 @@ int nextToken(const char* file, int start) {
 
 /*
     Copies a substring from src into destination */
-void copyToken(const char* src, char* dst, int start, int end) {
+static void copyToken(const char* src, char* dst, int start, int end) {
     int i;
     for(i = 0; i < end-start; i++) {
         dst[i] = src[i + start];
@@ -385,7 +385,7 @@ void copyToken(const char* src, char* dst, int start, int end) {
 
 /*
     Determines if the list element is the beginning of a comment delimiter */
-int matchComment(struct list* list, struct listElem* elem) {
+static int matchComment(struct list* list, struct listElem* elem) {
     if(elem != list_end(list) && list_next(elem) != list_end(list)) {
         if( ((struct token*)elem->data)->type == TOKEN_TILDE &&  
             ((struct token*)list_next(elem)->data)->type == TOKEN_TILDE) {
