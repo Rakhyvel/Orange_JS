@@ -8,7 +8,7 @@
     x array literals
     x else statements
     x return statements
-    - array initialize
+    x array initialize
     - character literal
     - string literal
     - struct definitions

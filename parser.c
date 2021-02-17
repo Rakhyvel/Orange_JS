@@ -27,10 +27,10 @@ static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType RETURN[] = {TOKEN_RETURN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType INDEX[] = {TOKEN_IDENTIFIER, TOKEN_LSQUARE};
-static const enum tokenType ARRAY_LITERAL[] = {TOKEN_LSQUARE};
+static const enum tokenType INDEX[] = {TOKEN_LSQUARE};
 
 // Private functions
+static void condenseArrayIdentifiers(struct list*);
 static void rejectUselessNewLines(struct list*);
 static void copyNextTokenString(struct list*, char*);
 static struct astNode* createBlockAST(struct list*);
@@ -74,6 +74,7 @@ struct function* parser_initFunction() {
     
     Functions, structs, and globals are also parsed. */
 void parser_addModules(struct program* program, struct list* tokenQueue) {
+    condenseArrayIdentifiers(tokenQueue);
     // Find all modules in a given token queue
     while(!list_isEmpty(tokenQueue)) {
         rejectUselessNewLines(tokenQueue);
@@ -139,7 +140,7 @@ void parser_addFunctions(struct module* module, struct list* tokenQueue) {
             map_put(module->functionsMap, function->name, function);
         } else {
     
-            printf("Token left after function: %s\n", ((struct token*)queue_peek(tokenQueue))->data);
+            printf("Encountered unknown token: %s\n", ((struct token*)queue_peek(tokenQueue))->data);
             ASSERT(0);
         }
         rejectUselessNewLines(tokenQueue);
@@ -304,6 +305,19 @@ char* parser_astToString(enum astType type) {
     return "";
 }
 
+static void condenseArrayIdentifiers(struct list* tokenQueue) {
+    struct listElem* elem;
+    for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue); elem = list_next(elem)) {
+        if(list_next(elem) != list_end(tokenQueue) &&
+        ((struct token*)elem->data)->type == TOKEN_IDENTIFIER &&
+        ((struct token*)(list_next(elem)->data))->type == TOKEN_ARRAY ) {
+            free(list_remove(tokenQueue, list_next(elem)));
+            strncat(((struct token*)elem->data)->data, " array", 255);
+            elem = elem->prev;
+        }
+    }
+}
+
 /*
     Takes in a queue of tokens, and rejects all newlines that are at the front.
     
@@ -405,13 +419,6 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             strncpy(astNode->varName, token->data, 254);
             stack_push(argStack, astNode);
             break;
-        case TOKEN_ARRAYLITERAL:
-            // Add args of call token (which are already ASTs) to new AST node's children
-            for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
-                queue_push(astNode->children, (struct astNode*)elem->data);
-            }
-            stack_push(argStack, astNode);
-            break;
         default: // Assume operator
             queue_push(astNode->children, stack_pop(argStack)); // Right
             queue_push(astNode->children, stack_pop(argStack)); // Left
@@ -467,6 +474,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
     function calls/index token structures into proper call/index tokens */
 static struct list* simplifyTokens(struct list* tokenQueue) {
     struct list* retval = list_create();
+    struct listElem* elem;
 
     // Go through each token in given expression token queue, add/reject/parse to retval
     while(!list_isEmpty(tokenQueue)) {
@@ -489,8 +497,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             queue_pop(tokenQueue); // Remove )
 
             queue_push(retval, call);
-        } else if(matchTokens(tokenQueue, INDEX, 2)) {
-            queue_push(retval, queue_pop(tokenQueue)); // move identifier
+        } else if(matchTokens(tokenQueue, INDEX, 1)) {
             queue_push(retval, lexer_createToken(TOKEN_INDEX, ""));
             queue_push(retval, lexer_createToken(TOKEN_LPAREN, "("));
             free(queue_pop(tokenQueue)); // Remove [
@@ -504,23 +511,6 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
 
             free(queue_pop(tokenQueue)); // Remove ]
             queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")"));
-        } else if(matchTokens(tokenQueue, ARRAY_LITERAL, 1)) {
-            struct token* array = lexer_createToken(TOKEN_ARRAYLITERAL, "");
-
-            free(queue_pop(tokenQueue)); // Remove [
-            
-            // Go through each argument, create AST representing it
-            while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RSQUARE) {
-                struct astNode* argAST = createExpressionAST(tokenQueue);
-                queue_push(array->list, argAST);
-
-                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
-                    free(queue_pop(tokenQueue));
-                }
-            }
-            queue_pop(tokenQueue); // Remove ]
-
-            queue_push(retval, array);
         } else {
             queue_push(retval, queue_pop(tokenQueue));
         }
