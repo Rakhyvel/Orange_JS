@@ -9,7 +9,7 @@
     x else statements
     x return statements
     x array initialize
-    - character literal
+    x character literal
     - string literal
     - struct definitions
     - struct extension
@@ -21,8 +21,10 @@
     - private modifier for higher levels
     - constants
     - imports
+    - syntax validation
 
     - type validation
+    - identifier validation
 
     Author: Joseph Shimel
     Date: 2/2/21

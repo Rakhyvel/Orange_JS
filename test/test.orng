@@ -1,3 +1,17 @@
-boolean main()
-	print("Hello, world!")
+module test
+	a b()
+	end
+
+	char gimmeANumber(int i)
+		if i is 0
+			return 'a'
+		else if i is 1
+			return 'b'
+		else if i is 2
+			return 'c'
+		else
+			return 'd'
+		end
+	end
+
 end

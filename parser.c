@@ -132,7 +132,6 @@ void parser_addFunctions(struct module* module, struct list* tokenQueue) {
                 LOG("New arg %s %s", argType, argName);
             }
             free(queue_pop(tokenQueue)); // Remove )
-
             function->code = createBlockAST(tokenQueue);
             free(queue_pop(tokenQueue)); // Remove "end"
             LOG("Function %s %s's AST", function->returnType, function->name);
@@ -181,9 +180,12 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         queue_push(retval->children, body);
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
             free(queue_pop(tokenQueue)); // Remove "else"
+            int removeEnd = ((struct token*)queue_peek(tokenQueue))->type != TOKEN_IF;
             queue_push(retval->children, parser_createAST(tokenQueue));
+            if(removeEnd) {
+                free(queue_pop(tokenQueue)); // Remove "end"
+            }
         }
-        free(queue_pop(tokenQueue)); // Remove "end"
     }
     // WHILE
     else if (matchTokens(tokenQueue, WHILE, 1)) {
@@ -231,6 +233,9 @@ void parser_printAST(struct astNode* node, int n) {
             for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
             int* data = (int*)(elem->data);
             LOG("%d", *data);
+        } else if(node->type == AST_CHARLITERAL) {
+            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
+            LOG("%s", (char*)(elem->data));
         } else if(node->type == AST_VAR) {
             for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
             LOG("%s", (char*)elem->data);
@@ -343,7 +348,7 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     end token */
 static struct astNode* createBlockAST(struct list* tokenQueue) {
     struct astNode* block = createAST(AST_BLOCK);
-    
+    rejectUselessNewLines(tokenQueue);
     // Go through statements in token queue until an end token is found
     while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END &&
             ((struct token*)queue_peek(tokenQueue))->type != TOKEN_ELSE) {
@@ -403,6 +408,12 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             intData = (int*)malloc(sizeof(int));
             *intData = atoi(token->data);
             queue_push(astNode->children, intData);
+            stack_push(argStack, astNode);
+            break;
+        case TOKEN_CHARLITERAL:
+            charData = (char*)malloc(sizeof(char) * 255);
+            strncpy(charData, token->data, 254);
+            queue_push(astNode->children, charData);
             stack_push(argStack, astNode);
             break;
         case TOKEN_IDENTIFIER:
@@ -531,7 +542,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
         token = ((struct token*) queue_pop(tokenQueue));
         // VALUE
         if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL 
-            || token->type == TOKEN_CALL || token->type == TOKEN_ARRAYLITERAL) {
+            || token->type == TOKEN_CALL) {
             queue_push(retval, token);
         } 
         // OPEN PARENTHESIS
@@ -604,8 +615,8 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_INDEX;
     case TOKEN_NUMLITERAL:
         return AST_NUMLITERAL;
-    case TOKEN_ARRAYLITERAL:
-        return AST_ARRAYLITERAL;
+    case TOKEN_CHARLITERAL:
+        return AST_CHARLITERAL;
     default:
         printf("Cannot convert %s to AST\n", lexer_tokenToString(type));
         NOT_REACHED();

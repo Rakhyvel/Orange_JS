@@ -21,9 +21,9 @@
 #include "./debug.h"
 
 /* These characters are whole tokens themselves */
-static const char oneCharTokens[21] = {'{', '}', '[', ']', '(', ')', ';', ',', 
+static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
-                                      '=', '"', '\'', '\n', '~'};
+                                      '=', '\n', '~'};
 
 // Private functions
 static bool charIsToken(char);
@@ -96,10 +96,6 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_COMMA;
         } else if(strcmp(".", tokenBuffer) == 0) {
             tempType = TOKEN_DOT;
-        } else if(strcmp("\"", tokenBuffer) == 0) {
-            tempType = TOKEN_DQUOTE;
-        } else if(strcmp("'", tokenBuffer) == 0) {
-            tempType = TOKEN_SQUOTE;
         } else if(strcmp("+", tokenBuffer) == 0) {
             tempType = TOKEN_PLUS;
         } else if(strcmp("-", tokenBuffer) == 0) {
@@ -138,6 +134,8 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_WHILE;
         } else if(isdigit(tokenBuffer[0])) {
             tempType = TOKEN_NUMLITERAL;
+        } else if(tokenBuffer[0] == '\''){
+            tempType = TOKEN_CHARLITERAL;
         } else {
             tempType = TOKEN_IDENTIFIER;
         }
@@ -218,10 +216,6 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:COMMA";
     case TOKEN_DOT:
         return "token:DOT";
-    case TOKEN_DQUOTE:
-        return "token:DQUOTE";
-    case TOKEN_SQUOTE:
-        return "token:SQUOTE";
     case TOKEN_NEWLINE:
         return "token:NEWLINE";
     case TOKEN_EOF:
@@ -230,8 +224,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:IDENTFIER";
     case TOKEN_NUMLITERAL:
         return "token:NUMLITERAL";
-    case TOKEN_ARRAYLITERAL:
-        return "token:ARRAYLITERAL";
+    case TOKEN_CHARLITERAL:
+        return "token:CHARLITERAL";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 
@@ -340,7 +334,7 @@ static int nextNonWhitespace(const char* file, int start) {
     Returns the index of the begining of the next token */
 static int nextToken(const char* file, int start) {
     enum TokenState {
-        BEGIN, TEXT, NUMBER
+        BEGIN, TEXT, NUMBER, CHAR
     };
 
     enum TokenState state = BEGIN;
@@ -361,6 +355,10 @@ static int nextToken(const char* file, int start) {
             else if(isdigit(nextChar)) {
                 state = NUMBER;
             }
+            // Check char
+            else if(nextChar == '\'') {
+                state = CHAR;
+            }
         } else if(state == TEXT) {
             // Ends on non-alphanumeric character
             if(!isalpha(nextChar) && !isdigit(nextChar)) {
@@ -370,6 +368,10 @@ static int nextToken(const char* file, int start) {
             // Ends on non-numeric character
             if(!isdigit(nextChar)) {
                 return start;
+            }
+        } else if (state == CHAR) {
+            if(nextChar == '\''){
+                return start + 1;
             }
         }
     }
