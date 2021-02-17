@@ -25,6 +25,7 @@ static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TO
 static const enum tokenType VAR[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
+static const enum tokenType RETURN[] = {TOKEN_RETURN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType INDEX[] = {TOKEN_IDENTIFIER, TOKEN_LSQUARE};
 static const enum tokenType ARRAY_LITERAL[] = {TOKEN_LSQUARE};
@@ -159,8 +160,7 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         copyNextTokenString(tokenQueue, retval->varType);
         copyNextTokenString(tokenQueue, retval->varName);
         // Add type modifiers to var modifiers list
-        while(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ARRAY
-           || ((struct token*)queue_peek(tokenQueue))->type == TOKEN_POINTER) {
+        while(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ARRAY) {
             queue_push(retval->modifiers, queue_pop(tokenQueue));
         }
 
@@ -193,6 +193,13 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         free(queue_pop(tokenQueue)); // Remove "end"
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
+    }
+    // RETURN
+    else if (matchTokens(tokenQueue, RETURN, 1)) {
+        retval = createAST(AST_RETURN);
+        free(queue_pop(tokenQueue)); // Remove 'return'
+        struct astNode* expression = parser_createAST(tokenQueue);
+        queue_push(retval->children, expression);
     }
     // EXPRESSION
     else {
@@ -249,6 +256,8 @@ char* parser_astToString(enum astType type) {
         return "astType.IF";
     case AST_WHILE: 
         return "astType.WHILE";
+    case AST_RETURN: 
+        return "astType.RETURN";
     case AST_PLUS: 
         return "astType:PLUS";
     case AST_MINUS: 

@@ -13,7 +13,7 @@
     AST nodes have types that tell them apart */
 enum astType {
     // StatementNode types
-	AST_BLOCK, AST_VARDECLARE, AST_VARDEFINE, AST_IF, AST_WHILE,
+	AST_BLOCK, AST_VARDECLARE, AST_VARDEFINE, AST_IF, AST_WHILE, AST_RETURN,
 	// Values
     AST_NUMLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, AST_CHARLITERAL, AST_ARRAYLITERAL,
     // Math operators

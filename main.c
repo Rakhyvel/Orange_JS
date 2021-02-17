@@ -6,7 +6,8 @@
     Todo:
     x indexing operator
     x array literals
-    - return statements
+    x else statements
+    x return statements
     - array initialize
     - character literal
     - string literal

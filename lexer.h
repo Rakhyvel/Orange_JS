@@ -24,11 +24,11 @@ enum tokenType {
 	// Boolean operators
 	TOKEN_AND, TOKEN_OR,
 	// Programatic structures
-	TOKEN_MODULE, TOKEN_FUNCTION, TOKEN_VAR, TOKEN_END,
+	TOKEN_MODULE, TOKEN_END,
 	// Modifiers
-	TOKEN_ARRAY, TOKEN_POINTER,
+	TOKEN_ARRAY,
 	// Control flow structures
-	TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE,
+	TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE, TOKEN_RETURN,
 	// Anonymous tokens
 	TOKEN_EOF, TOKEN_CALL, TOKEN_INDEX
 };

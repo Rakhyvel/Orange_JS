@@ -2,11 +2,9 @@ module Vector
 	Vector normalize(Vector v)
 		float magnitude = magnitude(v)
 		if magnitude is 0
-			int i = 4
-		else if magnitude < 4
-			int i = 5
+			return Vector(0, 0)
 		else
-			int i = 6
+			return Vector(v.x / magnitude, v.y / magnitude)
 		end
 	end
 end

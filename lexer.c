@@ -124,16 +124,12 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_OR;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
-        } else if(strcmp("function", tokenBuffer) == 0) {
-            tempType = TOKEN_FUNCTION;
-        } else if(strcmp("var", tokenBuffer) == 0) {
-            tempType = TOKEN_VAR;
+        } else if(strcmp("return", tokenBuffer) == 0) {
+            tempType = TOKEN_RETURN;
         } else if(strcmp("end", tokenBuffer) == 0) {
             tempType = TOKEN_END;
         } else if(strcmp("array", tokenBuffer) == 0) {
             tempType = TOKEN_ARRAY;
-        } else if(strcmp("pointer", tokenBuffer) == 0) {
-            tempType = TOKEN_POINTER;
         } else if(strcmp("if", tokenBuffer) == 0) {
             tempType = TOKEN_IF;
         } else if(strcmp("else", tokenBuffer) == 0) {
@@ -260,22 +256,18 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:OR";
     case TOKEN_MODULE:
         return "token:MODULE";
-    case TOKEN_FUNCTION:
-        return "token:FUNCTION";
-    case TOKEN_VAR:
-        return "token:VAR";
     case TOKEN_END:
         return "token:END";
     case TOKEN_ARRAY:
         return "token:ARRAY";
-    case TOKEN_POINTER:
-        return "token:POINTER";
     case TOKEN_IF:
         return "token:IF";
     case TOKEN_ELSE:
         return "token:ELSE";
     case TOKEN_WHILE:
         return "token:WHILE";
+    case TOKEN_RETURN:
+        return "token:RETURN";
     case TOKEN_CALL:
         return "token:CALL";
     case TOKEN_TILDE:
