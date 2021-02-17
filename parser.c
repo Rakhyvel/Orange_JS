@@ -19,10 +19,10 @@
 
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
-static const enum tokenType FUNCTION[] = {TOKEN_FUNCTION, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 
 // Lower level token signatures
-static const enum tokenType VAR[] = {TOKEN_VAR, TOKEN_IDENTIFIER};
+static const enum tokenType VAR[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
@@ -87,7 +87,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             map_put(program->modulesMap, module->name, module);
             parser_addFunctions(module, tokenQueue);
 
-            free(queue_pop(tokenQueue)); // Remove "end" because modules are not true statement blocks
+            free(queue_pop(tokenQueue)); // Remove "end"
         } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
             free(queue_pop(tokenQueue));
         } else {
@@ -102,13 +102,13 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
     module, including any internal AST's. */
 void parser_addFunctions(struct module* module, struct list* tokenQueue) {
     // Find all functions until a function's end is reached
+    rejectUselessNewLines(tokenQueue);
     while(!list_isEmpty(tokenQueue) && 
     ((struct token*) queue_peek(tokenQueue))->type != TOKEN_END) {
         rejectUselessNewLines(tokenQueue);
 
-        if(matchTokens(tokenQueue, FUNCTION, 4)) {
+        if(matchTokens(tokenQueue, FUNCTION, 3)) {
             struct function* function = parser_initFunction();
-            free(queue_pop(tokenQueue)); // Remove "function"
             copyNextTokenString(tokenQueue, function->returnType);
             copyNextTokenString(tokenQueue, function->name);
             LOG("New function: %s %s", function->returnType, function->name);
@@ -132,6 +132,7 @@ void parser_addFunctions(struct module* module, struct list* tokenQueue) {
             free(queue_pop(tokenQueue)); // Remove )
 
             function->code = createBlockAST(tokenQueue);
+            free(queue_pop(tokenQueue)); // Remove "end"
             LOG("Function %s %s's AST", function->returnType, function->name);
             parser_printAST(function->code, 0);
             map_put(module->functionsMap, function->name, function);
@@ -157,7 +158,11 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         retval = createAST(AST_VARDECLARE);
         copyNextTokenString(tokenQueue, retval->varType);
         copyNextTokenString(tokenQueue, retval->varName);
-        // TODO: pointer and array modifiers
+        // Add type modifiers to var modifiers list
+        while(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ARRAY
+           || ((struct token*)queue_peek(tokenQueue))->type == TOKEN_POINTER) {
+            queue_push(retval->modifiers, queue_pop(tokenQueue));
+        }
 
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ASSIGN) {
             retval->type = AST_VARDEFINE;
@@ -173,6 +178,11 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         struct astNode* body = createBlockAST(tokenQueue);
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
+        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
+            free(queue_pop(tokenQueue)); // Remove "else"
+            queue_push(retval->children, parser_createAST(tokenQueue));
+        }
+        free(queue_pop(tokenQueue)); // Remove "end"
     }
     // WHILE
     else if (matchTokens(tokenQueue, WHILE, 1)) {
@@ -180,6 +190,7 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         free(queue_pop(tokenQueue)); // Remove 'while'
         struct astNode* expression = parser_createAST(tokenQueue);
         struct astNode* body = createBlockAST(tokenQueue);
+        free(queue_pop(tokenQueue)); // Remove "end"
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
     }
@@ -311,11 +322,11 @@ static struct astNode* createBlockAST(struct list* tokenQueue) {
     struct astNode* block = createAST(AST_BLOCK);
     
     // Go through statements in token queue until an end token is found
-    while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END) {
+    while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END &&
+            ((struct token*)queue_peek(tokenQueue))->type != TOKEN_ELSE) {
         queue_push(block->children, parser_createAST(tokenQueue));
         rejectUselessNewLines(tokenQueue);
     }
-    free(queue_pop(tokenQueue)); // Remove "end"
     return block;
 }
 
@@ -342,6 +353,7 @@ static struct astNode* createAST(enum astType type) {
     struct astNode* retval = (struct astNode*) malloc(sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
+    retval->modifiers = list_create();
     return retval;
 }
 

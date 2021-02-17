@@ -25,6 +25,8 @@ enum tokenType {
 	TOKEN_AND, TOKEN_OR,
 	// Programatic structures
 	TOKEN_MODULE, TOKEN_FUNCTION, TOKEN_VAR, TOKEN_END,
+	// Modifiers
+	TOKEN_ARRAY, TOKEN_POINTER,
 	// Control flow structures
 	TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE,
 	// Anonymous tokens

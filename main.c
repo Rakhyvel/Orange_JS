@@ -6,15 +6,12 @@
     Todo:
     x indexing operator
     x array literals
-    - array type modifier
-    - pointer type modifier
-    - address off operator
-    - dereference operator
-    - sizeof operator
+    - return statements
+    - array initialize
     - character literal
     - string literal
     - struct definitions
-    - struct extention
+    - struct extension
     - interface definitions
     - struct implements
     - struct interface function

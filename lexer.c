@@ -130,6 +130,10 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_VAR;
         } else if(strcmp("end", tokenBuffer) == 0) {
             tempType = TOKEN_END;
+        } else if(strcmp("array", tokenBuffer) == 0) {
+            tempType = TOKEN_ARRAY;
+        } else if(strcmp("pointer", tokenBuffer) == 0) {
+            tempType = TOKEN_POINTER;
         } else if(strcmp("if", tokenBuffer) == 0) {
             tempType = TOKEN_IF;
         } else if(strcmp("else", tokenBuffer) == 0) {
@@ -262,6 +266,10 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:VAR";
     case TOKEN_END:
         return "token:END";
+    case TOKEN_ARRAY:
+        return "token:ARRAY";
+    case TOKEN_POINTER:
+        return "token:POINTER";
     case TOKEN_IF:
         return "token:IF";
     case TOKEN_ELSE:

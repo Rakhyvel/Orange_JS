@@ -33,7 +33,9 @@ enum astType {
     in a far more effective way than text or tokens. */
 struct astNode {
     enum astType type;
-    struct list* children; // of other AST's usually
+    struct list* children; // of other AST's
+
+    struct list* modifiers; // of tokens that modify variable/function/module
     char varType[255];
     char varName[255];
 };
