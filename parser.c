@@ -126,6 +126,8 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
     // Find all modules in a given token queue
     while(!list_isEmpty(tokenQueue)) {
         rejectUselessNewLines(tokenQueue);
+        int isStatic = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_STATIC;
+        if(isStatic) free(queue_pop(tokenQueue));
 
         if(matchTokens(tokenQueue, MODULE, 3)) {
             struct module* module = parser_initModule(program);
@@ -135,6 +137,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             free(queue_pop(tokenQueue)); // Remove "\n"
 
             map_put(program->modulesMap, module->name, module);
+            module->isStatic = isStatic;
             parser_addElements(module, tokenQueue);
 
             free(queue_pop(tokenQueue)); // Remove "end"

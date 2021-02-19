@@ -55,6 +55,7 @@ struct module {
     struct map* functionsMap;
     struct map* dataStructsMap;
     struct map* globalsMap; // name -> var AST
+    int isStatic;
 
     struct program* program;
 };

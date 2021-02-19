@@ -14,8 +14,8 @@
     x real vs integer literal
     x struct definitions
     x struct extension
-    - global variable declarations/definitions
-    - static modifier for modules
+    x global variable declarations/definitions
+    x static modifier for modules
     - constants
     - private modifier for higher levels
     - imports

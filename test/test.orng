@@ -1,4 +1,4 @@
-module LinkedList
+static module LinkedList
 	int j = 5
 	int k = 4
 end
