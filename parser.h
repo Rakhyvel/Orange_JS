@@ -38,6 +38,8 @@ struct astNode {
     struct list* modifiers; // of tokens that modify variable/function/module
     char varType[255];
     char varName[255];
+    int isConstant;
+    int isPrivate;
 };
 
 /*
@@ -68,6 +70,7 @@ struct function {
     struct list* argTypes;
     struct list* argNames;
     struct astNode* code;
+    int isPrivate;
 
     struct module* module;
     struct program* program;
@@ -78,6 +81,7 @@ struct dataStruct {
     char baseStruct[255];
     struct list* argTypes;
     struct list* argNames;
+    int isPrivate;
 
     struct module* module;
     struct program* program;

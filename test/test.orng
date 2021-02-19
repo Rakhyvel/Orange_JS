@@ -1,4 +1,4 @@
 static module LinkedList
-	int j = 5
-	int k = 4
+	private const int j = 5
+	const int k = 4
 end

@@ -26,6 +26,7 @@
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_ASSIGN};
 
 // Lower level token signatures
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
@@ -54,7 +55,7 @@ static enum astType tokenToAST(enum tokenType);
 /*
     Allocates and initializes the program struct */
 struct program* parser_initProgram() {
-    struct program* retval = (struct program*) malloc(sizeof(struct program));
+    struct program* retval = (struct program*) calloc(1, sizeof(struct program));
     retval->modulesMap = map_init();
     return retval;
 }
@@ -62,7 +63,7 @@ struct program* parser_initProgram() {
 /*
     Allocates and initializes a module struct */
 struct module* parser_initModule(struct program* program) {
-    struct module* retval = (struct module*) malloc(sizeof(struct module));
+    struct module* retval = (struct module*) calloc(1, sizeof(struct module));
     retval->functionsMap = map_init();
     retval->dataStructsMap = map_init();
     retval->globalsMap = map_init();
@@ -73,7 +74,7 @@ struct module* parser_initModule(struct program* program) {
 /*
     Allocates and initializes a function struct */
 struct function* parser_initFunction() {
-    struct function* retval = (struct function*) malloc(sizeof(struct function));
+    struct function* retval = (struct function*) calloc(1, sizeof(struct function));
     retval->argTypes = list_create();
     retval->argNames = list_create();
     return retval;
@@ -82,7 +83,7 @@ struct function* parser_initFunction() {
 /*
     Allocates and initializes a data struct */
 struct dataStruct* parser_initDataStruct() {
-    struct dataStruct* retval = (struct dataStruct*) malloc(sizeof(struct dataStruct));
+    struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
     retval->argTypes = list_create();
     retval->argNames = list_create();
     return retval;
@@ -160,6 +161,8 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
     while(!list_isEmpty(tokenQueue) && 
     ((struct token*) queue_peek(tokenQueue))->type != TOKEN_END) {
         rejectUselessNewLines(tokenQueue);
+        int isPrivate = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_PRIVATE;
+        if(isPrivate) free(queue_pop(tokenQueue));
 
         // STRUCT
         if(matchTokens(tokenQueue, STRUCT, 2)) {
@@ -176,6 +179,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             map_put(module->dataStructsMap, dataStruct->name, dataStruct);
             dataStruct->module = module;
             dataStruct->program = module->program;
+            dataStruct->isPrivate = isPrivate;
         }
         // FUNCTION
         else if(matchTokens(tokenQueue, FUNCTION, 3)) {
@@ -193,11 +197,21 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             map_put(module->functionsMap, function->name, function);
             function->module = module;
             function->program = module->program;
+            function->isPrivate = isPrivate;
         } 
+        // CONST
+        else if (matchTokens(tokenQueue, CONST, 4)) {
+            free(queue_pop(tokenQueue));
+            struct astNode* var = parser_createAST(tokenQueue);
+            var->isConstant = 1;
+            map_put(module->globalsMap, var->varName, var);
+            var->isPrivate = isPrivate;
+        }
         // GLOBAL
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
             struct astNode* var = parser_createAST(tokenQueue);
             map_put(module->globalsMap, var->varName, var);
+            var->isPrivate = isPrivate;
         }
         // ERROR
         else {
@@ -487,7 +501,7 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
 /*
     Allocates and initializes an Abstract Syntax Tree node, with the proper type */
 static struct astNode* createAST(enum astType type) {
-    struct astNode* retval = (struct astNode*) malloc(sizeof(struct astNode));
+    struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
     retval->modifiers = list_create();

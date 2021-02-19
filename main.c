@@ -16,7 +16,7 @@
     x struct extension
     x global variable declarations/definitions
     x static modifier for modules
-    - constants
+    x constants
     - private modifier for higher levels
     - imports
     - module access ":"
@@ -25,6 +25,8 @@
     - type validation
     - identifier validation
     - access validation
+    - constant modify validation
+    - constant define & no declare validation
 
     Author: Joseph Shimel
     Date: 2/2/21

@@ -26,7 +26,7 @@ enum tokenType {
 	// Programatic structures
 	TOKEN_MODULE, TOKEN_STRUCT, TOKEN_INTERFACE, TOKEN_END,
 	// Modifiers
-	TOKEN_ARRAY, TOKEN_STATIC,
+	TOKEN_ARRAY, TOKEN_STATIC, TOKEN_CONST, TOKEN_PRIVATE,
 	// Control flow structures
 	TOKEN_IF, TOKEN_ELSE, TOKEN_WHILE, TOKEN_RETURN,
 	// Anonymous tokens
