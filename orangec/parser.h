@@ -7,7 +7,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "./util/list.h"
+#include "../util/list.h"
 
 /*
     AST nodes have types that tell them apart */
@@ -17,7 +17,7 @@ enum astType {
 	// Values
     AST_INTLITERAL, AST_REALLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, AST_CHARLITERAL, AST_ARRAYLITERAL,
     // Math operators
-	AST_PLUS, AST_MINUS, AST_MULTIPLY, AST_DIVIDE, AST_ASSIGN,
+	AST_ADD, AST_SUBTRACT, AST_MULTIPLY, AST_DIVIDE, AST_ASSIGN,
     // Branch operators
     AST_IS, AST_ISNT, AST_GREATER, AST_LESSER,
     // Boolean operators
@@ -54,9 +54,9 @@ struct program {
     be used to maintain state and keep a project manageable. */
 struct module {
     char name[255];
-    struct map* functionsMap;
-    struct map* dataStructsMap;
-    struct map* globalsMap; // name -> var AST
+    struct map* functionsMap; // name -> struct function
+    struct map* dataStructsMap; // name -> struct dataStruct
+    struct map* globalsMap; // name -> struct astNode (AST_VAR)
     int isStatic;
 
     struct program* program;

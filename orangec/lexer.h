@@ -7,7 +7,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "./util/list.h"
+#include "../util/list.h"
 
 /*
 	Tokens have types that distinguish them from other tokens easily */
@@ -18,7 +18,7 @@ enum tokenType {
 	// Literals
 	TOKEN_IDENTIFIER, TOKEN_INTLITERAL, TOKEN_REALLITERAL, TOKEN_CHARLITERAL, TOKEN_STRINGLITERAL,
 	// Math operators
-	TOKEN_PLUS, TOKEN_MINUS, TOKEN_MULTIPLY, TOKEN_DIVIDE, TOKEN_ASSIGN,
+	TOKEN_PLUS, TOKEN_MINUS, TOKEN_STAR, TOKEN_SLASH, TOKEN_EQUALS,
 	// Branch operators
 	TOKEN_IS, TOKEN_ISNT, TOKEN_GREATER, TOKEN_LESSER,
 	// Boolean operators

@@ -20,8 +20,8 @@
 #include <string.h>
 
 #include "lexer.h"
-#include "./util/list.h"
-#include "./debug.h"
+#include "../util/list.h"
+#include "../util/debug.h"
 
 /* These characters are whole tokens themselves */
 static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
@@ -102,11 +102,11 @@ struct list* lexer_tokenize(const char *file) {
         } else if(strcmp("-", tokenBuffer) == 0) {
             tempType = TOKEN_MINUS;
         } else if(strcmp("/", tokenBuffer) == 0) {
-            tempType = TOKEN_DIVIDE;
+            tempType = TOKEN_SLASH;
         } else if(strcmp("*", tokenBuffer) == 0) {
-            tempType = TOKEN_MULTIPLY;
+            tempType = TOKEN_STAR;
         } else if(strcmp("=", tokenBuffer) == 0) {
-            tempType = TOKEN_ASSIGN;
+            tempType = TOKEN_EQUALS;
         } else if(strcmp("is", tokenBuffer) == 0) {
             tempType = TOKEN_IS;
         } else if(strcmp("isnt", tokenBuffer) == 0) {
@@ -186,7 +186,7 @@ struct token* lexer_createToken(enum tokenType type, char data[]) {
 /* Returns the precedence a token operator has */
 int lexer_getTokenPrecedence(enum tokenType type) {
     switch(type) {
-		case TOKEN_ASSIGN:
+		case TOKEN_EQUALS:
 			return 1;
 		case TOKEN_OR:
 			return 2;
@@ -201,8 +201,8 @@ int lexer_getTokenPrecedence(enum tokenType type) {
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
 			return 6;
-		case TOKEN_MULTIPLY:
-		case TOKEN_DIVIDE:
+		case TOKEN_STAR:
+		case TOKEN_SLASH:
 			return 7;
         case TOKEN_DOT:
         case TOKEN_COLON:
@@ -247,12 +247,12 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:PLUS";
     case TOKEN_MINUS: 
         return "token:MINUS";
-    case TOKEN_MULTIPLY: 
-        return "token:MULTIPLY";
-    case TOKEN_DIVIDE: 
-        return "token:DIVIDE";
-    case TOKEN_ASSIGN:
-        return "token:ASSIGN";
+    case TOKEN_STAR: 
+        return "token:STAR";
+    case TOKEN_SLASH: 
+        return "token:SLASH";
+    case TOKEN_EQUALS:
+        return "token:EQUALS";
 	case TOKEN_IS: 
         return "token:IS";
     case TOKEN_ISNT: 

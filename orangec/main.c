@@ -19,7 +19,7 @@
     x constants
     x private modifier for higher levels
     x module access ":"
-    - syntax validation
+    x syntax validation
 
     - type validation
     - identifier validation
@@ -36,10 +36,10 @@
 #include <stdlib.h>
 
 #include "./main.h"
-#include "./util/list.h"
 #include "./lexer.h"
 #include "./parser.h"
-#include "./debug.h"
+#include "../util/debug.h"
+#include "../util/list.h"
 
 /*
  * Takes in an array of files to compile

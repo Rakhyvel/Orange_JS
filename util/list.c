@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 #include "list.h"
-#include "../debug.h"
+#include "./debug.h"
 
 /*  Creates a new list, with no new nodes. */
 struct list* list_create() {

@@ -16,21 +16,21 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "./debug.h"
 #include "./parser.h"
 #include "./lexer.h"
-#include "./util/list.h"
-#include "./util/map.h"
+#include "../util/list.h"
+#include "../util/map.h"
+#include "../util/debug.h"
 
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_ASSIGN};
+static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 
 // Lower level token signatures
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
-static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_ASSIGN};
+static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType RETURN[] = {TOKEN_RETURN};
@@ -244,9 +244,9 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
         assertPeek(tokenQueue, TOKEN_IDENTIFIER);
         copyNextTokenString(tokenQueue, retval->varName);
 
-        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ASSIGN) {
+        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_EQUALS) {
             retval->type = AST_VARDEFINE;
-            assertRemove(tokenQueue, TOKEN_ASSIGN);
+            assertRemove(tokenQueue, TOKEN_EQUALS);
             queue_push(retval->children, parser_createAST(tokenQueue));
         }
     }
@@ -349,9 +349,9 @@ char* parser_astToString(enum astType type) {
         return "astType.WHILE";
     case AST_RETURN: 
         return "astType.RETURN";
-    case AST_PLUS: 
+    case AST_ADD: 
         return "astType:PLUS";
-    case AST_MINUS: 
+    case AST_SUBTRACT: 
         return "astType:MINUS";
     case AST_MULTIPLY: 
         return "astType:MULTIPLY";
@@ -725,20 +725,21 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
 
 /*
     Used to convert between token types for operators, and ast types for 
-    operators 
+    operators. Must have a one-to-one mapping. TOKEN_LPAREN for example, 
+    does not have a one-to-one mapping with any AST type.
     
     Called by createExpression to convert operator tokens into ASTs */
 static enum astType tokenToAST(enum tokenType type) {
     switch(type) {
     case TOKEN_PLUS:
-        return AST_PLUS;
+        return AST_ADD;
     case TOKEN_MINUS: 
-        return AST_MINUS;
-    case TOKEN_MULTIPLY: 
+        return AST_SUBTRACT;
+    case TOKEN_STAR: 
         return AST_MULTIPLY;
-    case TOKEN_DIVIDE: 
+    case TOKEN_SLASH: 
         return AST_DIVIDE;
-    case TOKEN_ASSIGN:
+    case TOKEN_EQUALS:
         return AST_ASSIGN;
 	case TOKEN_IS: 
         return AST_IS;
@@ -796,8 +797,8 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
 
 static void assertOperator(enum astType type) {
     switch(type) {
-    case AST_PLUS:
-    case AST_MINUS:
+    case AST_ADD:
+    case AST_SUBTRACT:
     case AST_MULTIPLY:
     case AST_DIVIDE:
     case AST_ASSIGN:

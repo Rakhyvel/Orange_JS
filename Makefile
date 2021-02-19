@@ -3,7 +3,7 @@ run:
 	./BloodOrange test/*.orng
 
 verbose:
-	gcc *.c util/*.c -Wall -o BloodOrange -DVERBOSE
+	gcc orangec/*.c util/*.c -Wall -o BloodOrange -DVERBOSE
 	./BloodOrange test/*.orng
 
 git-commit:
