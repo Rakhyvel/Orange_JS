@@ -23,7 +23,7 @@ enum astType {
     // Boolean operators
     AST_AND, AST_OR, 
     // Indexing
-    AST_DOT, AST_INDEX,
+    AST_DOT, AST_INDEX, AST_MODULEACCESS,
     // Unused
     AST_NOP
 };

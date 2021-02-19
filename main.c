@@ -17,14 +17,14 @@
     x global variable declarations/definitions
     x static modifier for modules
     x constants
-    - private modifier for higher levels
-    - imports
-    - module access ":"
+    x private modifier for higher levels
+    x module access ":"
     - syntax validation
 
     - type validation
     - identifier validation
     - access validation
+    - static module validation
     - constant modify validation
     - constant define & no declare validation
 

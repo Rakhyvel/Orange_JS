@@ -83,10 +83,6 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_LPAREN;
         } else if(strcmp(")", tokenBuffer) == 0) {
             tempType = TOKEN_RPAREN;
-        } else if(strcmp("{", tokenBuffer) == 0) {
-            tempType = TOKEN_LBRACE;
-        } else if(strcmp("}", tokenBuffer) == 0) {
-            tempType = TOKEN_RBRACE;
         } else if(strcmp("[", tokenBuffer) == 0) {
             tempType = TOKEN_LSQUARE;
         } else if(strcmp("]", tokenBuffer) == 0) {
@@ -209,6 +205,8 @@ int lexer_getTokenPrecedence(enum tokenType type) {
 		case TOKEN_DIVIDE:
 			return 7;
         case TOKEN_DOT:
+        case TOKEN_COLON:
+        case TOKEN_INDEX:
             return 8;
 		default:
 			return 0;
@@ -223,16 +221,10 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:LPAREN";
     case TOKEN_RPAREN:
         return "token:RPAREN";
-    case TOKEN_LBRACE:
-        return "token:LBRACE";
-    case TOKEN_RBRACE:
-        return "token:RBRACE";
     case TOKEN_LSQUARE:
         return "token:LSQUARE";
     case TOKEN_RSQUARE:
         return "token:RSQUARE";
-    case TOKEN_SEMICOLON:
-        return "token:SEMICOLON";
     case TOKEN_COMMA:
         return "token:COMMA";
     case TOKEN_DOT:
@@ -342,11 +334,11 @@ static int nextNonWhitespace(const char* file, int start) {
     
     Returns the index of the begining of the next token */
 static int nextToken(const char* file, int start) {
-    enum TokenState {
+    enum tokenState {
         BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING
     };
 
-    enum TokenState state = BEGIN;
+    enum tokenState state = BEGIN;
     char nextChar;
 
     for( ; nextChar != '\0'; start++) {

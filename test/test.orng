@@ -1,4 +1,27 @@
-static module LinkedList
-	private const int j = 5
-	const int k = 4
+static module test
+	boolean main()
+		List:List myList = List:create()
+		List:append(myList, 4)
+		List:append(myList, 5)
+		List:append(myList, 10)
+	end
+end
+
+module List
+	struct ListElem(ListElem prev, ListElem next, any data)
+	struct List(ListElem head, ListElem tail)
+
+	List create()
+		ListElem head = ListElem(null, null)
+		ListElem tail = ListElem(null, null)
+		head.next = tail
+		tail.prev = head
+		return List(head, tail)
+	end
+
+	void append(List list, any data)
+		ListElem new = ListElem(list.tail.prev, list.tail, data)
+		new.prev.next = new
+		new.next.prev = new
+	end
 end
