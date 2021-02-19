@@ -10,21 +10,21 @@
     x return statements
     x array initialize
     x character literal
-    - string literal
-    - struct definitions
-    - struct extension
-    - interface definitions
-    - struct implements
-    - struct interface function
-    - global variable definitions
+    x string literal
+    x real vs integer literal
+    x struct definitions
+    x struct extension
+    - global variable declarations/definitions
     - static modifier for modules
-    - private modifier for higher levels
     - constants
+    - private modifier for higher levels
     - imports
+    - module access ":"
     - syntax validation
 
     - type validation
     - identifier validation
+    - access validation
 
     Author: Joseph Shimel
     Date: 2/2/21
@@ -59,10 +59,10 @@ int main(int argn, char** argv)
 
         LOG("\n\nBegin Tokenization.");
         struct list* tokenQueue = lexer_tokenize(file);
-        lexer_removeComments(tokenQueue);
         LOG("\nEnd Tokenization\n");
 
         LOG("\n\nBegin Parsing.");
+        parser_removeComments(tokenQueue);
         parser_addModules(program, tokenQueue);
         LOG("\nEnd Parsing.\n");
     }

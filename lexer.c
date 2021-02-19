@@ -6,6 +6,9 @@
     which can be manipulated and parsed easier in later stages of the
     compilation. 
 
+    - The lexer DOES NOT care if the tokens are in a proper order
+    - The lexer ONLY turns the text data into a token queue
+
     Author: Joseph Shimel
     Date: 2/3/21
 */
@@ -23,14 +26,14 @@
 /* These characters are whole tokens themselves */
 static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
-                                      '=', '\n', '~'};
+                                      '=', '\n', '~', ':'};
 
 // Private functions
 static bool charIsToken(char);
 static int nextToken(const char*, int);
+static int numIsFloat(const char*);
 static int nextNonWhitespace(const char*, int);
 static void copyToken(const char* src, char* dst, int start, int end);
-static int matchComment(struct list* list, struct listElem* elem);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -96,6 +99,8 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_COMMA;
         } else if(strcmp(".", tokenBuffer) == 0) {
             tempType = TOKEN_DOT;
+        } else if(strcmp(":", tokenBuffer) == 0) {
+            tempType = TOKEN_COLON;
         } else if(strcmp("+", tokenBuffer) == 0) {
             tempType = TOKEN_PLUS;
         } else if(strcmp("-", tokenBuffer) == 0) {
@@ -120,6 +125,10 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_OR;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
+        } else if(strcmp("struct", tokenBuffer) == 0) {
+            tempType = TOKEN_STRUCT;
+        } else if(strcmp("interface", tokenBuffer) == 0) {
+            tempType = TOKEN_INTERFACE;
         } else if(strcmp("return", tokenBuffer) == 0) {
             tempType = TOKEN_RETURN;
         } else if(strcmp("end", tokenBuffer) == 0) {
@@ -133,9 +142,15 @@ struct list* lexer_tokenize(const char *file) {
         } else if(strcmp("while", tokenBuffer) == 0) {
             tempType = TOKEN_WHILE;
         } else if(isdigit(tokenBuffer[0])) {
-            tempType = TOKEN_NUMLITERAL;
+            if(numIsFloat(tokenBuffer)) {
+                tempType = TOKEN_REALLITERAL;
+            } else {
+                tempType = TOKEN_INTLITERAL;
+            }
         } else if(tokenBuffer[0] == '\''){
             tempType = TOKEN_CHARLITERAL;
+        } else if(tokenBuffer[0] == '"'){
+            tempType = TOKEN_STRINGLITERAL;
         } else {
             tempType = TOKEN_IDENTIFIER;
         }
@@ -222,10 +237,14 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:EOF";
     case TOKEN_IDENTIFIER:
         return "token:IDENTFIER";
-    case TOKEN_NUMLITERAL:
-        return "token:NUMLITERAL";
+    case TOKEN_INTLITERAL:
+        return "token:INTLITERAL";
+    case TOKEN_REALLITERAL:
+        return "token:REALLITERAL";
     case TOKEN_CHARLITERAL:
         return "token:CHARLITERAL";
+    case TOKEN_STRINGLITERAL:
+        return "token:STRINGLITERAL";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 
@@ -250,6 +269,10 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:OR";
     case TOKEN_MODULE:
         return "token:MODULE";
+    case TOKEN_STRUCT:
+        return "token:STRUCT";
+    case TOKEN_INTERFACE:
+        return "token:INTERFACE";
     case TOKEN_END:
         return "token:END";
     case TOKEN_ARRAY:
@@ -266,39 +289,13 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:CALL";
     case TOKEN_TILDE:
         return "token:TILDE";
+    case TOKEN_COLON:
+        return "token:COLON";
     case TOKEN_INDEX:
         return "token:INDEX";
     }
     ASSERT(0); // Unreachable
     return "";
-}
-
-/*
-    Removes tokens from a list that are surrounded by comments */
-void lexer_removeComments(struct list* tokenQueue) {
-    struct listElem* elem;
-    int withinComment = 0;
-
-    for(elem=list_begin(tokenQueue);elem!=list_end(tokenQueue);elem=list_next(elem)) {
-        if(withinComment) {
-            if(matchComment(tokenQueue, elem)) {
-                withinComment = 0;
-                elem = elem->prev;
-                free(list_remove(tokenQueue, list_next(elem)));
-                free(list_remove(tokenQueue, list_next(elem)));
-            } else {
-                elem = elem->prev;
-                free(list_remove(tokenQueue, list_next(elem)));
-            }
-        } else {
-            if(matchComment(tokenQueue, elem)) {
-                withinComment = 1;
-                elem = elem->prev;
-                free(list_remove(tokenQueue, list_next(elem)));
-                free(list_remove(tokenQueue, list_next(elem)));
-            }
-        }
-    }
 }
 
 /* Determines if the given character is a token all on it's own */
@@ -334,7 +331,7 @@ static int nextNonWhitespace(const char* file, int start) {
     Returns the index of the begining of the next token */
 static int nextToken(const char* file, int start) {
     enum TokenState {
-        BEGIN, TEXT, NUMBER, CHAR
+        BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING
     };
 
     enum TokenState state = BEGIN;
@@ -353,18 +350,29 @@ static int nextToken(const char* file, int start) {
             } 
             // Check number
             else if(isdigit(nextChar)) {
-                state = NUMBER;
+                state = INTEGER;
             }
             // Check char
             else if(nextChar == '\'') {
                 state = CHAR;
             }
+            // Check string
+            else if(nextChar == '"') {
+                state = STRING;
+            }
         } else if(state == TEXT) {
             // Ends on non-alphanumeric character
-            if(!isalpha(nextChar) && !isdigit(nextChar)) {
+            if(!isalpha(nextChar) && !isdigit(nextChar) && nextChar != '_') {
                 return start;
             }
-        } else if (state == NUMBER) {
+        } else if (state == INTEGER) {
+            // Ends on non-numeric character
+            if(nextChar == '.') {
+                state = FLOAT;
+            } else if(!isdigit(nextChar)) {
+                return start;
+            }
+        } else if (state == FLOAT) {
             // Ends on non-numeric character
             if(!isdigit(nextChar)) {
                 return start;
@@ -373,9 +381,22 @@ static int nextToken(const char* file, int start) {
             if(nextChar == '\''){
                 return start + 1;
             }
+        } else if (state == STRING) {
+            if(nextChar == '"'){
+                return start + 1;
+            }
         }
     }
     return start;
+}
+
+static int numIsFloat(const char* test) {
+    for(int i = 0; test[i] != '\0'; i++) {
+        if(test[i] == '.') {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -386,19 +407,4 @@ static void copyToken(const char* src, char* dst, int start, int end) {
         dst[i] = src[i + start];
     }
     dst[i] = '\0';
-}
-
-/*
-    Determines if the list element is the beginning of a comment delimiter */
-static int matchComment(struct list* list, struct listElem* elem) {
-    if(elem != list_end(list) && list_next(elem) != list_end(list)) {
-        if( ((struct token*)elem->data)->type == TOKEN_TILDE &&  
-            ((struct token*)list_next(elem)->data)->type == TOKEN_TILDE) {
-            return 1;
-        } else {
-            return 0;
-        }
-    } else {
-        return 0;
-    }
 }

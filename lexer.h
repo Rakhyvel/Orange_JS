@@ -14,9 +14,9 @@
 enum tokenType {
     TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_LBRACE, TOKEN_RBRACE, TOKEN_LSQUARE, TOKEN_RSQUARE,
 	// Punctuation
-	TOKEN_SEMICOLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_NEWLINE, TOKEN_TILDE,
+	TOKEN_SEMICOLON, TOKEN_COMMA, TOKEN_DOT, TOKEN_NEWLINE, TOKEN_TILDE, TOKEN_COLON,
 	// Literals
-	TOKEN_IDENTIFIER, TOKEN_NUMLITERAL, TOKEN_CHARLITERAL,
+	TOKEN_IDENTIFIER, TOKEN_INTLITERAL, TOKEN_REALLITERAL, TOKEN_CHARLITERAL, TOKEN_STRINGLITERAL,
 	// Math operators
 	TOKEN_PLUS, TOKEN_MINUS, TOKEN_MULTIPLY, TOKEN_DIVIDE, TOKEN_ASSIGN,
 	// Branch operators
@@ -24,7 +24,7 @@ enum tokenType {
 	// Boolean operators
 	TOKEN_AND, TOKEN_OR,
 	// Programatic structures
-	TOKEN_MODULE, TOKEN_END,
+	TOKEN_MODULE, TOKEN_STRUCT, TOKEN_INTERFACE, TOKEN_END,
 	// Modifiers
 	TOKEN_ARRAY,
 	// Control flow structures
@@ -47,6 +47,5 @@ struct list* lexer_tokenize(const char *file);
 struct token* lexer_createToken(enum tokenType, char[]);
 int lexer_getTokenPrecedence(enum tokenType);
 char* lexer_tokenToString(enum tokenType);
-void lexer_removeComments(struct list*);
 
 #endif

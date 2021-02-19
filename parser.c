@@ -1,7 +1,12 @@
 /*  parser.c
 
-    The compiler takes in tokens as a queue and parses them into modules,
-    functions, blocks of code, and expressions. 
+    The parser's job is to take in a stream of tokens, and build a structure 
+    that represents the program. 
+    
+    - The parser DOES NOT care if the structure represents a "correct" program. 
+      Program validation is performed later.
+    - The parser DOES care if the input token queue is in a correct fashion, 
+      and will give syntax errors if it is not.
     
     Author: Joseph Shimel
     Date: 2/3/21 
@@ -19,10 +24,12 @@
 
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
+static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 
 // Lower level token signatures
-static const enum tokenType VAR[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
+static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
+static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_ASSIGN};
 static const enum tokenType IF[] = {TOKEN_IF};
 static const enum tokenType WHILE[] = {TOKEN_WHILE};
 static const enum tokenType RETURN[] = {TOKEN_RETURN};
@@ -30,9 +37,11 @@ static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType INDEX[] = {TOKEN_LSQUARE};
 
 // Private functions
+static int matchComment(struct list*, struct listElem*);
 static void condenseArrayIdentifiers(struct list*);
 static void rejectUselessNewLines(struct list*);
 static void copyNextTokenString(struct list*, char*);
+static void parseParams(struct list*, struct list*, struct list*);
 static struct astNode* createBlockAST(struct list*);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static struct astNode* createAST(enum astType);
@@ -55,6 +64,8 @@ struct program* parser_initProgram() {
 struct module* parser_initModule(struct program* program) {
     struct module* retval = (struct module*) malloc(sizeof(struct module));
     retval->functionsMap = map_init();
+    retval->dataStructsMap = map_init();
+    retval->globalsMap = map_init();
     retval->program = program;
     return retval;
 }
@@ -66,6 +77,43 @@ struct function* parser_initFunction() {
     retval->argTypes = list_create();
     retval->argNames = list_create();
     return retval;
+}
+
+/*
+    Allocates and initializes a data struct */
+struct dataStruct* parser_initDataStruct() {
+    struct dataStruct* retval = (struct dataStruct*) malloc(sizeof(struct dataStruct));
+    retval->argTypes = list_create();
+    retval->argNames = list_create();
+    return retval;
+}
+
+/*
+    Removes tokens from a list that are surrounded by comments */
+void parser_removeComments(struct list* tokenQueue) {
+    struct listElem* elem;
+    int withinComment = 0;
+
+    for(elem=list_begin(tokenQueue);elem!=list_end(tokenQueue);elem=list_next(elem)) {
+        if(withinComment) {
+            if(matchComment(tokenQueue, elem)) {
+                withinComment = 0;
+                elem = elem->prev;
+                free(list_remove(tokenQueue, list_next(elem)));
+                free(list_remove(tokenQueue, list_next(elem)));
+            } else {
+                elem = elem->prev;
+                free(list_remove(tokenQueue, list_next(elem)));
+            }
+        } else {
+            if(matchComment(tokenQueue, elem)) {
+                withinComment = 1;
+                elem = elem->prev;
+                free(list_remove(tokenQueue, list_next(elem)));
+                free(list_remove(tokenQueue, list_next(elem)));
+            }
+        }
+    }
 }
 
 /*
@@ -87,7 +135,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             free(queue_pop(tokenQueue)); // Remove "\n"
 
             map_put(program->modulesMap, module->name, module);
-            parser_addFunctions(module, tokenQueue);
+            parser_addElements(module, tokenQueue);
 
             free(queue_pop(tokenQueue)); // Remove "end"
         } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
@@ -102,44 +150,55 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
 /*
     Takes in a token queue, adds functions, structs, and globals to a given 
     module, including any internal AST's. */
-void parser_addFunctions(struct module* module, struct list* tokenQueue) {
-    // Find all functions until a function's end is reached
+void parser_addElements(struct module* module, struct list* tokenQueue) {
     rejectUselessNewLines(tokenQueue);
+
+    // Find all functions until a function's end is reached
     while(!list_isEmpty(tokenQueue) && 
     ((struct token*) queue_peek(tokenQueue))->type != TOKEN_END) {
         rejectUselessNewLines(tokenQueue);
 
-        if(matchTokens(tokenQueue, FUNCTION, 3)) {
+        // STRUCT
+        if(matchTokens(tokenQueue, STRUCT, 2)) {
+            free(queue_pop(tokenQueue)); // Remove "struct"
+            struct dataStruct* dataStruct = parser_initDataStruct();
+            copyNextTokenString(tokenQueue, dataStruct->name);
+            if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_COLON) {
+                free(queue_pop(tokenQueue)); // Remove :
+                copyNextTokenString(tokenQueue, dataStruct->baseStruct);
+            }
+            LOG("New struct: %s", dataStruct->name);
+
+            parseParams(tokenQueue, dataStruct->argTypes, dataStruct->argNames);
+            map_put(module->dataStructsMap, dataStruct->name, dataStruct);
+            dataStruct->module = module;
+            dataStruct->program = module->program;
+        }
+        // FUNCTION
+        else if(matchTokens(tokenQueue, FUNCTION, 3)) {
             struct function* function = parser_initFunction();
             copyNextTokenString(tokenQueue, function->returnType);
             copyNextTokenString(tokenQueue, function->name);
             LOG("New function: %s %s", function->returnType, function->name);
 
-            free(queue_pop(tokenQueue)); // Remove (
-
-            // Parse parameters of function
-            while(((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
-                char* argType = (char*)malloc(sizeof(char) * 255);
-                char* argName = (char*)malloc(sizeof(char) * 255);
-                copyNextTokenString(tokenQueue, argType);
-                copyNextTokenString(tokenQueue, argName);
-                queue_push(function->argTypes, argType);
-                queue_push(function->argNames, argName);
-    
-                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
-                    free(queue_pop(tokenQueue));
-                }
-                LOG("New arg %s %s", argType, argName);
-            }
-            free(queue_pop(tokenQueue)); // Remove )
+            parseParams(tokenQueue, function->argTypes, function->argNames);
             function->code = createBlockAST(tokenQueue);
             free(queue_pop(tokenQueue)); // Remove "end"
             LOG("Function %s %s's AST", function->returnType, function->name);
+
             parser_printAST(function->code, 0);
             map_put(module->functionsMap, function->name, function);
-        } else {
-    
-            printf("Encountered unknown token: %s\n", ((struct token*)queue_peek(tokenQueue))->data);
+            function->module = module;
+            function->program = module->program;
+        } 
+        // GLOBAL
+        else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
+            struct astNode* var = parser_createAST(tokenQueue);
+            map_put(module->globalsMap, var->varName, var);
+        }
+        // ERROR
+        else {
+            printf("\nEncountered unknown token: %s\n", ((struct token*)queue_peek(tokenQueue))->data);
             ASSERT(0);
         }
         rejectUselessNewLines(tokenQueue);
@@ -154,8 +213,9 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
     ASSERT(tokenQueue != NULL);
     struct astNode* retval = NULL;
     rejectUselessNewLines(tokenQueue);
-    // VARIABLE DEFINE
-    if (matchTokens(tokenQueue, VAR, 2)) {
+
+    // VARIABLE
+    if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
         retval = createAST(AST_VARDECLARE);
         copyNextTokenString(tokenQueue, retval->varType);
         copyNextTokenString(tokenQueue, retval->varName);
@@ -229,11 +289,15 @@ void parser_printAST(struct astNode* node, int n) {
     // Go through children of passed in AST node
     struct listElem* elem = NULL;
     for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-        if(node->type == AST_NUMLITERAL) {
+        if(node->type == AST_INTLITERAL) {
             for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
             int* data = (int*)(elem->data);
             LOG("%d", *data);
-        } else if(node->type == AST_CHARLITERAL) {
+        } else if(node->type == AST_REALLITERAL) {
+            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
+            float* data = (float*)(elem->data);
+            LOG("%f", *data);
+        } else if(node->type == AST_CHARLITERAL || node->type == AST_STRINGLITERAL) {
             for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
             LOG("%s", (char*)(elem->data));
         } else if(node->type == AST_VAR) {
@@ -288,8 +352,10 @@ char* parser_astToString(enum astType type) {
         return "astType:ASSIGN";
     case AST_INDEX: 
         return "astType.INDEX";
-    case AST_NUMLITERAL: 
-        return "astType:NUMLITERAL";
+    case AST_INTLITERAL: 
+        return "astType:INTLITERAL";
+    case AST_REALLITERAL: 
+        return "astType:REALLITERAL";
     case AST_ARRAYLITERAL: 
         return "astType:ARRAYLITERAL";
     case AST_CALL:
@@ -308,6 +374,21 @@ char* parser_astToString(enum astType type) {
     printf("Unknown astType: %d\n", type);
     NOT_REACHED();
     return "";
+}
+
+/*
+    Determines if the list element is the beginning of a comment delimiter */
+static int matchComment(struct list* list, struct listElem* elem) {
+    if(elem != list_end(list) && list_next(elem) != list_end(list)) {
+        if( ((struct token*)elem->data)->type == TOKEN_TILDE &&  
+            ((struct token*)list_next(elem)->data)->type == TOKEN_TILDE) {
+            return 1;
+        } else {
+            return 0;
+        }
+    } else {
+        return 0;
+    }
 }
 
 static void condenseArrayIdentifiers(struct list* tokenQueue) {
@@ -341,6 +422,31 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     struct token* nextToken = (struct token*) queue_pop(tokenQueue);
     strncpy(dest, nextToken->data, 254);
     free(nextToken);
+}
+
+/*
+    Takes in a token queue, reads in the parameters and adds both the types and
+    names to lists. The lists are ordered and pairs are in the same indices.
+    
+    Parenthesis are removed in this function as well. */
+static void parseParams(struct list* tokenQueue, struct list* argTypes, struct list* argNames) {
+    free(queue_pop(tokenQueue)); // Remove (
+
+    // Parse parameters of function
+    while(((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
+        char* argType = (char*)malloc(sizeof(char) * 255);
+        char* argName = (char*)malloc(sizeof(char) * 255);
+        copyNextTokenString(tokenQueue, argType);
+        copyNextTokenString(tokenQueue, argName);
+        queue_push(argTypes, argType);
+        queue_push(argNames, argName);
+    
+        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
+            free(queue_pop(tokenQueue));
+        }
+        LOG("New arg: %s %s", argType, argName);
+    }
+    free(queue_pop(tokenQueue)); // Remove )
 }
 
 /*
@@ -400,16 +506,24 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         token = (struct token*)queue_pop(expression);
         astNode = createAST(AST_NOP);
         int* intData;
+        float* realData;
         char* charData;
         astNode->type = tokenToAST(token->type);
 
         switch(token->type) {
-        case TOKEN_NUMLITERAL:
+        case TOKEN_INTLITERAL:
             intData = (int*)malloc(sizeof(int));
             *intData = atoi(token->data);
             queue_push(astNode->children, intData);
             stack_push(argStack, astNode);
             break;
+        case TOKEN_REALLITERAL:
+            realData = (float*)malloc(sizeof(float));
+            *realData = atof(token->data);
+            queue_push(astNode->children, realData);
+            stack_push(argStack, astNode);
+            break;
+        case TOKEN_STRINGLITERAL:
         case TOKEN_CHARLITERAL:
             charData = (char*)malloc(sizeof(char) * 255);
             strncpy(charData, token->data, 254);
@@ -541,8 +655,9 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
     while(!list_isEmpty(tokenQueue)) {
         token = ((struct token*) queue_pop(tokenQueue));
         // VALUE
-        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_NUMLITERAL 
-            || token->type == TOKEN_CALL) {
+        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_INTLITERAL  || token->type == TOKEN_REALLITERAL 
+            || token->type == TOKEN_CALL || token->type == TOKEN_CHARLITERAL
+            || token->type == TOKEN_STRINGLITERAL) {
             queue_push(retval, token);
         } 
         // OPEN PARENTHESIS
@@ -613,10 +728,14 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_DOT;
     case TOKEN_INDEX:
         return AST_INDEX;
-    case TOKEN_NUMLITERAL:
-        return AST_NUMLITERAL;
+    case TOKEN_INTLITERAL:
+        return AST_INTLITERAL;
+    case TOKEN_REALLITERAL:
+        return AST_REALLITERAL;
     case TOKEN_CHARLITERAL:
         return AST_CHARLITERAL;
+    case TOKEN_STRINGLITERAL:
+        return AST_STRINGLITERAL;
     default:
         printf("Cannot convert %s to AST\n", lexer_tokenToString(type));
         NOT_REACHED();

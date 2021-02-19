@@ -15,7 +15,7 @@ enum astType {
     // StatementNode types
 	AST_BLOCK, AST_VARDECLARE, AST_VARDEFINE, AST_IF, AST_WHILE, AST_RETURN,
 	// Values
-    AST_NUMLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, AST_CHARLITERAL, AST_ARRAYLITERAL,
+    AST_INTLITERAL, AST_REALLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, AST_CHARLITERAL, AST_ARRAYLITERAL,
     // Math operators
 	AST_PLUS, AST_MINUS, AST_MULTIPLY, AST_DIVIDE, AST_ASSIGN,
     // Branch operators
@@ -53,6 +53,8 @@ struct program {
 struct module {
     char name[255];
     struct map* functionsMap;
+    struct map* dataStructsMap;
+    struct map* globalsMap; // name -> var AST
 
     struct program* program;
 };
@@ -70,12 +72,32 @@ struct function {
     struct program* program;
 };
 
+struct dataStruct {
+    char name[255];
+    char baseStruct[255];
+    struct list* argTypes;
+    struct list* argNames;
+
+    struct module* module;
+    struct program* program;
+};
+
+struct interface {
+    char name[255];
+    struct map* functionArgMap; // function's name -> function's 
+
+    struct module* module;
+    struct program* program;
+};
+
 struct program* parser_initProgram();
 struct module* parser_initModule();
 struct function* parser_initFunction();
+struct dataStruct* parser_initDataStruct();
 
+void parser_removeComments(struct list*);
 void parser_addModules(struct program*, struct list*);
-void parser_addFunctions(struct module*, struct list*);
+void parser_addElements(struct module*, struct list*);
 
 struct astNode* parser_createAST(struct list*);
 void parser_printAST(struct astNode*, int);
