@@ -1,6 +1,10 @@
 /*
     Maps are used to associate string names with pieces of data. They can give 
-    almost instantaneous lookup capabilities. */
+    almost instantaneous lookup capabilities. 
+    
+    Author: Joseph Shimel
+    Date: 11/29/20 
+*/
 
 #include "map.h"
 #include <math.h>
@@ -11,6 +15,7 @@
 #include "./list.h"
 
 int hash(const char*);
+void addNode(struct map* map, char* key, void* value, int hash);
 
 /*
     Creates a map pointer */

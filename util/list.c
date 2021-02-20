@@ -1,11 +1,16 @@
-/*
+/*  list.c
+
     A doubly linked list is represented by list elements that have pointers to
     the next and previous list element.
 
     List structs have a head and tail list element that do not store data, and 
     only serve to mark out the begining and end of a list. 
 
-    Linked lists can represent queues, stacks, or regular lists */
+    Linked lists can represent queues, stacks, or regular lists 
+    
+    Author: Joseph Shimel
+    Date: 1/31/21
+*/
 
 #include <stdlib.h>
 #include <stdio.h>
