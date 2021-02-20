@@ -40,6 +40,7 @@
 #include "./parser.h"
 #include "../util/debug.h"
 #include "../util/list.h"
+#include "../util/map.h"
 
 /*
  * Takes in an array of files to compile
@@ -67,6 +68,12 @@ int main(int argn, char** argv)
         parser_removeComments(tokenQueue);
         parser_addModules(program, tokenQueue);
         LOG("\nEnd Parsing.\n");
+
+        struct list* list = map_getKeyList(program->modulesMap);
+        struct listElem* elem;
+        for(elem = list_begin(list); elem != list_end(list); elem = list_next(elem)) {
+            printf("%s\n", (char*)elem->data);
+        }
     }
     printf("Done.\n");
     return 0;

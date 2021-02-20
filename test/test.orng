@@ -1,27 +1,38 @@
-static module test
-	boolean main()
-		List:List myList = List:create()
-		List:append(myList, 4)
-		List:append(myList, 5)
-		List:append(myList, 10)
-	end
+module test0
 end
 
-module List
-	struct ListElem(ListElem prev, ListElem next, any data)
-	struct List(ListElem head, ListElem tail)
+module test1
+end
 
-	List create()
-		ListElem head = ListElem(null, null)
-		ListElem tail = ListElem(null, null)
-		head.next = tail
-		tail.prev = head
-		return List(head, tail)
-	end
+module test2
+end
 
-	void append(List list, any data)
-		ListElem new = ListElem(list.tail.prev, list.tail, data)
-		new.prev.next = new
-		new.next.prev = new
-	end
+module test3
+end
+
+module test4
+end
+
+module test5
+end
+
+module test6
+end
+
+module test7
+end
+
+module test8
+end
+
+module test9
+end
+
+module test10
+end
+
+module test10
+end
+
+module test11
 end

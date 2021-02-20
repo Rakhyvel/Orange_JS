@@ -7,7 +7,7 @@ struct mapNode {
 	struct mapNode* next;
 };
 
-// Maps void pointers to void pointers
+// Maps text to void pointers
 struct map {
 	int size;
 	int capacity;
@@ -18,5 +18,6 @@ struct map* map_init();
 void map_destroy(struct map*);
 void map_put(struct map*, char*, void*);
 void* map_get(struct map*, const char*);
+struct list* map_getKeyList(struct map* map);
 
 #endif

@@ -1,5 +1,5 @@
 run:
-	gcc *.c util/*.c -Wall -o BloodOrange
+	gcc orangec/*.c util/*.c -Wall -o BloodOrange
 	./BloodOrange test/*.orng
 
 verbose:

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "./debug.h"
+#include "./list.h"
 
 int hash(const char*);
 
@@ -17,10 +18,7 @@ struct map* map_init() {
     struct map* map = (struct map*)malloc(sizeof(map));
     map->size = 0;
     map->capacity = 10;
-    map->lists = (struct mapNode**)malloc(map->capacity * sizeof(struct mapNode*));
-    for(int i = 0; i < map->capacity; i++) {
-        map->lists[i] = NULL;
-    }
+    map->lists = (struct mapNode**)calloc(map->capacity, sizeof(struct mapNode*));
     return map;
 }
 
@@ -51,28 +49,11 @@ void map_put(struct map* map, char* key, void* value) {
     ASSERT(key != NULL);
     unsigned int hashcode = abs(hash(key)) % map->capacity;
     struct mapNode* bucket = map->lists[hashcode];
+
     if (bucket == NULL) {
-        map->lists[hashcode] = (struct mapNode*)malloc(sizeof(struct mapNode));
-        map->lists[hashcode]->key = key;
-        map->lists[hashcode]->value = value;
-        map->lists[hashcode]->next = NULL;
-    } else {
-        // Bucket cannot be null
-        struct mapNode* curr = bucket;
-        int contains = 0;
-        while (curr->next != NULL) {
-            if (strcmp(curr->key, key) == 1) {
-                contains = 1;
-                break;
-            }
-            curr = curr->next;
-        }
-        if (!contains) {
-            curr->next = (struct mapNode*)malloc(sizeof(struct mapNode));
-            map->lists[hashcode]->key = key;
-            curr->next->value = value;
-            curr->next->next = NULL;
-        }
+        addNode(map, key, value, hashcode);
+    } else if (map_get(map, key) == NULL) {
+        addNode(map, key, value, hashcode);
     }
     map->size++;
 }
@@ -97,6 +78,31 @@ void* map_get(struct map* map, const char* key) {
         }
     }
     return NULL;
+}
+
+/*
+    Creates a list of keys found in the map */
+struct list* map_getKeyList(struct map* map) {
+    ASSERT(map != NULL);
+    struct list* retval = list_create();
+
+    for(int i = 0; i < map->capacity; i++) {
+        struct mapNode* node = map->lists[i];
+        while(node != NULL) {
+            queue_push(retval, node->key);
+            node = node->next;
+        }
+    }
+
+    return retval;
+}
+
+void addNode(struct map* map, char* key, void* value, int hash) {
+    struct mapNode* node = (struct mapNode*) malloc(sizeof(struct mapNode*));
+    node->key = key;
+    node->value = value;
+    node->next = map->lists[hash];
+    map->lists[hash] = node;
 }
 
 /*
