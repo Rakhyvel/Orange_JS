@@ -38,6 +38,8 @@
 #include "./main.h"
 #include "./lexer.h"
 #include "./parser.h"
+#include "./validator.h"
+
 #include "../util/debug.h"
 #include "../util/list.h"
 #include "../util/map.h"
@@ -69,6 +71,9 @@ int main(int argn, char** argv)
         parser_addModules(program, tokenQueue);
         LOG("\nEnd Parsing.\n");
 
+        LOG("\nBegin Validating.");
+        validator_validate(program);
+        LOG("\nEnd Validating.\n");
     }
     printf("Done.\n");
     return 0;

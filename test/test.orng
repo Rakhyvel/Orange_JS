@@ -1,2 +1,8 @@
 module test
+    boolean main()
+        int i
+    end
+end
+
+module list
 end
