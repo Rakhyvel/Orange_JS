@@ -218,7 +218,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             if(map_put(module->globalsMap, var->name, var)) {
                 error("Global \"%s\"s defined in more than one place in module!\n", var->name, module->name);
             }
-            var->isPrivate = var->isPrivate;
+            var->isPrivate = isPrivate;
         }
         // ERROR
         else {

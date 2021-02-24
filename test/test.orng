@@ -4,15 +4,14 @@ static module test
     i -> {type="int", ast=null, private=no, constant=no}
     j -> {type="int", ast=plus(4,5), private=no, constant=no}
     ~~
-    Vector main()
-        int i = test(1, 'c')
-    end
-
-    int test(int a, char b)
+    void main()
+        int i = test2:j
     end
 end
 
 static module test2
-    int global
-    struct Vector(int x, int y)
+    int j
+
+    private int test(int j)
+    end
 end
