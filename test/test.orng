@@ -1,10 +1,14 @@
-module test
+static module test
     ~~
     struct function:varMap
     i -> {type="int", ast=null, private=no, constant=no}
     j -> {type="int", ast=plus(4,5), private=no, constant=no}
     ~~
-    Vector main(int i)
+    Vector main()
+        int i = test(1, 'c')
+    end
+
+    int test(int a, char b)
     end
 end
 

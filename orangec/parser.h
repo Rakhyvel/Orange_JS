@@ -7,6 +7,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include <stdbool.h>
 #include "../util/list.h"
 
 /*
@@ -15,7 +16,8 @@ enum astType {
     // StatementNode types
 	AST_BLOCK, AST_VARDECLARE, AST_VARDEFINE, AST_IF, AST_WHILE, AST_RETURN,
 	// Values
-    AST_INTLITERAL, AST_REALLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, AST_CHARLITERAL, AST_ARRAYLITERAL,
+    AST_INTLITERAL, AST_REALLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, 
+    AST_CHARLITERAL, AST_ARRAYLITERAL, AST_TRUE, AST_FALSE,
     // Math operators
 	AST_ADD, AST_SUBTRACT, AST_MULTIPLY, AST_DIVIDE, AST_ASSIGN,
     // Branch operators
@@ -100,5 +102,8 @@ struct astNode* parser_createAST(struct list*, struct function*);
 void parser_printAST(struct astNode*, int);
 
 char* parser_astToString(enum astType);
+
+bool parser_astTakesTypes(char* types,...);
+char* parser_astReturnType(enum astType, char* inputs,...);
 
 #endif

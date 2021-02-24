@@ -119,6 +119,10 @@ struct list* lexer_tokenize(const char *file) {
             tempType = TOKEN_AND;
         } else if(strcmp("or", tokenBuffer) == 0) {
             tempType = TOKEN_OR;
+        } else if(strcmp("true", tokenBuffer) == 0) {
+            tempType = TOKEN_TRUE;
+        } else if(strcmp("false", tokenBuffer) == 0) {
+            tempType = TOKEN_FALSE;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
         } else if(strcmp("struct", tokenBuffer) == 0) {
@@ -243,6 +247,10 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:CHARLITERAL";
     case TOKEN_STRINGLITERAL:
         return "token:STRINGLITERAL";
+    case TOKEN_TRUE:
+        return "token:TRUE";
+    case TOKEN_FALSE:
+        return "token:FALSE";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 

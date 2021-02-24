@@ -22,7 +22,9 @@
 
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*);
-static void validateAST(struct astNode*);
+static void validateAST(struct astNode*, const struct function* function, const struct module* module);
+char* validateExpressionType(struct astNode*, const struct function*, const struct module*);
+static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module);
 
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
@@ -40,7 +42,7 @@ void validator_validate(struct program* program) {
             // VALIDATE TYPE EXISTS
             validateType(function->self.type, module);
             // VALIDATE CODE AST
-            validateAST(function->self.code);
+            validateAST(function->self.code, function, module);
         }
 
         // VALIDATE GLOBALS
@@ -69,6 +71,7 @@ static void validateType(const char* type, const struct module* module) {
     // Check primitives
     int end = findTypeEnd(type);
     char temp[255];
+    memset(temp, 0, 254);
     strncpy(temp, type, end);
     if(strcmp(temp, "int") != 0 && strcmp(temp, "char") != 0 && 
         strcmp(temp, "boolean") != 0 && strcmp(temp, "void") != 0 && 
@@ -80,20 +83,149 @@ static void validateType(const char* type, const struct module* module) {
     }
 }
 
-static void validateAST(struct astNode* node) {
+static void validateAST(struct astNode* node, const struct function* function, const struct module* module) {
     if(node == NULL) return;
 
     struct listElem* elem;
+    struct variable* var;
+
     switch(node->type) {
     case AST_BLOCK:
         break;
     case AST_VARDECLARE:
+        var = (struct variable*) node->data;
+        validateType(var->type, module);
         break;
+    case AST_VARDEFINE: {
+        var = (struct variable*) node->data;
+        validateType(var->type, module);
+        char *initType = validateExpressionType(((struct variable*) node->data)->code, function, module);
+        if(strcmp(var->type, initType)) {
+            error("Type mismatch when assigning to variable \"%s\"", var->name);
+        }
+        break;
+    }
     default:
         error("Unsupported feature!");
     }
 
     for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-        validateAST((struct astNode*)elem->data);
+        validateAST((struct astNode*)elem->data, function, module);
     }
+}
+
+/*
+    Recursively goes through expression, checks to make sure that the type of 
+    the inputs is correct, returns output type based on input */
+char* validateExpressionType(struct astNode* node, const struct function* function, const struct module* module) {
+    char left[255], right[255];
+    char* retval = (char*)malloc(sizeof(char) * 255);
+
+    switch(node->type){
+    // BASE CASES
+    case AST_INTLITERAL:
+        strcpy(retval, "int");
+        return retval;
+    case AST_REALLITERAL:
+        strcpy(retval, "real");
+        return retval;
+    case AST_CHARLITERAL:
+        strcpy(retval, "char");
+        return retval;
+    case AST_STRINGLITERAL:
+        strcpy(retval, "char array");
+        return retval;
+    case AST_FALSE:
+    case AST_TRUE:
+        strcpy(retval, "boolean");
+        return retval;
+    case AST_VAR: {
+        char* varName = (char*)node->data;
+        if(function != NULL) {
+            if(map_get(function->varMap, varName) != NULL) {
+                return ((struct variable*) map_get(function->varMap, varName))->type;
+            } else if(map_get(function->argMap, varName) != NULL) {
+                return ((struct variable*) map_get(function->argMap, varName))->type;
+            }
+        }
+        if(map_get(module->globalsMap, varName) != NULL) {
+            return ((struct variable*) map_get(module->globalsMap, varName))->type;
+        }
+        error("The variable \"%s\" is not visible", varName);
+    }
+    // RECURSIVE CASES
+    case AST_ADD:
+    case AST_SUBTRACT:
+    case AST_MULTIPLY:
+    case AST_DIVIDE: {
+        validateBinaryOp(node->children, left, right, function, module);
+        if((!strcmp(left, "real") && !strcmp(right, "real")) || 
+            (!strcmp(left, "real") && !strcmp(right, "int")) || 
+            (!strcmp(left, "int") && !strcmp(right, "real"))) {
+            strcpy(retval, "real");
+            return retval;
+        } else if(!strcmp(left, "int") && !strcmp(right, "int")) {
+            strcpy(retval, "int");
+            return retval;
+        } else {
+            error("Type mismatch with %s or %s, expected int or real", left, right);
+        }
+    }
+    case AST_OR:
+    case AST_AND:
+        validateBinaryOp(node->children, left, right, function, module);
+         if(!strcmp(left, "boolean") && !strcmp(right, "boolean")) {
+            strcpy(retval, "boolean");
+            return retval;
+        } else {
+            error("Type mismatch with %s and %s, expected boolean", left, right);
+        }
+    case AST_GREATER:
+    case AST_LESSER:{
+        validateBinaryOp(node->children, left, right, function, module);
+        if((!strcmp(left, "real") && !strcmp(right, "real")) || 
+            (!strcmp(left, "real") && !strcmp(right, "int")) || 
+            (!strcmp(left, "int") && !strcmp(right, "real")) ||
+            (!strcmp(left, "int") && !strcmp(right, "int"))) {
+            strcpy(retval, "boolean");
+            return retval;
+        } else {
+            error("Type mismatch with %s or %s, expected int or real", left, right);
+        }
+    }
+    case AST_IS:
+    case AST_ISNT:
+        strcpy(retval, "boolean");
+        return retval;
+    case AST_CALL: {
+        struct function* callee = map_get(module->functionsMap, (char*)node->data);
+        if(callee != NULL) {
+            struct list* params = map_getKeyList(callee->argMap);
+            struct list* args = node->children;
+            struct listElem* paramElem;
+            struct listElem* argElem;
+            for(paramElem = list_begin(params), argElem = list_begin(args); 
+                paramElem != list_end(params) && argElem != list_end(args); 
+                paramElem = list_next(params), argElem = list_next(args)) {
+                char* paramType = ((struct variable*)map_get(callee->argMap, ((char*)paramElem->data)))->type;
+                char* argType = validateExpressionType((struct astNode*)argElem->data, function, module);
+                if(strcmp(paramType, argType)) {
+                    error("Wrong argument type for function %s, was %s, expected %s", node->data, argType, paramType);
+                }
+            }
+            strcpy(retval, callee->self.type);
+            return retval;
+        } else {
+            error("Unknown function %s", node->data);
+        }
+    }
+    default:
+        PANIC("AST %s is not an expression", parser_astToString(node->type));
+    }
+    return NULL;
+}
+
+static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module) {
+    strcpy(rightType, validateExpressionType(children->head.next->data, function, module));
+    strcpy(leftType, validateExpressionType(children->head.next->next->data, function, module));
 }

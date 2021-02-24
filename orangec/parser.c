@@ -27,6 +27,7 @@
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 
 // Lower level token signatures
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
@@ -212,7 +213,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             function->self.isPrivate = isPrivate;
         }
         // GLOBAL
-        else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
+        else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
             struct variable* var = createVar(tokenQueue, NULL);
             if(map_put(module->globalsMap, var->name, var)) {
                 error("Global \"%s\"s defined in more than one place in module!\n", var->name, module->name);
@@ -377,6 +378,10 @@ char* parser_astToString(enum astType type) {
         return "astType:REALLITERAL";
     case AST_ARRAYLITERAL: 
         return "astType:ARRAYLITERAL";
+    case AST_TRUE: 
+        return "astType:TRUE";
+    case AST_FALSE: 
+        return "astType:FALSE";
     case AST_CALL:
         return "astType.CALL";
     case AST_VAR: 
@@ -451,7 +456,7 @@ static struct variable* createVar(struct list* tokenQueue, struct function* func
     strcpy(retval->varType, "variable");
 
     if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_CONST) {
-        retval->isPrivate = 1;
+        retval->isConstant = 1;
         free(queue_pop(tokenQueue));
     }
 
@@ -565,20 +570,19 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             astNode->data = realData;
             stack_push(argStack, astNode);
             break;
-        case TOKEN_STRINGLITERAL:
-        case TOKEN_CHARLITERAL:
-        case TOKEN_IDENTIFIER:
-            charData = (char*)malloc(sizeof(char) * 255);
-            strncpy(charData, token->data, 254);
-            astNode->data = charData;
-            stack_push(argStack, astNode);
-            break;
         case TOKEN_CALL:
             // Add args of call token (which are already ASTs) to new AST node's children
             for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
                 queue_push(astNode->children, (struct astNode*)elem->data);
             }
-            strncpy(astNode->data, token->data, 254);
+        case TOKEN_STRINGLITERAL:
+        case TOKEN_CHARLITERAL:
+        case TOKEN_IDENTIFIER:
+        case TOKEN_TRUE:
+        case TOKEN_FALSE:
+            charData = (char*)malloc(sizeof(char) * 255);
+            strncpy(charData, token->data, 254);
+            astNode->data = charData;
             stack_push(argStack, astNode);
             break;
         default: // Assume operator
@@ -700,7 +704,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
         // VALUE
         if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_INTLITERAL  || token->type == TOKEN_REALLITERAL 
             || token->type == TOKEN_CALL || token->type == TOKEN_CHARLITERAL
-            || token->type == TOKEN_STRINGLITERAL) {
+            || token->type == TOKEN_STRINGLITERAL || token->type == TOKEN_FALSE || token->type == TOKEN_TRUE) {
             queue_push(retval, token);
         } 
         // OPEN PARENTHESIS
@@ -782,6 +786,10 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_CHARLITERAL;
     case TOKEN_STRINGLITERAL:
         return AST_STRINGLITERAL;
+    case TOKEN_TRUE:
+        return AST_FALSE;
+    case TOKEN_FALSE:
+        return AST_FALSE;
     default:
         printf("Cannot directly convert %s to AST\n", lexer_tokenToString(type));
         NOT_REACHED();
