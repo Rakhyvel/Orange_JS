@@ -19,11 +19,12 @@ void addNode(struct map* map, char* key, void* value, int hash);
 
 /*
     Creates a map pointer */
-struct map* map_init() {
+struct map* map_create() {
     struct map* map = (struct map*)malloc(sizeof(map));
     map->size = 0;
     map->capacity = 10;
     map->lists = (struct mapNode**)calloc(map->capacity, sizeof(struct mapNode*));
+    map->keyList = list_create();
     return map;
 }
 
@@ -48,8 +49,10 @@ void map_destroy(struct map* map) {
 }
 
 /*
-    Associates a string value with a pointer value in the map */
-void map_put(struct map* map, char* key, void* value) {
+    Associates a string value with a pointer value in the map 
+    
+    Returns 1 if key is already in map, 0 if not */
+int map_put(struct map* map, char* key, void* value) {
     ASSERT(map != NULL);
     ASSERT(key != NULL);
     unsigned int hashcode = abs(hash(key)) % map->capacity;
@@ -59,12 +62,16 @@ void map_put(struct map* map, char* key, void* value) {
         addNode(map, key, value, hashcode);
     } else if (map_get(map, key) == NULL) {
         addNode(map, key, value, hashcode);
+    } else {
+        return 1;
     }
     map->size++;
+    return 0;
 }
 
 /*
-    Returns a the pointer associated with a given string key */
+    Returns a the pointer associated with a given string key. Returns NULL if 
+    key is not in map. */
 void* map_get(struct map* map, const char* key) {
     ASSERT(map != NULL);
     ASSERT(key != NULL);
@@ -86,28 +93,20 @@ void* map_get(struct map* map, const char* key) {
 }
 
 /*
-    Creates a list of keys found in the map */
+    Returns list of keys in a map ORDERED by when they were added to map! */
 struct list* map_getKeyList(struct map* map) {
-    ASSERT(map != NULL);
-    struct list* retval = list_create();
-
-    for(int i = 0; i < map->capacity; i++) {
-        struct mapNode* node = map->lists[i];
-        while(node != NULL) {
-            queue_push(retval, node->key);
-            node = node->next;
-        }
-    }
-
-    return retval;
+    return map->keyList;
 }
 
+/*
+    Adds a node to a map, and the key to the keylist */
 void addNode(struct map* map, char* key, void* value, int hash) {
     struct mapNode* node = (struct mapNode*) malloc(sizeof(struct mapNode*));
     node->key = key;
     node->value = value;
     node->next = map->lists[hash];
     map->lists[hash] = node;
+    queue_push(map->keyList, key);
 }
 
 /*

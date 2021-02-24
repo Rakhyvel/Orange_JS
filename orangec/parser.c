@@ -16,6 +16,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "./main.h"
 #include "./parser.h"
 #include "./lexer.h"
 #include "../util/list.h"
@@ -26,7 +27,6 @@
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 
 // Lower level token signatures
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_NEWLINE};
@@ -42,8 +42,9 @@ static int matchComment(struct list*, struct listElem*);
 static void condenseArrayIdentifiers(struct list*);
 static void rejectUselessNewLines(struct list*);
 static void copyNextTokenString(struct list*, char*);
-static void parseParams(struct list*, struct list*, struct list*);
-static struct astNode* createBlockAST(struct list*);
+static struct variable* createVar(struct list*, struct function*);
+static void parseParams(struct list*, struct map*, struct variable*);
+static struct astNode* createBlockAST(struct list*, struct function*);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static struct astNode* createAST(enum astType);
 static struct astNode* createExpressionAST(struct list*);
@@ -59,7 +60,8 @@ static void assertOperator(enum astType);
     Allocates and initializes the program struct */
 struct program* parser_initProgram() {
     struct program* retval = (struct program*) calloc(1, sizeof(struct program));
-    retval->modulesMap = map_init();
+    retval->modulesMap = map_create();
+    retval->dataStructsMap = map_create();
     return retval;
 }
 
@@ -67,9 +69,8 @@ struct program* parser_initProgram() {
     Allocates and initializes a module struct */
 struct module* parser_initModule(struct program* program) {
     struct module* retval = (struct module*) calloc(1, sizeof(struct module));
-    retval->functionsMap = map_init();
-    retval->dataStructsMap = map_init();
-    retval->globalsMap = map_init();
+    retval->functionsMap = map_create();
+    retval->globalsMap = map_create();
     retval->program = program;
     return retval;
 }
@@ -78,8 +79,9 @@ struct module* parser_initModule(struct program* program) {
     Allocates and initializes a function struct */
 struct function* parser_initFunction() {
     struct function* retval = (struct function*) calloc(1, sizeof(struct function));
-    retval->argTypes = list_create();
-    retval->argNames = list_create();
+    strcpy(retval->self.varType, "function");
+    retval->argMap = map_create();
+    retval->varMap = map_create();
     return retval;
 }
 
@@ -87,8 +89,8 @@ struct function* parser_initFunction() {
     Allocates and initializes a data struct */
 struct dataStruct* parser_initDataStruct() {
     struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
-    retval->argTypes = list_create();
-    retval->argNames = list_create();
+    strcpy(retval->self.varType, "struct");
+    retval->fieldMap = map_create();
     return retval;
 }
 
@@ -140,7 +142,9 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             LOG("New module: %s", module->name);
             assertRemove(tokenQueue, TOKEN_NEWLINE);
 
-            map_put(program->modulesMap, module->name, module);
+            if(map_put(program->modulesMap, module->name, module)) {
+                error("Module \"%s\" defined in more than one place!\n", module->name);
+            }
             module->isStatic = isStatic;
             parser_addElements(module, tokenQueue);
 
@@ -148,8 +152,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
         } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
             free(queue_pop(tokenQueue));
         } else {
-            fprintf(stderr, "Unnecessary token %s found\n", ((struct token*)queue_peek(tokenQueue))->data);
-            exit(1);
+            error("Unnecessary token %s found\n", ((struct token*)queue_peek(tokenQueue))->data);
         }
     }   
 }
@@ -171,57 +174,54 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         if(matchTokens(tokenQueue, STRUCT, 2)) {
             assertRemove(tokenQueue, TOKEN_STRUCT);
             struct dataStruct* dataStruct = parser_initDataStruct();
-            copyNextTokenString(tokenQueue, dataStruct->name);
+            copyNextTokenString(tokenQueue, dataStruct->self.name);
             if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LSQUARE) {
                 assertRemove(tokenQueue, TOKEN_LSQUARE);
                 assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-                copyNextTokenString(tokenQueue, dataStruct->baseStruct);
+                copyNextTokenString(tokenQueue, dataStruct->self.type);
                 assertRemove(tokenQueue, TOKEN_RSQUARE);
             }
-            LOG("New struct: %s", dataStruct->name);
+            LOG("New struct: %s", dataStruct->self.name);
 
-            parseParams(tokenQueue, dataStruct->argTypes, dataStruct->argNames);
-            map_put(module->dataStructsMap, dataStruct->name, dataStruct);
+            parseParams(tokenQueue, dataStruct->fieldMap, &dataStruct->self);
+            if(map_put(module->program->dataStructsMap, dataStruct->self.name, dataStruct)) {
+                error("Struct \"%s\" defined in more than one place!\n", dataStruct->self.name);
+            }
             dataStruct->module = module;
             dataStruct->program = module->program;
-            dataStruct->isPrivate = isPrivate;
+            dataStruct->self.isPrivate = isPrivate;
         }
         // FUNCTION
         else if(matchTokens(tokenQueue, FUNCTION, 3)) {
             struct function* function = parser_initFunction();
-            copyNextTokenString(tokenQueue, function->returnType);
-            copyNextTokenString(tokenQueue, function->name);
-            LOG("New function: %s %s", function->returnType, function->name);
+            copyNextTokenString(tokenQueue, function->self.type);
+            copyNextTokenString(tokenQueue, function->self.name);
+            LOG("New function: %s %s", function->self.type, function->self.name);
 
-            parseParams(tokenQueue, function->argTypes, function->argNames);
-            function->code = createBlockAST(tokenQueue);
+            parseParams(tokenQueue, function->argMap, &function->self);
+            function->self.code = createBlockAST(tokenQueue, function);
             assertRemove(tokenQueue, TOKEN_END);
-            LOG("Function %s %s's AST", function->returnType, function->name);
+            LOG("Function %s %s's AST", function->self.type, function->self.name);
 
-            parser_printAST(function->code, 0);
-            map_put(module->functionsMap, function->name, function);
+            parser_printAST(function->self.code, 0);
+            if(map_put(module->functionsMap, function->self.name, function)) {
+                error("Function \"%s\" defined in more than one place in module \"%s\"!\n", function->self.name, module->name);
+            }
             function->module = module;
             function->program = module->program;
-            function->isPrivate = isPrivate;
-        } 
-        // CONST
-        else if (matchTokens(tokenQueue, CONST, 4)) {
-            free(queue_pop(tokenQueue));
-            struct astNode* var = parser_createAST(tokenQueue);
-            var->isConstant = 1;
-            map_put(module->globalsMap, var->varName, var);
-            var->isPrivate = isPrivate;
+            function->self.isPrivate = isPrivate;
         }
         // GLOBAL
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
-            struct astNode* var = parser_createAST(tokenQueue);
-            map_put(module->globalsMap, var->varName, var);
-            var->isPrivate = isPrivate;
+            struct variable* var = createVar(tokenQueue, NULL);
+            if(map_put(module->globalsMap, var->name, var)) {
+                error("Global \"%s\"s defined in more than one place in module!\n", var->name, module->name);
+            }
+            var->isPrivate = var->isPrivate;
         }
         // ERROR
         else {
-            fprintf(stderr, "\nUnexpected token %s\n in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);
-            exit(1);
+            error("\nUnexpected token %s\n in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);   
         }
         rejectUselessNewLines(tokenQueue);
     }
@@ -231,37 +231,38 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
     Creates an AST for code given a queue of tokens. Only parses one 
     instruction per call. Blocks must be created using the createBlockAST()
     function. */
-struct astNode* parser_createAST(struct list* tokenQueue) {
+struct astNode* parser_createAST(struct list* tokenQueue, struct function* function) {
     ASSERT(tokenQueue != NULL);
     struct astNode* retval = NULL;
     rejectUselessNewLines(tokenQueue);
 
     // VARIABLE
     if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
-        retval = createAST(AST_VARDECLARE);
-        assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-        copyNextTokenString(tokenQueue, retval->varType);
-        assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-        copyNextTokenString(tokenQueue, retval->varName);
-
-        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_EQUALS) {
-            retval->type = AST_VARDEFINE;
-            assertRemove(tokenQueue, TOKEN_EQUALS);
-            queue_push(retval->children, parser_createAST(tokenQueue));
+        ASSERT(function != NULL);
+        struct variable* var = createVar(tokenQueue, function);
+        if(var->code == NULL) {
+            retval = createAST(AST_VARDECLARE);
+        } else {
+            retval = createAST(AST_VARDEFINE);
+        }
+        retval->data = var;
+        if(map_put(function->varMap, var->name, var) || map_get(function->argMap, var->name)) {
+            error("Variable \"%s\" defined in more than one place in function \"%s\"!\n", var->name, function->self.name);
         }
     }
     // IF
     else if (matchTokens(tokenQueue, IF, 1)) {
+        ASSERT(function != NULL);
         retval = createAST(AST_IF);
         assertRemove(tokenQueue, TOKEN_IF);
-        struct astNode* expression = parser_createAST(tokenQueue);
-        struct astNode* body = createBlockAST(tokenQueue);
+        struct astNode* expression = parser_createAST(tokenQueue, function);
+        struct astNode* body = createBlockAST(tokenQueue, function);
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
             assertRemove(tokenQueue, TOKEN_ELSE);
             int removeEnd = ((struct token*)queue_peek(tokenQueue))->type != TOKEN_IF;
-            queue_push(retval->children, parser_createAST(tokenQueue));
+            queue_push(retval->children, parser_createAST(tokenQueue, function));
             if(removeEnd) {
                 assertRemove(tokenQueue, TOKEN_END);
             }
@@ -269,25 +270,27 @@ struct astNode* parser_createAST(struct list* tokenQueue) {
     }
     // WHILE
     else if (matchTokens(tokenQueue, WHILE, 1)) {
+        ASSERT(function != NULL);
         retval = createAST(AST_WHILE);
         assertRemove(tokenQueue, TOKEN_WHILE);
-        struct astNode* expression = parser_createAST(tokenQueue);
-        struct astNode* body = createBlockAST(tokenQueue);
-            assertRemove(tokenQueue, TOKEN_END);
+        struct astNode* expression = parser_createAST(tokenQueue, function);
+        struct astNode* body = createBlockAST(tokenQueue, function);
+        assertRemove(tokenQueue, TOKEN_END);
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
     }
     // RETURN
     else if (matchTokens(tokenQueue, RETURN, 1)) {
+        ASSERT(function != NULL);
         retval = createAST(AST_RETURN);
-            assertRemove(tokenQueue, TOKEN_RETURN);
-        struct astNode* expression = parser_createAST(tokenQueue);
+        assertRemove(tokenQueue, TOKEN_RETURN);
+        struct astNode* expression = parser_createAST(tokenQueue, function);
         queue_push(retval->children, expression);
     }
     // EXPRESSION
     else {
         retval = createExpressionAST(tokenQueue);
-            assertRemove(tokenQueue, TOKEN_NEWLINE);
+        assertRemove(tokenQueue, TOKEN_NEWLINE);
     }
     return retval;
 }
@@ -298,13 +301,8 @@ void parser_printAST(struct astNode* node, int n) {
     #ifndef VERBOSE
     return;
     #else
-
     for(int i = 0; i < n; i++) printf("  "); // print spaces
     LOG("%s", parser_astToString(node->type));
-    if(node->varType[0] != '\0' || node->varName[0] != '\0') {
-        for(int i = 0; i < n + 1; i++) printf("  ");
-        LOG("%s:%s", node->varName, node->varType);
-    }
 
     // Go through children of passed in AST node
     struct listElem* elem = NULL;
@@ -448,29 +446,48 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     free(nextToken);
 }
 
+static struct variable* createVar(struct list* tokenQueue, struct function* function) {
+    struct variable* retval = (struct variable*)malloc(sizeof(struct variable));
+    strcpy(retval->varType, "variable");
+
+    if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_CONST) {
+        retval->isPrivate = 1;
+        free(queue_pop(tokenQueue));
+    }
+
+    assertPeek(tokenQueue, TOKEN_IDENTIFIER);
+    copyNextTokenString(tokenQueue, retval->type);
+    assertPeek(tokenQueue, TOKEN_IDENTIFIER);
+    copyNextTokenString(tokenQueue, retval->name);
+
+    if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_EQUALS) {
+        assertRemove(tokenQueue, TOKEN_EQUALS);
+        retval->code = parser_createAST(tokenQueue, function);
+    } else if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_NEWLINE) {
+        retval->code = NULL;
+    }
+    return retval;
+}
+
 /*
     Takes in a token queue, reads in the parameters and adds both the types and
     names to lists. The lists are ordered and pairs are in the same indices.
     
     Parenthesis are removed in this function as well.*/
-static void parseParams(struct list* tokenQueue, struct list* argTypes, struct list* argNames) {
+static void parseParams(struct list* tokenQueue, struct map* argMap, struct variable* variable) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
 
     // Parse parameters of function
     while(((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
-        char* argType = (char*)malloc(sizeof(char) * 255);
-        char* argName = (char*)malloc(sizeof(char) * 255);
-        assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-        copyNextTokenString(tokenQueue, argType);
-        assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-        copyNextTokenString(tokenQueue, argName);
-        queue_push(argTypes, argType);
-        queue_push(argNames, argName);
+        struct variable* arg = createVar(tokenQueue, NULL);
+        if(map_put(argMap, arg->name, arg)) {
+            error("Parameter \"%s\" defined in more than one place in %s \"%s\"!\n", arg->name, variable->varType, variable->name);
+        }
     
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
             free(queue_pop(tokenQueue));
         }
-        LOG("New arg: %s %s", argType, argName);
+        LOG("New arg: %s %s", arg->type, arg->name);
     }
     assertRemove(tokenQueue, TOKEN_RPAREN);
 }
@@ -478,13 +495,13 @@ static void parseParams(struct list* tokenQueue, struct list* argTypes, struct l
 /*
     Takes in a token queue, parses out a block of statements which end with an 
     end token */
-static struct astNode* createBlockAST(struct list* tokenQueue) {
+static struct astNode* createBlockAST(struct list* tokenQueue, struct function* function) {
     struct astNode* block = createAST(AST_BLOCK);
     rejectUselessNewLines(tokenQueue);
     // Go through statements in token queue until an end token is found
     while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END &&
             ((struct token*)queue_peek(tokenQueue))->type != TOKEN_ELSE) {
-        queue_push(block->children, parser_createAST(tokenQueue));
+        queue_push(block->children, parser_createAST(tokenQueue, function));
         rejectUselessNewLines(tokenQueue);
     }
     return block;
@@ -513,7 +530,6 @@ static struct astNode* createAST(enum astType type) {
     struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
-    retval->modifiers = list_create();
     return retval;
 }
 
@@ -540,26 +556,21 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         case TOKEN_INTLITERAL:
             intData = (int*)malloc(sizeof(int));
             *intData = atoi(token->data);
-            queue_push(astNode->children, intData);
+            astNode->data = intData;
             stack_push(argStack, astNode);
             break;
         case TOKEN_REALLITERAL:
             realData = (float*)malloc(sizeof(float));
             *realData = atof(token->data);
-            queue_push(astNode->children, realData);
+            astNode->data = realData;
             stack_push(argStack, astNode);
             break;
         case TOKEN_STRINGLITERAL:
         case TOKEN_CHARLITERAL:
-            charData = (char*)malloc(sizeof(char) * 255);
-            strncpy(charData, token->data, 254);
-            queue_push(astNode->children, charData);
-            stack_push(argStack, astNode);
-            break;
         case TOKEN_IDENTIFIER:
             charData = (char*)malloc(sizeof(char) * 255);
             strncpy(charData, token->data, 254);
-            queue_push(astNode->children, charData);
+            astNode->data = charData;
             stack_push(argStack, astNode);
             break;
         case TOKEN_CALL:
@@ -567,7 +578,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
                 queue_push(astNode->children, (struct astNode*)elem->data);
             }
-            strncpy(astNode->varName, token->data, 254);
+            strncpy(astNode->data, token->data, 254);
             stack_push(argStack, astNode);
             break;
         default: // Assume operator
@@ -780,8 +791,7 @@ static enum astType tokenToAST(enum tokenType type) {
 static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
     enum tokenType actual = ((struct token*) queue_peek(tokenQueue))->type;
     if(actual != expected) {
-        fprintf(stderr, "ERROR: unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
-        exit(1);
+        error("Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
     }
 }
 
@@ -790,8 +800,7 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
     if(actual == expected) {
         free(queue_pop(tokenQueue));
     } else {
-        fprintf(stderr, "ERROR: unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
-        exit(1);
+        error("Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
     }
 }
 
@@ -813,7 +822,6 @@ static void assertOperator(enum astType type) {
     case AST_MODULEACCESS:
         return;
     default:
-        fprintf(stderr, "ERROR: operator stack corrupted, %s was assumed to be operator!\n", parser_astToString(type));
-        exit(1);
+        error("Operator stack corrupted, %s was assumed to be operator!\n", parser_astToString(type));
     }
 }

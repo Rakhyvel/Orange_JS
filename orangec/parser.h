@@ -33,19 +33,15 @@ enum astType {
     in a far more effective way than text or tokens. */
 struct astNode {
     enum astType type;
-    struct list* children; // of other AST's
-
-    struct list* modifiers; // of tokens that modify variable/function/module
-    char varType[255];
-    char varName[255];
-    int isConstant;
-    int isPrivate;
+    struct list* children; // list of OTHER AST's ONLY!
+    void* data;
 };
 
 /*
     Stores information about the program being compiled. */
 struct program {
-    struct map* modulesMap;
+    struct map* modulesMap; // name -> struct module
+    struct map* dataStructsMap; // name -> struct dataStruct
 };
 
 /*
@@ -55,41 +51,37 @@ struct program {
 struct module {
     char name[255];
     struct map* functionsMap; // name -> struct function
-    struct map* dataStructsMap; // name -> struct dataStruct
-    struct map* globalsMap; // name -> struct astNode (AST_VAR)
+    struct map* globalsMap; // name -> struct variable
+
     int isStatic;
 
     struct program* program;
 };
 
+struct variable {
+    char varType[255];
+    char type[255];
+    char name[255];
+    struct astNode* code;
+
+    int isConstant;
+    int isPrivate;
+};
+
 /*
     Functions take in input, perform actions on that input, and produce output. */
 struct function {
-    char name[255];
-    char returnType[255];
-    struct list* argTypes;
-    struct list* argNames;
-    struct astNode* code;
-    int isPrivate;
+    struct variable self;
+    struct map* argMap; // name -> struct variable
+    struct map* varMap; // name -> struct variable
 
     struct module* module;
     struct program* program;
 };
 
 struct dataStruct {
-    char name[255];
-    char baseStruct[255];
-    struct list* argTypes;
-    struct list* argNames;
-    int isPrivate;
-
-    struct module* module;
-    struct program* program;
-};
-
-struct interface {
-    char name[255];
-    struct map* functionArgMap; // function's name -> function's 
+    struct variable self;
+    struct map* fieldMap; // name -> struct variable
 
     struct module* module;
     struct program* program;
@@ -104,7 +96,7 @@ void parser_removeComments(struct list*);
 void parser_addModules(struct program*, struct list*);
 void parser_addElements(struct module*, struct list*);
 
-struct astNode* parser_createAST(struct list*);
+struct astNode* parser_createAST(struct list*, struct function*);
 void parser_printAST(struct astNode*, int);
 
 char* parser_astToString(enum astType);

@@ -1,8 +1,14 @@
 module test
-    boolean main()
-        int i
+    ~~
+    struct function:varMap
+    i -> {type="int", ast=null, private=no, constant=no}
+    j -> {type="int", ast=plus(4,5), private=no, constant=no}
+    ~~
+    Vector main(int i)
     end
 end
 
-module list
+static module test2
+    int global
+    struct Vector(int x, int y)
 end

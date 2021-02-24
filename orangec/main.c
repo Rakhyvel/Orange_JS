@@ -78,3 +78,16 @@ int main(int argn, char** argv)
     printf("Done.\n");
     return 0;
 }
+
+void error(const char *message, ...) {
+    va_list args;
+
+    fprintf(stderr, "error: ");
+
+    va_start (args, message);
+    vfprintf (stderr, message, args);
+    fprintf (stderr, "\n");
+    va_end(args);
+  
+    exit (1);
+}
