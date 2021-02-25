@@ -5,8 +5,8 @@ static module test
     j -> {type="int", ast=plus(4,5), private=no, constant=no}
     ~~
     void main()
-        Vector pos = Vector:create(4.0, 4.0)
-        real x = Vector:create(4.0, 4.0).x
+        real array i = real array[4]
+        real j = i[3]
     end
 end
 

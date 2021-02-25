@@ -285,17 +285,22 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     case AST_INDEX: {
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
-        if(rightAST->type != AST_INTLITERAL) {
-            error("Right side of index must be an integer");
-        }
-        char* leftType = validateExpressionType(leftAST, function, module);
-        if(!strstr(leftType, " array")) {
-            error("Left side must be an array type");
-        }
+        if(strstr(leftAST->data, " array")){
+            strcpy(retval, leftAST->data);
+            return retval;
+        } else {
+            if(rightAST->type != AST_INTLITERAL) {
+                error("Right side of index must be an integer");
+            }
+            char* leftType = validateExpressionType(leftAST, function, module);
+            if(!strstr(leftType, " array")) {
+                error("Left side must be an array type");
+            }
 
-        strcpy(retval,leftType);
-        removeArray(retval);
-        return retval;
+            strcpy(retval,leftType);
+            removeArray(retval);
+            return retval;
+        }
     }
     case AST_MODULEACCESS: {
         struct astNode* leftAST = node->children->head.next->next->data;
