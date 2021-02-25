@@ -5,13 +5,11 @@ static module test
     j -> {type="int", ast=plus(4,5), private=no, constant=no}
     ~~
     void main()
-        int i = test2:j
+        System:println("Hello, world!")
     end
 end
 
-static module test2
-    int j
-
-    private int test(int j)
+static module System
+    void println(char array msg)
     end
 end

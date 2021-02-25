@@ -92,6 +92,9 @@ static void validateAST(struct astNode* node, const struct function* function, c
 
     switch(node->type) {
     case AST_BLOCK:
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            validateAST((struct astNode*)elem->data, function, module);
+        }
         break;
     case AST_VARDECLARE:
         var = (struct variable*) node->data;
@@ -107,11 +110,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
         break;
     }
     default:
-        error("Unsupported feature!");
-    }
-
-    for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-        validateAST((struct astNode*)elem->data, function, module);
+        LOG("%p", validateExpressionType(node, function, module));
     }
 }
 
@@ -141,17 +140,19 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
         strcpy(retval, "boolean");
         return retval;
     case AST_VAR: {
-        free(retval);
         char* varName = (char*)node->data;
         if(function != NULL) {
             if(map_get(function->varMap, varName) != NULL) {
-                return ((struct variable*) map_get(function->varMap, varName))->type;
+                strcpy(retval, ((struct variable*) map_get(function->varMap, varName))->type);
+                return retval;
             } else if(map_get(function->argMap, varName) != NULL) {
-                return ((struct variable*) map_get(function->argMap, varName))->type;
+                strcpy(retval, ((struct variable*) map_get(function->argMap, varName))->type);
+                return retval;
             }
         }
         if(map_get(module->globalsMap, varName) != NULL) {
-            return ((struct variable*) map_get(module->globalsMap, varName))->type;
+            strcpy(retval, ((struct variable*) map_get(module->globalsMap, varName))->type);
+            return retval;
         }
         error("The variable \"%s\" is not visible", varName);
     }
@@ -214,7 +215,6 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     case AST_CALL: {
         if(strstr(node->data, " array")){
             strcpy(retval, node->data);
-            removeArray(retval);
             return retval;
         } else if(map_get(module->program->dataStructsMap, node->data) != NULL) {
             struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, node->data);
@@ -268,6 +268,26 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
             }
         }
     }
+    case AST_DOT: {
+        struct astNode* leftAST = node->children->head.next->next->data;
+        struct astNode* rightAST = node->children->head.next->data;
+
+    }
+    case AST_INDEX: {
+        struct astNode* leftAST = node->children->head.next->next->data;
+        struct astNode* rightAST = node->children->head.next->data;
+        if(rightAST->type != AST_INTLITERAL) {
+            error("Right side of index must be an integer");
+        }
+        char* leftType = validateExpressionType(leftAST, function, module);
+        if(!strstr(leftType, " array")) {
+            error("Left side must be an array type");
+        }
+
+        strcpy(retval,leftType);
+        removeArray(retval);
+        return retval;
+    }
     case AST_MODULEACCESS: {
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
@@ -302,7 +322,7 @@ static void validateBinaryOp(struct list* children, char* leftType, char* rightT
 static void removeArray(char* str) {
     int length = strlen(str);
     for(int i = length - 1; i >= 0; i--){
-        if(str[i] == 'a' && str[i-11] == ' '){
+        if(str[i] == 'a' && str[i-1] == ' '){
             str[i - 1] = '\0';
         }
     }
