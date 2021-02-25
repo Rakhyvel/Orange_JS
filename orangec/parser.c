@@ -144,7 +144,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             assertRemove(tokenQueue, TOKEN_NEWLINE);
 
             if(map_put(program->modulesMap, module->name, module)) {
-                error("Module \"%s\" defined in more than one place!\n", module->name);
+                error("Module \"%s\" defined in more than one place!", module->name);
             }
             module->isStatic = isStatic;
             parser_addElements(module, tokenQueue);
@@ -153,7 +153,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
         } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
             free(queue_pop(tokenQueue));
         } else {
-            error("Unnecessary token %s found\n", ((struct token*)queue_peek(tokenQueue))->data);
+            error("Unnecessary token %s found", ((struct token*)queue_peek(tokenQueue))->data);
         }
     }   
 }
@@ -186,7 +186,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
 
             parseParams(tokenQueue, dataStruct->fieldMap, &dataStruct->self);
             if(map_put(module->program->dataStructsMap, dataStruct->self.name, dataStruct)) {
-                error("Struct \"%s\" defined in more than one place!\n", dataStruct->self.name);
+                error("Struct \"%s\" defined in more than one place!", dataStruct->self.name);
             }
             dataStruct->module = module;
             dataStruct->program = module->program;
@@ -206,7 +206,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
 
             parser_printAST(function->self.code, 0);
             if(map_put(module->functionsMap, function->self.name, function)) {
-                error("Function \"%s\" defined in more than one place in module \"%s\"!\n", function->self.name, module->name);
+                error("Function \"%s\" defined in more than one place in module \"%s\"!", function->self.name, module->name);
             }
             function->module = module;
             function->program = module->program;
@@ -216,7 +216,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
             struct variable* var = createVar(tokenQueue, NULL);
             if(map_put(module->globalsMap, var->name, var)) {
-                error("Global \"%s\"s defined in more than one place in module!\n", var->name, module->name);
+                error("Global \"%s\"s defined in more than one place in module!", var->name, module->name);
             }
             var->isPrivate = isPrivate;
         }
@@ -248,7 +248,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
         }
         retval->data = var;
         if(map_put(function->varMap, var->name, var) || map_get(function->argMap, var->name)) {
-            error("Variable \"%s\" defined in more than one place in function \"%s\"!\n", var->name, function->self.name);
+            error("Variable \"%s\" defined in more than one place in function \"%s\"!", var->name, function->self.name);
         }
     }
     // IF
@@ -262,11 +262,17 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
         queue_push(retval->children, body);
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
             assertRemove(tokenQueue, TOKEN_ELSE);
-            int removeEnd = ((struct token*)queue_peek(tokenQueue))->type != TOKEN_IF;
-            queue_push(retval->children, parser_createAST(tokenQueue, function));
-            if(removeEnd) {
+            if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_IF) {
+                queue_push(retval->children, parser_createAST(tokenQueue, function));
+            } else {
+                assertRemove(tokenQueue, TOKEN_NEWLINE);
+                queue_push(retval->children, createBlockAST(tokenQueue, function));
                 assertRemove(tokenQueue, TOKEN_END);
             }
+        } else if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_END) {
+            assertRemove(tokenQueue, TOKEN_END);
+        } else {
+            error("Unexpected token after if block, %s", ((struct token*)(queue_peek(tokenQueue)))->data);
         }
     }
     // WHILE
@@ -499,7 +505,9 @@ static void parseParams(struct list* tokenQueue, struct map* argMap, struct vari
 
 /*
     Takes in a token queue, parses out a block of statements which end with an 
-    end token */
+    end/else token 
+    
+    DOES NOT REMOVE FINAL TOKEN! */
 static struct astNode* createBlockAST(struct list* tokenQueue, struct function* function) {
     struct astNode* block = createAST(AST_BLOCK);
     rejectUselessNewLines(tokenQueue);

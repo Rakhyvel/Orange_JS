@@ -22,10 +22,11 @@
 
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*);
-static void validateAST(struct astNode*, const struct function* function, const struct module* module);
+static void validateAST(struct astNode*, const struct function*, const struct module*);
 char* validateExpressionType(struct astNode*, const struct function*, const struct module*);
-static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module);
+static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*);
 static void removeArray(char* str);
+static int validateParamType(struct list*, struct map*, const struct function*, const struct module*);
 
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
@@ -62,12 +63,22 @@ void validator_validate(struct program* program) {
     return;
 }
 
+/*
+    Returns the position where a type ends, used to find array's base type 
+    
+    Ex:
+    "int"       -> findTypeEnd -> "int|"
+    "int array" -> findTypeEnd -> "int| array"
+    where | represents the index returned
+*/
 static int findTypeEnd(const char* type) {
     int i = 0;
     while (type[i] != '\0' && type[i] != ' ') i++;
     return i;
 }
 
+/*
+    Checks that a type exists either as a primitive type, or as a user defined struct */
 static void validateType(const char* type, const struct module* module) {
     // Check primitives
     int end = findTypeEnd(type);
@@ -109,6 +120,18 @@ static void validateAST(struct astNode* node, const struct function* function, c
         }
         break;
     }
+    case AST_IF: {
+        struct astNode* condition = node->children->head.next->data;
+        struct astNode* block = node->children->head.next->next->data;
+        struct astNode* elseBlock;
+        char *conditionType = validateExpressionType(condition, function, module);
+        if(strcmp("boolean", conditionType)) {
+            error("Type mismatch when assigning to variable \"%s\"", var->name);
+        }
+        break;
+    }
+    case AST_WHILE:
+    case AST_RETURN:
     default:
         LOG("%p", validateExpressionType(node, function, module));
     }
@@ -141,6 +164,7 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
         return retval;
     case AST_VAR: {
         char* varName = (char*)node->data;
+        // Function variable/argument
         if(function != NULL) {
             if(map_get(function->varMap, varName) != NULL) {
                 strcpy(retval, ((struct variable*) map_get(function->varMap, varName))->type);
@@ -150,6 +174,7 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
                 return retval;
             }
         }
+        // Module global variable
         if(map_get(module->globalsMap, varName) != NULL) {
             strcpy(retval, ((struct variable*) map_get(module->globalsMap, varName))->type);
             return retval;
@@ -213,59 +238,38 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
         strcpy(retval, "boolean");
         return retval;
     case AST_CALL: {
+        struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, node->data);
+        struct function* callee = map_get(module->functionsMap, (char*)node->data);
+        // ARRAY LITERAL
         if(strstr(node->data, " array")){
             strcpy(retval, node->data);
             return retval;
-        } else if(map_get(module->program->dataStructsMap, node->data) != NULL) {
-            struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, node->data);
-            struct list* params = map_getKeyList(dataStruct->fieldMap);
-            struct list* args = node->children;
-            struct listElem* paramElem;
-            struct listElem* argElem;
-            for(paramElem = list_begin(params), argElem = list_begin(args); 
-                paramElem != list_end(params) && argElem != list_end(args); 
-                paramElem = list_next(paramElem), argElem = list_next(argElem)) {
-                char* paramType = ((struct variable*)map_get(dataStruct->fieldMap, ((char*)paramElem->data)))->type;
-                char* argType = validateExpressionType((struct astNode*)argElem->data, function, module);
-                if(strcmp(paramType, argType)) {
-                    error("Wrong argument type for struct %s, was %s, expected %s", node->data, argType, paramType);
-                }
-            }
-            if(argElem == list_end(args) && paramElem == list_end(params)) {
+        } 
+        // STRUCT INIT
+        else if(dataStruct != NULL) {
+            int err = validateParamType(node->children, dataStruct->fieldMap, function, module);
+            if(!err) {
                 strcpy(retval, node->data);
                 return retval;
-            } else if(argElem != list_end(args)){
+            } else if(err > 0){
                 error("Too many arguments");
-            } else {
+            } else if(err < 0){
+                error("Too few arguments");
+            }
+        } 
+        // FUNCTION CALL
+        else if(callee != NULL) {
+            int err = validateParamType(node->children, callee->argMap, function, module);
+            if(!err) {
+                strcpy(retval, callee->self.type);
+                return retval;
+            } else if(err > 0){
+                error("Too many arguments");
+            } else if(err < 0){
                 error("Too few arguments");
             }
         } else {
-            struct function* callee = map_get(module->functionsMap, (char*)node->data);
-            if(callee != NULL) {
-                struct list* params = map_getKeyList(callee->argMap);
-                struct list* args = node->children;
-                struct listElem* paramElem;
-                struct listElem* argElem;
-                for(paramElem = list_begin(params), argElem = list_begin(args); 
-                    paramElem != list_end(params) && argElem != list_end(args); 
-                    paramElem = list_next(paramElem), argElem = list_next(argElem)) {
-                    char* paramType = ((struct variable*)map_get(callee->argMap, ((char*)paramElem->data)))->type;
-                    char* argType = validateExpressionType((struct astNode*)argElem->data, function, module);
-                    if(strcmp(paramType, argType)) {
-                        error("Wrong argument type for function %s, was %s, expected %s", node->data, argType, paramType);
-                    }
-                }
-                if(argElem == list_end(args) && paramElem == list_end(params)) {
-                    strcpy(retval, callee->self.type);
-                    return retval;
-                } else if(argElem != list_end(args)){
-                    error("Too many arguments");
-                } else {
-                    error("Too few arguments");
-                }
-            } else {
-                error("Unknown function %s", node->data);
-            }
+            error("Unknown function or struct %s", node->data);
         }
     }
     case AST_DOT: {
@@ -285,13 +289,17 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     case AST_INDEX: {
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
+        // SIZE ARRAY INIT
         if(strstr(leftAST->data, " array")){
             strcpy(retval, leftAST->data);
             return retval;
-        } else {
+        } 
+        // ARRAY INDEXING
+        else {
             if(rightAST->type != AST_INTLITERAL) {
                 error("Right side of index must be an integer");
             }
+
             char* leftType = validateExpressionType(leftAST, function, module);
             if(!strstr(leftType, " array")) {
                 error("Left side must be an array type");
@@ -305,22 +313,27 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     case AST_MODULEACCESS: {
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
+        // Check ast type's are correct (left=var, right={var, call})
         if(leftAST->type != AST_VAR || (rightAST->type != AST_VAR && rightAST->type != AST_CALL)) {
             error("Malformed module access modifier");
         }
+        // Check module exists
         struct module* newModule = map_get(module->program->modulesMap, leftAST->data);
         if(newModule == NULL) {
             error("Unknown module \"%s\"", leftAST->data);
         }
-        if(map_get(newModule->functionsMap, rightAST->data) != NULL
-            && ((struct function*)map_get(newModule->functionsMap, rightAST->data))->self.isPrivate) {
+        // Check either function/variable exist
+        int funcExists = (map_get(newModule->functionsMap, rightAST->data) != NULL && 
+                        !((struct function*)map_get(newModule->functionsMap, rightAST->data))->self.isPrivate);
+        int varExists = (map_get(newModule->globalsMap, rightAST->data) != NULL &&
+                        !((struct variable*)map_get(newModule->globalsMap, rightAST->data))->isPrivate);
+        if(funcExists || varExists) {
+            return validateExpressionType(rightAST, NULL, newModule);
+        } else if(rightAST->type == AST_CALL) {
             error("Unknown function %s:%s", leftAST->data, rightAST->data);
-        }
-        if(map_get(newModule->globalsMap, rightAST->data) != NULL
-            && ((struct variable*)map_get(newModule->globalsMap, rightAST->data))->isPrivate) {
+        } else if(rightAST->type == AST_VAR) {
             error("Unknown variable %s:%s", leftAST->data, rightAST->data);
         }
-        return validateExpressionType(rightAST, NULL, newModule);
     }
     default:
         PANIC("AST %s is not an expression", parser_astToString(node->type));
@@ -328,16 +341,50 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     return NULL;
 }
 
+/*
+    Copies the types of both the left expression and right expression to given strings. */
 static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module) {
     strcpy(rightType, validateExpressionType(children->head.next->data, function, module));
     strcpy(leftType, validateExpressionType(children->head.next->next->data, function, module));
 }
 
+/*
+    Takes in an array type, returns the lower level type (the type without the "array" modifier) */
 static void removeArray(char* str) {
+    ASSERT(strstr(str, " array"));
     int length = strlen(str);
     for(int i = length - 1; i >= 0; i--){
         if(str[i] == 'a' && str[i-1] == ' '){
             str[i - 1] = '\0';
         }
+    }
+}
+
+/*
+    Takes in a list of AST's representing expressions for arguments, checks each of their types against a list of given
+    parameters. 
+    
+    Returns: 1 when too many args, 
+            -1 when too few args,
+             0 when okay args. */
+static int validateParamType(struct list* args, struct map* paramMap, const struct function* function, const struct module* module) {
+    struct list* params = map_getKeyList(paramMap);
+    struct listElem* paramElem;
+    struct listElem* argElem;
+    for(paramElem = list_begin(params), argElem = list_begin(args); 
+        paramElem != list_end(params) && argElem != list_end(args); 
+        paramElem = list_next(paramElem), argElem = list_next(argElem)) {
+        char* paramType = ((struct variable*)map_get(paramMap, ((char*)paramElem->data)))->type;
+        char* argType = validateExpressionType((struct astNode*)argElem->data, function, module);
+        if(strcmp(paramType, argType)) {
+            error("Wrong argument type %s, expected %s", argType, paramType);
+        }
+    }
+    if(argElem != list_end(args)) {
+        return 1;
+    } else if(paramElem != list_end(params)){
+        return -1;
+    } else {
+        return 0;
     }
 }
