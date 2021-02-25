@@ -5,11 +5,14 @@ static module test
     j -> {type="int", ast=plus(4,5), private=no, constant=no}
     ~~
     void main()
-        System:println("Hello, world!")
+        Vector pos = Vector:create(4.0, 4.0)
+        real x = Vector:create(4.0, 4.0).x
     end
 end
 
-static module System
-    void println(char array msg)
+static module Vector
+    struct Vector(real x, real y)
+
+    Vector create(real x, real y)
     end
 end

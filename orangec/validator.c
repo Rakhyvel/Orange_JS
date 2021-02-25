@@ -176,7 +176,7 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
     }
     case AST_ASSIGN: {
         struct astNode* leftAST = node->children->head.next->next->data;
-        if(leftAST->type != AST_VAR) {
+        if(leftAST->type != AST_VAR && leftAST->type != AST_DOT && leftAST->type != AST_INDEX && leftAST->type != AST_MODULEACCESS) {
             error("Left side of assignment must be a location");
         }
         validateBinaryOp(node->children, left, right, function, module);
@@ -272,6 +272,15 @@ char* validateExpressionType(struct astNode* node, const struct function* functi
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
 
+        struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, validateExpressionType(leftAST, function, module));
+        if(dataStruct == NULL) {
+            error("%s is not a struct!", leftAST->data);
+        }
+        if(map_get(dataStruct->fieldMap, rightAST->data) == NULL) {
+            error("Unknown field %s!", rightAST->data);
+        }
+        strcpy(retval, ((struct variable*)map_get(dataStruct->fieldMap, rightAST->data))->type);
+        return retval;
     }
     case AST_INDEX: {
         struct astNode* leftAST = node->children->head.next->next->data;
