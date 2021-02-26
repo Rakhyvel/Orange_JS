@@ -85,6 +85,7 @@ struct function {
 struct dataStruct {
     struct variable self;
     struct map* fieldMap; // name -> struct variable
+    struct map* parentSet; // names of parents
 
     struct module* module;
     struct program* program;

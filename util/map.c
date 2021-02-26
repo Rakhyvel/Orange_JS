@@ -99,6 +99,31 @@ struct list* map_getKeyList(struct map* map) {
 }
 
 /*
+    Copies the elements from one map into another, in the same order they 
+    were added to the original map.
+    
+    Duplicates are NOT added twice, the original is kept */
+void map_copy(struct map* dst, struct map* src) {
+    struct list* srcList = src->keyList;
+    struct listElem* elem;
+    for(elem = list_begin(srcList); elem != list_end(srcList); elem = list_next(elem)) {
+        map_put(dst, elem->data, map_get(src, elem->data));
+    }
+}
+
+/*
+    Adds a string to the set */
+int set_add(struct map* set, char* key) {
+    return map_put(set, key, 1);
+}
+
+/*
+    Returns whether or not the given string is in the set */
+int set_contains(struct map* set, const char* key) {
+    return map_get(set, key);
+}
+
+/*
     Adds a node to a map, and the key to the keylist */
 void addNode(struct map* map, char* key, void* value, int hash) {
     struct mapNode* node = (struct mapNode*) malloc(sizeof(struct mapNode*));

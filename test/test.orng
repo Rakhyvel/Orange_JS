@@ -4,13 +4,25 @@ static module main
     A simple chess engine
     ~~
     void start()
+        Piece p = Piece(4, 'd')
     end
 end
 
-static module Board
+module Board
     struct Board(int array array grid)
+    private struct Piece(int type)
     const int BOARD_SIZE = 8
 
+    const int EMPTY = 0
+    const int PAWN_ID = 1
+    const int KNIGHT_ID = 2
+    const int BISHOP_ID = 3
+    const int ROOK_ID = 4
+    const int QUEEN_ID = 5
+    const int KING_ID = 6
+
+    ~~
+        Creates a chess board along with all the pieces placed on it ~~
     Board create()
         Board retval = Board(int array array[BOARD_SIZE])
         int i = 0
