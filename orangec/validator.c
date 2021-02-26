@@ -28,7 +28,7 @@ static void validateBinaryOp(struct list*, char*, char*, const struct function*,
 static void removeArray(char* str);
 static struct variable* findVariable(char*, const struct function*, const struct module* module);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int);
-static char* validateStructField(char*, struct astNode*, struct program*);
+static char* validateStructField(char*, char*, struct program*);
 
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
@@ -61,6 +61,9 @@ void validator_validate(struct program* program) {
             validateType(global->type, module);
             // VALIDATE CODE AST
             global->isDeclared = 1;
+            if(global->code == NULL) {
+                error("Globals must be initialized");
+            }
             char *initType = validateExpressionAST(global->code, NULL, module, 1);
             if(strcmp(global->type, initType)) {
                 error("Type mismatch when assigning to variable \"%s\"", global->name);
@@ -118,6 +121,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
 
     struct listElem* elem;
     struct variable* var;
+    LOG("Validating block %s", parser_astToString(node->type));
 
     switch(node->type) {
     case AST_BLOCK:
@@ -209,7 +213,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, "boolean");
         return retval;
     case AST_VAR: {
-        strcpy(retval, findVariable(node->data, function, module)->type);
+        struct variable* var = findVariable(node->data, function, module);
+        strcpy(retval, var->type);
         return retval;
     }
     // RECURSIVE CASES
@@ -236,6 +241,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         if(leftAST->type != AST_VAR && leftAST->type != AST_DOT && leftAST->type != AST_INDEX && leftAST->type != AST_MODULEACCESS) {
             error("Left side of assignment must be a location");
         }
+        // Constant assignment validation
         if(leftAST->type == AST_VAR) {
             var = findVariable(leftAST->data, function, module);
         } else if(leftAST->type == AST_INDEX) {
@@ -250,10 +256,10 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         if(var->isConstant) {
             error("Cannot assign to constant %s", var->name);
         }
-
+        // Left/right type matching
         validateBinaryOp(node->children, left, right, function, module, isGlobal);
         if(strcmp(left, right)) {
-            error("Type mismatch");
+            error("Type mismatch %s and %s", left, right);
         }
         strcpy(retval, left);
         return retval;
@@ -306,6 +312,9 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         } 
         // FUNCTION CALL
         else if(callee != NULL) {
+            if(isGlobal && module->isStatic) {
+                error("Cannot call state function from global");
+            }
             int err = validateParamType(node->children, callee->argMap, function, module, isGlobal);
             if(!err) {
                 strcpy(retval, callee->self.type);
@@ -324,7 +333,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* rightAST = node->children->head.next->data;
 
         char* type = validateExpressionAST(leftAST, function, module, isGlobal);
-        strcpy(retval, validateStructField(type, rightAST, module->program));
+        strcpy(retval, validateStructField(type, rightAST->data, module->program));
         return retval;
     }
     case AST_INDEX: {
@@ -337,7 +346,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         } 
         // ARRAY INDEXING
         else {
-            if(rightAST->type != AST_INTLITERAL) {
+            if(strcmp(validateExpressionAST(rightAST, function, module, isGlobal), "int")) {
                 error("Right side of index must be an integer");
             }
 
@@ -401,6 +410,7 @@ static void removeArray(char* str) {
     for(int i = length - 1; i >= 0; i--){
         if(str[i] == 'a' && str[i-1] == ' '){
             str[i - 1] = '\0';
+            return;
         }
     }
 }
@@ -453,18 +463,20 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
     }
 }
 
-static char* validateStructField(char* type, struct astNode* right, struct program* program) {
-    struct dataStruct* dataStruct = map_get(program->dataStructsMap, type);
+/*
+    Checks to see if a struct contains a field, or if a super struct contains the field. */
+static char* validateStructField(char* structName, char* fieldName, struct program* program) {
+    struct dataStruct* dataStruct = map_get(program->dataStructsMap, structName);
     if(dataStruct == NULL) {
-        error("%s is not a struct!", type);
+        error("%s is not a struct!", structName);
     }
-    if(map_get(dataStruct->fieldMap, right->data) == NULL) {
+    if(map_get(dataStruct->fieldMap, fieldName) == NULL) {
         if(dataStruct->self.type[0] != '\0' && map_get(program->dataStructsMap, dataStruct->self.type) != NULL) {
-            return validateStructField(dataStruct->self.type, right, program);
+            return validateStructField(dataStruct->self.type, fieldName, program);
         } else {
-            error("Unknown field %s!", right->data);
+            error("Unknown field %s!", fieldName);
         }
     }
 
-    return ((struct variable*)map_get(dataStruct->fieldMap, right->data))->type;
+    return ((struct variable*)map_get(dataStruct->fieldMap, fieldName))->type;
 }
