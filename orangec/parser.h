@@ -44,6 +44,7 @@ struct astNode {
 struct program {
     struct map* modulesMap; // name -> struct module
     struct map* dataStructsMap; // name -> struct dataStruct
+    // moduleName -> array of lines
 };
 
 /*
@@ -85,7 +86,7 @@ struct function {
 struct dataStruct {
     struct variable self;
     struct map* fieldMap; // name -> struct variable
-    struct map* parentSet; // names of parents
+    struct map* parentSet; // names of parents, and self
 
     struct module* module;
     struct program* program;

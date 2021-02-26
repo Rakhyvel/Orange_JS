@@ -104,8 +104,9 @@ struct dataStruct* extendStructs(char* name, struct program* program) {
     Returns the position where a type ends, used to find array's base type 
     
     Ex:
-    "int"       -> findTypeEnd -> "int|"
-    "int array" -> findTypeEnd -> "int| array"
+    "int"             -> findTypeEnd -> "int|"
+    "int array"       -> findTypeEnd -> "int| array"
+    "int array array" -> findTypeEnd -> "int| array array"
     where | represents the index returned
 */
 static int findTypeEnd(const char* type) {
@@ -143,8 +144,20 @@ static void validateType(const char* type, const struct module* module) {
 static int typesMatch(const char* expected, const char* actual, const struct program* program) {
     if(isPrimitive(expected)) {
         return !strcmp(expected, actual);
+    } else if(strstr(expected, " array") != NULL){
+        char expectedBase[255];
+        char actualBase[255];
+        if(strcmp(expected, actual)){
+            return 0;
+        }
+        strncpy(expectedBase, expected, findTypeEnd(expected));
+        strncpy(actualBase, actual, findTypeEnd(actual));
+        return !strcmp(expectedBase, actualBase);
     } else {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, actual);
+        if(dataStruct == NULL) {
+            error("Unknown struct %s", actual);
+        }
         return set_contains(dataStruct->parentSet, expected);
     }
 }
@@ -295,7 +308,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
         // Left/right type matching
         validateBinaryOp(node->children, left, right, function, module, isGlobal);
-        if(strcmp(left, right)) {
+        if(!typesMatch(left, right, module->program)) {
             error("Type mismatch %s and %s", left, right);
         }
         strcpy(retval, left);

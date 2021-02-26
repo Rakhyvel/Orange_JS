@@ -1,5 +1,14 @@
 /*  main.c
 
+    The idea of Orange is a language that is simple and easy enough for beginners
+    to learn the basics of programming, and have them be able to construct
+    good, useful, small to large sized projects.
+    
+    It should be so basic and universal that it can be compiled to any other 
+    programming language. This in turn will make it so that beginners transfering
+    on to other languages will have an easier time transfering concepts over,
+    and will think about programming the way they did in Orange. 
+
     Modules:
         Modules contain functions and sometimes globals.
         Modules can be static. Static modules can define global varibales.

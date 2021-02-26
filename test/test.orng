@@ -1,10 +1,10 @@
 static module main
     struct Parent(int i)
     struct Child[Parent](int j)
+    struct Grandchild[Child](int k)
 
     void main()
-        Parent p = Child(0, 0)
-        Child c = Child(0, 0)
-        c.i
+        Parent array p_s = Parent array[5]
+        p_s[0] = Grandchild(0, 0, 0)
     end
 end
