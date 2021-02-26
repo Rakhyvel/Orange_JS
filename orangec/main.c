@@ -21,12 +21,15 @@
     x module access ":"
     x syntax validation
 
-    - type validation
-    - identifier validation
-    - access validation
-    - static module validation
+    x type validation
+    x identifier validation
+    x access validation
+    x static module validation
+    - struct dot op. for extend structs
     - constant modify validation
     - constant define & no declare validation
+    - non-void functions return
+    - program has function called "int main(char array args)"
 
     Author: Joseph Shimel
     Date: 2/2/21

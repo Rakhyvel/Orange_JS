@@ -27,9 +27,20 @@ char* validateExpressionAST(struct astNode*, const struct function*, const struc
 static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int);
 static void removeArray(char* str);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int);
+static char* validateStructField(char*, struct astNode*, struct program*);
 
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
+
+    struct list* dataStructs = map_getKeyList(program->dataStructsMap);   
+    struct listElem* dataStructElem;
+    for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
+        struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
+        // VALIDATE PARENT STRUCT
+        if(dataStruct->self.type[0] != '\0' && map_get(program->dataStructsMap, dataStruct->self.type) == NULL) {
+            error("Undefined stuct %s", dataStruct->self.type);
+        }
+    }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
     struct listElem* moduleElem;
@@ -312,14 +323,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
 
-        struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, validateExpressionAST(leftAST, function, module, isGlobal));
-        if(dataStruct == NULL) {
-            error("%s is not a struct!", leftAST->data);
-        }
-        if(map_get(dataStruct->fieldMap, rightAST->data) == NULL) {
-            error("Unknown field %s!", rightAST->data);
-        }
-        strcpy(retval, ((struct variable*)map_get(dataStruct->fieldMap, rightAST->data))->type);
+        char* type = validateExpressionAST(leftAST, function, module, isGlobal);
+        strcpy(retval, validateStructField(type, rightAST, module->program));
         return retval;
     }
     case AST_INDEX: {
@@ -427,4 +432,20 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
     } else {
         return 0;
     }
+}
+
+static char* validateStructField(char* type, struct astNode* right, struct program* program) {
+    struct dataStruct* dataStruct = map_get(program->dataStructsMap, type);
+    if(dataStruct == NULL) {
+        error("%s is not a struct!", type);
+    }
+    if(map_get(dataStruct->fieldMap, right->data) == NULL) {
+        if(dataStruct->self.type[0] != '\0' && map_get(program->dataStructsMap, dataStruct->self.type) != NULL) {
+            return validateStructField(dataStruct->self.type, right, program);
+        } else {
+            error("Unknown field %s!", right->data);
+        }
+    }
+
+    return ((struct variable*)map_get(dataStruct->fieldMap, right->data))->type;
 }
