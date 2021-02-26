@@ -121,7 +121,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
 
     struct listElem* elem;
     struct variable* var;
-    LOG("Validating block %s", parser_astToString(node->type));
+    LOG("Validating AST %s", parser_astToString(node->type));
 
     switch(node->type) {
     case AST_BLOCK:
@@ -194,6 +194,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     char left[255], right[255];
     char* retval = (char*)malloc(sizeof(char) * 255);
 
+    LOG("Validating expression %s", parser_astToString(node->type));
     switch(node->type){
     // BASE CASES
     case AST_INTLITERAL:
@@ -237,23 +238,26 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     }
     case AST_ASSIGN: {
         struct astNode* leftAST = node->children->head.next->next->data;
-        struct variable* var;
+        struct variable* var = NULL;
         if(leftAST->type != AST_VAR && leftAST->type != AST_DOT && leftAST->type != AST_INDEX && leftAST->type != AST_MODULEACCESS) {
             error("Left side of assignment must be a location");
         }
         // Constant assignment validation
         if(leftAST->type == AST_VAR) {
             var = findVariable(leftAST->data, function, module);
-        } else if(leftAST->type == AST_INDEX) {
-            var = findVariable(((struct astNode*)leftAST->children->head.next->next->data)->data, function, module);
         } else if(leftAST->type == AST_MODULEACCESS) {
             struct module* newModule = map_get(module->program->modulesMap, ((struct astNode*)leftAST->children->head.next->next->data)->data);
-            var = findVariable(((struct astNode*)leftAST->children->head.next->data)->data, NULL, newModule);
-            if(var->isPrivate) {
-                error("Unknown variable");
+            struct astNode* modRight = (struct astNode*)leftAST->children->head.next->data;
+            if(modRight->type == AST_VAR) {
+                var = findVariable(((struct astNode*)leftAST->children->head.next->data)->data, NULL, newModule);
+                if(var->isPrivate) {
+                    error("Unknown variable");
+                }
+            } else if(modRight->type != AST_INDEX) {
+                error("Left side of assignment must be a location");
             }
         }
-        if(var->isConstant) {
+        if(var != NULL && var->isConstant) {
             error("Cannot assign to constant %s", var->name);
         }
         // Left/right type matching
@@ -340,7 +344,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
         // SIZE ARRAY INIT
-        if(strstr(leftAST->data, " array")){
+        if(leftAST->type == AST_VAR && strstr(leftAST->data, " array")){
             strcpy(retval, leftAST->data);
             return retval;
         } 

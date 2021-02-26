@@ -1,4 +1,5 @@
 static module main
+    const int array testArray = int array[5]
     ~~
     A simple chess engine
     ~~
@@ -6,15 +7,15 @@ static module main
     end
 end
 
-module Board
+static module Board
     struct Board(int array array grid)
-    const int BOARDSIZE = 8
+    const int BOARD_SIZE = 8
 
     Board create()
-        Board retval = Board(int array array[BOARDSIZE])
+        Board retval = Board(int array array[BOARD_SIZE])
         int i = 0
-        while i < BOARDSIZE
-            retval.grid[i] = int array[BOARDSIZE]
+        while i < BOARD_SIZE
+            retval.grid[i] = int array[BOARD_SIZE]
             i = i + 1
         end
         return retval

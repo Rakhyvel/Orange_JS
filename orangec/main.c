@@ -27,7 +27,7 @@
     x static module validation
     x struct dot op. for extend structs
     x constant modify validation
-    - constant define & no declare validation
+    x constant define & no declare validation
     - line numbers/file info for tokens/ast, line list for each module
     - better error messages
     - vars belong to blocks, not functions
