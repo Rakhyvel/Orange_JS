@@ -34,6 +34,8 @@ static char* validateStructField(char*, char*, struct program*, const char*, int
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
 
+    int hasStart = 0;
+
     struct list* dataStructs = map_getKeyList(program->dataStructsMap);   
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
@@ -77,7 +79,17 @@ void validator_validate(struct program* program) {
             validateType(function->self.type, module, function->self.filename, function->self.line);
             // VALIDATE CODE AST
             validateAST(function->self.code, function, module);
+            if(!strcmp(function->self.name, "start")) {
+                if(hasStart) {
+                    error(function->self.filename, function->self.line, "Too many starting points");
+                } else {
+                    hasStart = 1;
+                }
+            }
         }
+    }
+    if(!hasStart) {
+        error(NULL, 0, "No starting point (function named \"start\") for program found\n");
     }
     return;
 }

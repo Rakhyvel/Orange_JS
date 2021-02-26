@@ -1,8 +1,5 @@
 static module main
-    struct Vector(real x, real y)
-    struct Entity(Vector pos, int array image)
-    struct Player[Entity](real health)
+    void start()
 
-    void main()
     end
 end

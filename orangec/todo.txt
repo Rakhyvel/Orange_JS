@@ -24,10 +24,8 @@ x struct dot op. for extend structs
 x constant modify validation
 x constant define & no declare validation
 x struct extension
-- line numbers/file info for tokens/ast, line list for each module
-- better error messages
-- vars belong to blocks, not functions
-- program has starting point called "int main(char array args)"?
-- non-void functions return
+x line numbers/file info for tokens/ast, line list for each module
+x better error messages
+- program has starting point called "int start(char array args)"?
 
 - everything on the other list

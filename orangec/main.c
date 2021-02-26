@@ -136,13 +136,18 @@ void println(const char* line) {
 
 void error(const char* filename, int line, const char *message, ...) {
     va_list args;
-
-    fprintf(stderr, "%s:%d error: ", filename, line);
+    if(filename != NULL) {
+        fprintf(stderr, "%s:%d error: ", filename, line);
+    } else {
+        fprintf(stderr, "error: ");
+    }
 
     va_start (args, message);
     vfprintf (stderr, message, args);
-    fprintf (stderr, "\n%d |\t", (line + 1));
-    println(((struct file*)map_get(program->fileMap, filename))->lines[line]);
+    if(filename != NULL) {
+        fprintf (stderr, "\n%d |\t", (line + 1));
+        println(((struct file*)map_get(program->fileMap, filename))->lines[line]);
+    }
     va_end(args);
   
     exit (1);
