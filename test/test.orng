@@ -4,7 +4,6 @@ static module main
     A simple chess engine
     ~~
     void start()
-        Piece p = Piece(4, 'd')
     end
 end
 

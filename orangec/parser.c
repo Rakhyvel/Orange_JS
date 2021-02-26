@@ -92,6 +92,7 @@ struct dataStruct* parser_initDataStruct() {
     struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
     strcpy(retval->self.varType, "struct");
     retval->fieldMap = map_create();
+    retval->parentSet = map_create();
     return retval;
 }
 
@@ -176,6 +177,8 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             assertRemove(tokenQueue, TOKEN_STRUCT);
             struct dataStruct* dataStruct = parser_initDataStruct();
             copyNextTokenString(tokenQueue, dataStruct->self.name);
+
+            // Check for parent struct
             if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LSQUARE) {
                 assertRemove(tokenQueue, TOKEN_LSQUARE);
                 assertPeek(tokenQueue, TOKEN_IDENTIFIER);

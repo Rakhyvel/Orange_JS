@@ -114,13 +114,13 @@ void map_copy(struct map* dst, struct map* src) {
 /*
     Adds a string to the set */
 int set_add(struct map* set, char* key) {
-    return map_put(set, key, 1);
+    return map_put(set, key, (void*)1);
 }
 
 /*
     Returns whether or not the given string is in the set */
 int set_contains(struct map* set, const char* key) {
-    return map_get(set, key);
+    return (int)map_get(set, key);
 }
 
 /*

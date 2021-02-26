@@ -20,6 +20,7 @@
 #include "../util/list.h"
 #include "../util/debug.h"
 
+struct dataStruct* extendStructs(char* name, struct program* program);
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
@@ -37,10 +38,7 @@ void validator_validate(struct program* program) {
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
-        // VALIDATE PARENT STRUCT
-        if(dataStruct->self.type[0] != '\0' && map_get(program->dataStructsMap, dataStruct->self.type) == NULL) {
-            error("Undefined stuct %s", dataStruct->self.type);
-        }
+        extendStructs(dataStruct->self.name, program);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -82,6 +80,24 @@ void validator_validate(struct program* program) {
         }
     }
     return;
+}
+
+struct dataStruct* extendStructs(char* name, struct program* program) {
+    struct dataStruct* dataStruct = map_get(program->dataStructsMap, name);
+    ASSERT(dataStruct != NULL);
+    if(dataStruct->self.type[0] != '\0') {
+        struct dataStruct* parent = extendStructs(dataStruct->self.type, program);
+        map_copy(dataStruct->parentSet, parent->parentSet);
+        set_add(dataStruct->parentSet, dataStruct->self.type);
+
+        struct map* newFieldMap = map_create();
+        struct map* oldMap = dataStruct->fieldMap;
+        map_copy(newFieldMap, parent->fieldMap);
+        map_copy(newFieldMap, dataStruct->fieldMap);
+        dataStruct->fieldMap = newFieldMap;
+        map_destroy(oldMap);
+    }
+    return dataStruct;
 }
 
 /*
@@ -475,11 +491,7 @@ static char* validateStructField(char* structName, char* fieldName, struct progr
         error("%s is not a struct!", structName);
     }
     if(map_get(dataStruct->fieldMap, fieldName) == NULL) {
-        if(dataStruct->self.type[0] != '\0' && map_get(program->dataStructsMap, dataStruct->self.type) != NULL) {
-            return validateStructField(dataStruct->self.type, fieldName, program);
-        } else {
-            error("Unknown field %s!", fieldName);
-        }
+        error("Unknown field %s!", fieldName);
     }
 
     return ((struct variable*)map_get(dataStruct->fieldMap, fieldName))->type;
