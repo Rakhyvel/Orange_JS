@@ -62,6 +62,8 @@ struct module {
 
     int isStatic;
 
+    const char* filename;
+	int line;
     struct program* program;
 };
 
@@ -70,6 +72,9 @@ struct variable {
     char type[255];
     char name[255];
     struct astNode* code;
+
+    const char* filename;
+	int line;
 
     int isConstant;
     int isPrivate;
@@ -97,9 +102,9 @@ struct dataStruct {
 };
 
 struct program* parser_initProgram();
-struct module* parser_initModule();
-struct function* parser_initFunction();
-struct dataStruct* parser_initDataStruct();
+struct module* parser_initModule(struct program*, const char*, int);
+struct function* parser_initFunction(const char*, int);
+struct dataStruct* parser_initDataStruct(const char*, int);
 
 void parser_removeComments(struct list*);
 void parser_addModules(struct program*, struct list*);

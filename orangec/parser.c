@@ -55,7 +55,7 @@ static struct list* infixToPostfix(struct list*);
 static enum astType tokenToAST(enum tokenType);
 static void assertPeek(struct list*, enum tokenType);
 static void assertRemove(struct list*, enum tokenType);
-static void assertOperator(enum astType);
+static void assertOperator(enum astType, const char*, int);
 
 /*
     Allocates and initializes the program struct */
@@ -69,31 +69,37 @@ struct program* parser_initProgram() {
 
 /*
     Allocates and initializes a module struct */
-struct module* parser_initModule(struct program* program) {
+struct module* parser_initModule(struct program* program, const char* filename, int line) {
     struct module* retval = (struct module*) calloc(1, sizeof(struct module));
     retval->functionsMap = map_create();
     retval->globalsMap = map_create();
     retval->program = program;
+    retval->filename = filename;
+    retval->line = line;
     return retval;
 }
 
 /*
     Allocates and initializes a function struct */
-struct function* parser_initFunction() {
+struct function* parser_initFunction(const char* filename, int line) {
     struct function* retval = (struct function*) calloc(1, sizeof(struct function));
     strcpy(retval->self.varType, "function");
     retval->argMap = map_create();
     retval->varMap = map_create();
+    retval->self.filename = filename;
+    retval->self.line = line;
     return retval;
 }
 
 /*
     Allocates and initializes a data struct */
-struct dataStruct* parser_initDataStruct() {
+struct dataStruct* parser_initDataStruct(const char* filename, int line) {
     struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
     strcpy(retval->self.varType, "struct");
     retval->fieldMap = map_create();
     retval->parentSet = map_create();
+    retval->self.filename = filename;
+    retval->self.line = line;
     return retval;
 }
 
@@ -137,16 +143,16 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
         rejectUselessNewLines(tokenQueue);
         int isStatic = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_STATIC;
         if(isStatic) free(queue_pop(tokenQueue));
-
+        struct token* topToken = queue_peek(tokenQueue);
         if(matchTokens(tokenQueue, MODULE, 3)) {
-            struct module* module = parser_initModule(program);
+            struct module* module = parser_initModule(program, topToken->filename, topToken->line);
             assertRemove(tokenQueue, TOKEN_MODULE);
             copyNextTokenString(tokenQueue, module->name);
             LOG("New module: %s", module->name);
             assertRemove(tokenQueue, TOKEN_NEWLINE);
 
             if(map_put(program->modulesMap, module->name, module)) {
-                error("Module \"%s\" defined in more than one place!", module->name);
+                error(module->filename, module->line, "Module \"%s\" defined in more than one place!", module->name);
             }
             module->isStatic = isStatic;
             parser_addElements(module, tokenQueue);
@@ -155,7 +161,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
         } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
             free(queue_pop(tokenQueue));
         } else {
-            error("Unnecessary token %s found", ((struct token*)queue_peek(tokenQueue))->data);
+            error(topToken->filename, topToken->line, "Unnecessary token %s found", ((struct token*)queue_peek(tokenQueue))->data);
         }
     }   
 }
@@ -173,10 +179,11 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         int isPrivate = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_PRIVATE;
         if(isPrivate) free(queue_pop(tokenQueue));
 
+        struct token* topToken = queue_peek(tokenQueue);
         // STRUCT
         if(matchTokens(tokenQueue, STRUCT, 2)) {
             assertRemove(tokenQueue, TOKEN_STRUCT);
-            struct dataStruct* dataStruct = parser_initDataStruct();
+            struct dataStruct* dataStruct = parser_initDataStruct(topToken->filename, topToken->line);
             copyNextTokenString(tokenQueue, dataStruct->self.name);
 
             // Check for parent struct
@@ -190,7 +197,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
 
             parseParams(tokenQueue, dataStruct->fieldMap, &dataStruct->self);
             if(map_put(module->program->dataStructsMap, dataStruct->self.name, dataStruct)) {
-                error("Struct \"%s\" defined in more than one place!", dataStruct->self.name);
+                error(dataStruct->self.filename, dataStruct->self.line, "Struct \"%s\" defined in more than one place!", dataStruct->self.name);
             }
             dataStruct->module = module;
             dataStruct->program = module->program;
@@ -198,7 +205,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         }
         // FUNCTION
         else if(matchTokens(tokenQueue, FUNCTION, 3)) {
-            struct function* function = parser_initFunction();
+            struct function* function = parser_initFunction(topToken->filename, topToken->line);
             copyNextTokenString(tokenQueue, function->self.type);
             copyNextTokenString(tokenQueue, function->self.name);
             LOG("New function: %s %s", function->self.type, function->self.name);
@@ -210,7 +217,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
 
             parser_printAST(function->self.code, 0);
             if(map_put(module->functionsMap, function->self.name, function)) {
-                error("Function \"%s\" defined in more than one place in module \"%s\"!", function->self.name, module->name);
+                error(function->self.filename, function->self.line, "Function \"%s\" defined in more than one place in module \"%s\"!", function->self.name, module->name);
             }
             function->module = module;
             function->program = module->program;
@@ -220,13 +227,13 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
             struct variable* var = createVar(tokenQueue, NULL);
             if(map_put(module->globalsMap, var->name, var)) {
-                error("Global \"%s\"s defined in more than one place in module!", var->name, module->name);
+                error(topToken->filename, topToken->line, "Global \"%s\"s defined in more than one place in module!", var->name, module->name);
             }
             var->isPrivate = isPrivate;
         }
         // ERROR
         else {
-            error("\nUnexpected token %s\n in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);   
+            error(module->filename, module->line, "\nUnexpected token %s in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);   
         }
         rejectUselessNewLines(tokenQueue);
     }
@@ -251,7 +258,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
         }
         retval->data = var;
         if(map_put(function->varMap, var->name, var) || map_get(function->argMap, var->name)) {
-            error("Variable \"%s\" defined in more than one place in function \"%s\"!", var->name, function->self.name);
+            error(retval->filename, retval->line, "Variable \"%s\" defined in more than one place in function \"%s\"!", var->name, function->self.name);
         }
     }
     // IF
@@ -275,7 +282,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
         } else if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_END) {
             assertRemove(tokenQueue, TOKEN_END);
         } else {
-            error("Unexpected token after if block, %s", ((struct token*)(queue_peek(tokenQueue)))->data);
+            error(retval->filename, retval->line, "Unexpected token after if block, %s", ((struct token*)(queue_peek(tokenQueue)))->data);
         }
     }
     // WHILE
@@ -465,6 +472,9 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
 static struct variable* createVar(struct list* tokenQueue, struct function* function) {
     struct variable* retval = (struct variable*)malloc(sizeof(struct variable));
     strcpy(retval->varType, "variable");
+    struct token* topToken = queue_peek(tokenQueue);
+    retval->filename = topToken->filename;
+    retval->line = topToken->line;
 
     if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_CONST) {
         retval->isConstant = 1;
@@ -496,8 +506,9 @@ static void parseParams(struct list* tokenQueue, struct map* argMap, struct vari
     // Parse parameters of function
     while(((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
         struct variable* arg = createVar(tokenQueue, NULL);
+        struct token* topToken = queue_peek(tokenQueue);
         if(map_put(argMap, arg->name, arg)) {
-            error("Parameter \"%s\" defined in more than one place in %s \"%s\"!\n", arg->name, variable->varType, variable->name);
+            error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place in %s \"%s\"!\n", arg->name, variable->varType, variable->name);
         }
     
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
@@ -607,7 +618,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             stack_push(argStack, astNode);
             break;
         default: // Assume operator
-            assertOperator(astNode->type);
+            assertOperator(astNode->type, token->filename, token->line);
             queue_push(astNode->children, stack_pop(argStack)); // Right
             queue_push(astNode->children, stack_pop(argStack)); // Left
             stack_push(argStack, astNode);
@@ -671,6 +682,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             assertPeek(tokenQueue, TOKEN_IDENTIFIER);
             struct token* callName = ((struct token*)queue_pop(tokenQueue));
             struct token* call = lexer_createToken(TOKEN_CALL, callName->data);
+            call->line = callName->line;
             free(callName);
 
             assertRemove(tokenQueue, TOKEN_LPAREN);
@@ -819,22 +831,24 @@ static enum astType tokenToAST(enum tokenType type) {
 }
 
 static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
-    enum tokenType actual = ((struct token*) queue_peek(tokenQueue))->type;
+    struct token* topToken = (struct token*) queue_peek(tokenQueue);
+    enum tokenType actual = topToken->type;
     if(actual != expected) {
-        error("Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
+        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
     }
 }
 
 static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
-    enum tokenType actual = ((struct token*) queue_peek(tokenQueue))->type;
+    struct token* topToken = (struct token*) queue_peek(tokenQueue);
+    enum tokenType actual = topToken->type;
     if(actual == expected) {
         free(queue_pop(tokenQueue));
     } else {
-        error("Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
+        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s\n", lexer_tokenToString(actual), lexer_tokenToString(expected));
     }
 }
 
-static void assertOperator(enum astType type) {
+static void assertOperator(enum astType type, const char* filename, int line) {
     switch(type) {
     case AST_ADD:
     case AST_SUBTRACT:
@@ -852,6 +866,6 @@ static void assertOperator(enum astType type) {
     case AST_MODULEACCESS:
         return;
     default:
-        error("Operator stack corrupted, %s was assumed to be operator!\n", parser_astToString(type));
+        error(filename, line, "Operator stack corrupted, %s was assumed to be operator!\n", parser_astToString(type));
     }
 }

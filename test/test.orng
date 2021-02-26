@@ -1,10 +1,8 @@
 static module main
-    struct Parent(int i)
-    struct Child[Parent](int j)
-    struct Grandchild[Child](int k)
+    struct Vector(real x, real y)
+    struct Entity(Vector pos, int array image)
+    struct Player[Entity](real health)
 
     void main()
-        Parent array p_s = Parent array[5]
-        p_s[0] = Grandchild(0, 0, 0)
     end
 end

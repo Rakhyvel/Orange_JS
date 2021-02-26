@@ -6,6 +6,6 @@ struct file {
     int nLines;
 };
 
-void error(const char* msg, ...);
+void error(const char* filename, int line, const char* msg, ...);
 
 #endif

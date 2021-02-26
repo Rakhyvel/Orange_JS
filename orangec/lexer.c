@@ -58,15 +58,16 @@ char* lexer_readFile(FILE* file) {
 }
 
 char** lexer_getLines(char* filestring, int* numLines) {
-    char** retval = calloc(1, sizeof(char*));
+    char** retval = malloc(sizeof(char*));
     *numLines = 1;
     int i = 0;
+    retval[0] = filestring;
     
     while(filestring[i] != '\0') {
         if(filestring[i] == '\n') {
             (*numLines)++;
             retval = realloc(retval, (*numLines + 1) * sizeof(char*));
-            retval[*numLines - 1] = filestring + (i - 1) * sizeof(char*);
+            retval[*numLines - 1] = filestring + (i + 1);
         }
         i++;
     }

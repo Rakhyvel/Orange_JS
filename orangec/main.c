@@ -73,6 +73,8 @@
 #include "../util/list.h"
 #include "../util/map.h"
 
+static struct program* program;
+
 /*
  * Takes in an array of files to compile
  * 
@@ -84,7 +86,7 @@
  */
 int main(int argn, char** argv)
 {
-    struct program* program = parser_initProgram();
+    program = parser_initProgram();
 
     for(int i = 1; i < argn; i++)
     {
@@ -117,14 +119,30 @@ int main(int argn, char** argv)
     return 0;
 }
 
-void error(const char *message, ...) {
+void println(const char* line) {
+    int i = 0;
+    int hasBegun = 0;
+    while (line[i] != '\0' && line[i] != '\n'){
+        if(line[i] != '\t' && line[i] != ' ') {
+            hasBegun = 1;
+        }
+        if(hasBegun){
+            printf("%c", line[i]);
+        }
+        i ++;
+    }
+    printf("\n\n");
+}
+
+void error(const char* filename, int line, const char *message, ...) {
     va_list args;
 
-    fprintf(stderr, "error: ");
+    fprintf(stderr, "%s:%d error: ", filename, line);
 
     va_start (args, message);
     vfprintf (stderr, message, args);
-    fprintf (stderr, "\n");
+    fprintf (stderr, "\n%d |\t", (line + 1));
+    println(((struct file*)map_get(program->fileMap, filename))->lines[line]);
     va_end(args);
   
     exit (1);
