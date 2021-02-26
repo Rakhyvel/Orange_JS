@@ -3,37 +3,6 @@
     1. Simple components, complex combinations
     2. Lower level control
 
-    Todo:
-    x indexing operator
-    x array literals
-    x else statements
-    x return statements
-    x array initialize
-    x character literal
-    x string literal
-    x real vs integer literal
-    x struct definitions
-    x struct extension
-    x global variable declarations/definitions
-    x static modifier for modules
-    x constants
-    x private modifier for higher levels
-    x module access ":"
-    x syntax validation
-
-    x type validation
-    x identifier validation
-    x access validation
-    x static module validation
-    x struct dot op. for extend structs
-    x constant modify validation
-    x constant define & no declare validation
-    - line numbers/file info for tokens/ast, line list for each module
-    - better error messages
-    - vars belong to blocks, not functions
-    - program has starting point called "int main(char array args)"?
-    - non-void functions return
-
     Author: Joseph Shimel
     Date: 2/2/21
 */
