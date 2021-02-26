@@ -291,7 +291,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
         ASSERT(function != NULL);
         retval = createAST(AST_RETURN);
         assertRemove(tokenQueue, TOKEN_RETURN);
-        struct astNode* expression = parser_createAST(tokenQueue, function);
+        struct astNode* expression = createExpressionAST(tokenQueue);
         queue_push(retval->children, expression);
     }
     // EXPRESSION
@@ -314,7 +314,9 @@ void parser_printAST(struct astNode* node, int n) {
     // Go through children of passed in AST node
     struct listElem* elem = NULL;
     for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-        if(node->type == AST_INTLITERAL) {
+        if(elem->data == NULL) {
+            break;
+        } else if(node->type == AST_INTLITERAL) {
             for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
             int* data = (int*)(elem->data);
             LOG("%d", *data);
@@ -553,7 +555,12 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
     ASSERT(tokenQueue != NULL);
     struct astNode* astNode = NULL;
     struct token* token = NULL;
-    struct list* expression = infixToPostfix(simplifyTokens(nextExpression(tokenQueue)));
+    struct list* rawExpression = nextExpression(tokenQueue);
+    if(list_isEmpty(rawExpression)) {
+        return NULL;
+    }
+
+    struct list* expression = infixToPostfix(simplifyTokens(rawExpression));
     struct list* argStack = list_create();
     
     while (!list_isEmpty(expression)) {
@@ -618,6 +625,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
     // Go through tokens, pick out the first expression. Stop when state determines expression is over
     while(!list_isEmpty(tokenQueue)) {
         nextType = ((struct token*)queue_peek(tokenQueue))->type;
+        LOG("%s", lexer_tokenToString(nextType));
         if(nextType == TOKEN_LPAREN || nextType == TOKEN_LSQUARE) {
             depth++;
         } else if(nextType == TOKEN_RPAREN || nextType == TOKEN_RSQUARE) {

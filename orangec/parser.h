@@ -68,6 +68,7 @@ struct variable {
 
     int isConstant;
     int isPrivate;
+    int isDeclared;
 };
 
 /*

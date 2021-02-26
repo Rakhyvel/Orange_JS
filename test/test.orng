@@ -1,26 +1,49 @@
 static module test
-    ~~
-    struct function:varMap
-    i -> {type="int", ast=null, private=no, constant=no}
-    j -> {type="int", ast=plus(4,5), private=no, constant=no}
-    ~~
+    int i = test2:g()
+
+    ~~ A simple test program that asks for a username and password ~~
     void main()
-        Vector:create(0.0, 0.0).x
-        if i < 5
-            int i = 4
+        char array username = System:input("Username: ")
+        char array password
+        int tries = 0
+        boolean in = false
+
+        while tries < 5 and in isnt true
+            if (password = System:input("Password: ")) is "password123"
+                System:println("Correct! Welcome in")
+                in = true
+            else
+                System:println("Wrong! Try again")
+            end
         end
+        
+        if in
+            displaySecrets()
+        else
+            System:println("Sorry! Goodbye")
+            System:exit(1)
+        end
+    end
+
+    void displaySecrets()
+    end
+
+    int f()
     end
 end
 
-static module Vector
-    struct Vector(real x, real y)
-    private struct test()
-    private int i_4
+module test2
+    int g()
+    end
+end
 
-    Vector create(real x, real y)
-        Vector(x, y)
+static module System
+    void println(char array msg)
     end
 
-    void test()
+    char array input(char array prompt)
+    end
+
+    void exit(int errCode)
     end
 end
