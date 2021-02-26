@@ -238,7 +238,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
     rejectUselessNewLines(tokenQueue);
 
     // VARIABLE
-    if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3)) {
+    if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
         ASSERT(function != NULL);
         struct variable* var = createVar(tokenQueue, function);
         if(var->code == NULL) {

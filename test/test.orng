@@ -1,10 +1,12 @@
-module test
-    struct Vector(real x, real y)
-    struct Entity(Vector pos)
-    struct Player[Entity](real health)
+static module test
+    struct Vector(int i)
+    private int i = 5
 
     void main()
-        Player p = Player(100.0)
-        p.pos = Vector(0.0, 0.0)
+        i = 6
     end
+end
+
+static module test2
+    private const int i = 5
 end

@@ -26,6 +26,7 @@ static void validateAST(struct astNode*, const struct function*, const struct mo
 char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int);
 static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int);
 static void removeArray(char* str);
+static struct variable* findVariable(char*, const struct function*, const struct module* module);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int);
 static char* validateStructField(char*, struct astNode*, struct program*);
 
@@ -208,25 +209,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, "boolean");
         return retval;
     case AST_VAR: {
-        char* varName = (char*)node->data;
-        // Function variable/argument
-        if(function != NULL) {
-            struct variable* var = map_get(function->varMap, varName);
-            struct variable* arg = map_get(function->argMap, varName);
-            if(var != NULL && var->isDeclared) {
-                strcpy(retval, ((struct variable*) map_get(function->varMap, varName))->type);
-                return retval;
-            } else if(arg != NULL) {
-                strcpy(retval, ((struct variable*) map_get(function->argMap, varName))->type);
-                return retval;
-            }
-        }
-        // Module global variable
-        if(map_get(module->globalsMap, varName) != NULL) {
-            strcpy(retval, ((struct variable*) map_get(module->globalsMap, varName))->type);
-            return retval;
-        }
-        error("The variable \"%s\" is not visible", varName);
+        strcpy(retval, findVariable(node->data, function, module)->type);
+        return retval;
     }
     // RECURSIVE CASES
     case AST_ADD:
@@ -248,9 +232,25 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     }
     case AST_ASSIGN: {
         struct astNode* leftAST = node->children->head.next->next->data;
+        struct variable* var;
         if(leftAST->type != AST_VAR && leftAST->type != AST_DOT && leftAST->type != AST_INDEX && leftAST->type != AST_MODULEACCESS) {
             error("Left side of assignment must be a location");
         }
+        if(leftAST->type == AST_VAR) {
+            var = findVariable(leftAST->data, function, module);
+        } else if(leftAST->type == AST_INDEX) {
+            var = findVariable(((struct astNode*)leftAST->children->head.next->next->data)->data, function, module);
+        } else if(leftAST->type == AST_MODULEACCESS) {
+            struct module* newModule = map_get(module->program->modulesMap, ((struct astNode*)leftAST->children->head.next->next->data)->data);
+            var = findVariable(((struct astNode*)leftAST->children->head.next->data)->data, NULL, newModule);
+            if(var->isPrivate) {
+                error("Unknown variable");
+            }
+        }
+        if(var->isConstant) {
+            error("Cannot assign to constant %s", var->name);
+        }
+
         validateBinaryOp(node->children, left, right, function, module, isGlobal);
         if(strcmp(left, right)) {
             error("Type mismatch");
@@ -403,6 +403,25 @@ static void removeArray(char* str) {
             str[i - 1] = '\0';
         }
     }
+}
+
+static struct variable* findVariable(char* name, const struct function* function, const struct module* module) {
+    struct variable* mod = map_get(module->globalsMap, name);
+    if(function != NULL) {
+        struct variable* var = map_get(function->varMap, name);
+        struct variable* arg = map_get(function->argMap, name);
+        if(var != NULL && var->isDeclared) {
+            return var;
+        } else if(arg != NULL) {
+            return arg;
+        }
+    }
+    // Module global variable
+    if(mod != NULL) {
+        return mod;
+    }
+    error("The variable %s is not visible", name);
+    return NULL;
 }
 
 /*

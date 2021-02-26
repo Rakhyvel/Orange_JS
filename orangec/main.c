@@ -25,11 +25,14 @@
     x identifier validation
     x access validation
     x static module validation
-    - struct dot op. for extend structs
-    - constant modify validation
+    x struct dot op. for extend structs
+    x constant modify validation
     - constant define & no declare validation
+    - line numbers/file info for tokens/ast, line list for each module
+    - better error messages
+    - vars belong to blocks, not functions
+    - program has starting point called "int main(char array args)"?
     - non-void functions return
-    - program has function called "int main(char array args)"
 
     Author: Joseph Shimel
     Date: 2/2/21
