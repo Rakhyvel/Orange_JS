@@ -46,8 +46,11 @@ struct token {
 	int line;
 };
 
+// File functions
 char* lexer_readFile(FILE*);
 char** lexer_getLines(char*, int*);
+
+// Token functions
 struct list* lexer_tokenize(const char*, const char*);
 struct token* lexer_createToken(enum tokenType, char[]);
 int lexer_getTokenPrecedence(enum tokenType);

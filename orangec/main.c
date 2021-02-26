@@ -9,54 +9,6 @@
     on to other languages will have an easier time transfering concepts over,
     and will think about programming the way they did in Orange. 
 
-    Modules:
-        Modules contain functions and sometimes globals.
-        Modules can be static. Static modules can define global varibales.
-        Non static modules can define global constants
-        Modules provide a namespace for functions and global variables
-
-        <static >module name
-            ... code ...
-        end
-    Structs:
-        Structs are a collection of named, bundled variables
-        Structs are neccesarily defined in modules, but belong to the program as a whole
-        Structs can be private
-        Private structs can only be used in their containing module
-        Structs are initialized by calling the function with their name
-        Struct types are always references to the location of a struct on the heap (unlike C structs)
-        Struct's fields can be accessed by using the dot (.) operator
-        Structs can extend other structs, and in doing so inherit their fields
-        Struct's inherited fields come before their own
-        Therefore, a reference to a struct is also a refrence to all their parents
-        Struct definition is nebulous
-
-        <private >struct name<[extended struct]>(parameters)
-    Globals:
-        Global variables belong to modules.
-        Globals can be private, meaning they can only be accessed by code in the same module
-        Globals can be constant, meaning their value cannot be changed
-        Globals must be initialized
-        Globals cannot be initialized using other non-constant globals, or functions from static modules
-        Public globals can be accessed using the colon (:) operator
-        Global definition is order dependent
-
-        <private ><const >type name = expr
-    Functions:
-        Functions take in arguments, perform code, and give output
-        Two functions cannot have the same name
-        When calling a function, the argument types and number must match
-        Arguments and function variables cannot have the same name
-        A function must return its declared type
-    Return:
-        Returns set their function's return value, and end the function
-        Void functions can be returns with a simple "return" and no expression
-    While:
-    If:
-    Arrays:
-    Variables:
-    Math:
-
     Author: Joseph Shimel
     Date: 2/2/21
 */
@@ -73,7 +25,7 @@
 #include "../util/list.h"
 #include "../util/map.h"
 
-static struct program* program;
+static struct program* program; // Represents the program as a whole
 
 /*
  * Takes in an array of files to compile
@@ -119,6 +71,9 @@ int main(int argn, char** argv)
     return 0;
 }
 
+/*
+    Takes a pointer to a character, prints characters out until reaches new 
+    line or end of string */
 void println(const char* line) {
     int i = 0;
     int hasBegun = 0;
@@ -134,6 +89,11 @@ void println(const char* line) {
     printf("\n\n");
 }
 
+/*
+    Prints out an error message, with a filename and line number if one is 
+    provided.
+    
+    Works with varargs to provide cool printing features. */
 void error(const char* filename, int line, const char *message, ...) {
     va_list args;
     if(filename != NULL) {

@@ -57,6 +57,12 @@ char* lexer_readFile(FILE* file) {
     return fileContents;
 }
 
+/*
+    Takes in a string representing a file, returns an array of pointers to 
+    characters just after newlines.
+    
+    Used for setting up the data structure for error message printing, where
+    errors print out the line where an error occured */
 char** lexer_getLines(char* filestring, int* numLines) {
     char** retval = malloc(sizeof(char*));
     *numLines = 1;
@@ -421,6 +427,8 @@ static int nextToken(const char* file, int start) {
     return start;
 }
 
+/*
+    Determines if a given string is a float */
 static int numIsFloat(const char* test) {
     for(int i = 0; test[i] != '\0'; i++) {
         if(test[i] == '.') {

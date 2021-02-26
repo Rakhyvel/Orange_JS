@@ -67,6 +67,9 @@ struct module {
     struct program* program;
 };
 
+/*
+    Holds common data for function, structs, and variables such as type, name,
+    an AST, and some flags */
 struct variable {
     char varType[255];
     char type[255];
@@ -92,6 +95,8 @@ struct function {
     struct program* program;
 };
 
+/*
+    Structs are a collection of variables that can be packaged and moved as one */
 struct dataStruct {
     struct variable self;
     struct map* fieldMap; // name -> struct variable
@@ -101,21 +106,22 @@ struct dataStruct {
     struct program* program;
 };
 
+// Init functions
 struct program* parser_initProgram();
 struct module* parser_initModule(struct program*, const char*, int);
 struct function* parser_initFunction(const char*, int);
 struct dataStruct* parser_initDataStruct(const char*, int);
 
+// Pre-processing
 void parser_removeComments(struct list*);
+
+// Parsing elements
 void parser_addModules(struct program*, struct list*);
 void parser_addElements(struct module*, struct list*);
 
+// AST functions
 struct astNode* parser_createAST(struct list*, struct function*);
 void parser_printAST(struct astNode*, int);
-
 char* parser_astToString(enum astType);
-
-bool parser_astTakesTypes(char* types,...);
-char* parser_astReturnType(enum astType, char* inputs,...);
 
 #endif

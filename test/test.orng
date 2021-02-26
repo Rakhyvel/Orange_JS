@@ -1,5 +1,7 @@
 static module main
-    void start()
+    struct lol[poop]()
 
+    void start()
+        integer array i
     end
 end

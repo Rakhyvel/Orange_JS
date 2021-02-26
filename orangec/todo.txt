@@ -26,6 +26,6 @@ x constant define & no declare validation
 x struct extension
 x line numbers/file info for tokens/ast, line list for each module
 x better error messages
-- program has starting point called "int start(char array args)"?
+x program has starting point called "int start(char array args)"?
 
 - everything on the other list

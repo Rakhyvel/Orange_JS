@@ -469,6 +469,9 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     free(nextToken);
 }
 
+/*
+    Takes in a token queue, parses out a variable from it. Variables are marked constant
+    automatically if needed */
 static struct variable* createVar(struct list* tokenQueue, struct function* function) {
     struct variable* retval = (struct variable*)malloc(sizeof(struct variable));
     strcpy(retval->varType, "variable");
@@ -830,6 +833,8 @@ static enum astType tokenToAST(enum tokenType type) {
     }
 }
 
+/*
+    Verifies that the next token is what is expected. Errors otherwise */
 static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
     enum tokenType actual = topToken->type;
@@ -838,6 +843,9 @@ static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
     }
 }
 
+/*
+    Verifies that the next token is what is expected, and removes it. Errors
+    otherwise */
 static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
     enum tokenType actual = topToken->type;
@@ -848,6 +856,8 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
     }
 }
 
+/*
+    Verifies that the next token is an operator. Errors otherwise */
 static void assertOperator(enum astType type, const char* filename, int line) {
     switch(type) {
     case AST_ADD:

@@ -20,7 +20,8 @@
 #include "../util/list.h"
 #include "../util/debug.h"
 
-struct dataStruct* extendStructs(char*, struct program*);
+// Private functions
+struct dataStruct* extendStructs(char*, struct program*, const char*, int);
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
@@ -31,6 +32,9 @@ static struct variable* findVariable(char*, const struct function*, const struct
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, const char*, int);
 static char* validateStructField(char*, char*, struct program*, const char*, int);
 
+/*
+    Takes in a program, looks through structures, modules, globals, and 
+    functions, and validates that they make sense as an Orange program */
 void validator_validate(struct program* program) {
     ASSERT(program != NULL);
 
@@ -40,7 +44,7 @@ void validator_validate(struct program* program) {
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
-        extendStructs(dataStruct->self.name, program);
+        extendStructs(dataStruct->self.name, program, dataStruct->self.filename, dataStruct->self.line);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -94,11 +98,19 @@ void validator_validate(struct program* program) {
     return;
 }
 
-struct dataStruct* extendStructs(char* name, struct program* program) {
+/*
+    Takes in a name of a struct, copies in it's parent struct's fields if any, 
+    and copies in the parent struct's ancestor structs */
+struct dataStruct* extendStructs(char* name, struct program* program, const char* filename, int line) {
     struct dataStruct* dataStruct = map_get(program->dataStructsMap, name);
-    ASSERT(dataStruct != NULL);
+    if(dataStruct == NULL) {
+        return NULL;
+    }
     if(dataStruct->self.type[0] != '\0') {
-        struct dataStruct* parent = extendStructs(dataStruct->self.type, program);
+        struct dataStruct* parent = extendStructs(dataStruct->self.type, program, filename, line);
+        if(parent == NULL) {
+            error(filename, line, "Struct \"%s\" inherits from unknown struct \"%s\"", name, dataStruct->self.type);
+        }
         map_copy(dataStruct->parentSet, parent->parentSet);
 
         struct map* newFieldMap = map_create();
@@ -127,10 +139,12 @@ static int findTypeEnd(const char* type) {
     return i;
 }
 
+/*
+    Checks to see if a type is a primitive, built in type*/
 static int isPrimitive(const char* type) {
-    if(!strcmp(type, "int") || !strcmp(type, "char") ||
+    if(!strcmp(type,  "int") || !strcmp(type, "char") ||
         !strcmp(type, "boolean") || !strcmp(type, "void") || 
-        !strcmp(type, "real")) {
+        !strcmp(type, "real") || !strcmp(type, "byte")) {
         return 1;
     } else {
         return 0;
@@ -153,6 +167,9 @@ static void validateType(const char* type, const struct module* module, const ch
     }
 }
 
+/*
+    Determines if two types are the same. For structs, the expected type may 
+    be a parent struct of the actual struct */
 static int typesMatch(const char* expected, const char* actual, const struct program* program, const char* filename, int line) {
     if(isPrimitive(expected)) {
         return !strcmp(expected, actual);
@@ -174,6 +191,8 @@ static int typesMatch(const char* expected, const char* actual, const struct pro
     }
 }
 
+/*
+    Takes in an AST and checks to make sure that it is correct */
 static void validateAST(struct astNode* node, const struct function* function, const struct module* module) {
     if(node == NULL) return;
 
@@ -483,6 +502,8 @@ static void removeArray(char* str) {
     }
 }
 
+/*
+    Takes in a name, function, and module, and returns a variable, if it can be found */
 static struct variable* findVariable(char* name, const struct function* function, const struct module* module, const char* filename, int line) {
     struct variable* mod = map_get(module->globalsMap, name);
     if(function != NULL) {
