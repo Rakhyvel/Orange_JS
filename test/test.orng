@@ -1,34 +1,10 @@
 static module main
-    const int array testArray = int array[5]
-    ~~
-    A simple chess engine
-    ~~
-    void start()
-    end
-end
+    struct Parent(int i)
+    struct Child[Parent](int j)
 
-module Board
-    struct Board(int array array grid)
-    private struct Piece(int type)
-    const int BOARD_SIZE = 8
-
-    const int EMPTY = 0
-    const int PAWN_ID = 1
-    const int KNIGHT_ID = 2
-    const int BISHOP_ID = 3
-    const int ROOK_ID = 4
-    const int QUEEN_ID = 5
-    const int KING_ID = 6
-
-    ~~
-        Creates a chess board along with all the pieces placed on it ~~
-    Board create()
-        Board retval = Board(int array array[BOARD_SIZE])
-        int i = 0
-        while i < BOARD_SIZE
-            retval.grid[i] = int array[BOARD_SIZE]
-            i = i + 1
-        end
-        return retval
+    void main()
+        Parent p = Child(0, 0)
+        Child c = Child(0, 0)
+        c.i
     end
 end

@@ -88,7 +88,6 @@ struct dataStruct* extendStructs(char* name, struct program* program) {
     if(dataStruct->self.type[0] != '\0') {
         struct dataStruct* parent = extendStructs(dataStruct->self.type, program);
         map_copy(dataStruct->parentSet, parent->parentSet);
-        set_add(dataStruct->parentSet, dataStruct->self.type);
 
         struct map* newFieldMap = map_create();
         struct map* oldMap = dataStruct->fieldMap;
@@ -97,6 +96,7 @@ struct dataStruct* extendStructs(char* name, struct program* program) {
         dataStruct->fieldMap = newFieldMap;
         map_destroy(oldMap);
     }
+    set_add(dataStruct->parentSet, name);
     return dataStruct;
 }
 
@@ -114,6 +114,16 @@ static int findTypeEnd(const char* type) {
     return i;
 }
 
+static int isPrimitive(const char* type) {
+    if(!strcmp(type, "int") || !strcmp(type, "char") ||
+        !strcmp(type, "boolean") || !strcmp(type, "void") || 
+        !strcmp(type, "real")) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 /*
     Checks that a type exists either as a primitive type, or as a user defined struct */
 static void validateType(const char* type, const struct module* module) {
@@ -122,13 +132,20 @@ static void validateType(const char* type, const struct module* module) {
     char temp[255];
     memset(temp, 0, 254);
     strncpy(temp, type, end);
-    if(strcmp(temp, "int") != 0 && strcmp(temp, "char") != 0 && 
-        strcmp(temp, "boolean") != 0 && strcmp(temp, "void") != 0 && 
-        strcmp(temp, "real") != 0) {
+    if(!isPrimitive(temp)) {
         struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, temp);
         if(dataStruct == NULL || (dataStruct->self.isPrivate && dataStruct->module != module)) {
             error("Unrecognized type \"%s\"", type);
         }
+    }
+}
+
+static int typesMatch(const char* expected, const char* actual, const struct program* program) {
+    if(isPrimitive(expected)) {
+        return !strcmp(expected, actual);
+    } else {
+        struct dataStruct* dataStruct = map_get(program->dataStructsMap, actual);
+        return set_contains(dataStruct->parentSet, expected);
     }
 }
 
@@ -155,7 +172,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
         var->isDeclared = 1;
         validateType(var->type, module);
         char *initType = validateExpressionAST(var->code, function, module, 0);
-        if(strcmp(var->type, initType)) {
+        if(!typesMatch(var->type, initType, module->program)) {
             error("Type mismatch when assigning to variable \"%s\"", var->name);
         }
         break;

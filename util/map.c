@@ -120,7 +120,7 @@ int set_add(struct map* set, char* key) {
 /*
     Returns whether or not the given string is in the set */
 int set_contains(struct map* set, const char* key) {
-    return (int)map_get(set, key);
+    return map_get(set, key) != NULL;
 }
 
 /*
