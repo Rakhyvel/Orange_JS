@@ -39,7 +39,7 @@ struct astNode {
     struct list* children; // list of OTHER AST's ONLY!
     void* data;
 
-	char* filename;
+	const char* filename;
 	int line;
 };
 

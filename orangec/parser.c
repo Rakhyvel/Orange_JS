@@ -47,7 +47,7 @@ static struct variable* createVar(struct list*, struct function*);
 static void parseParams(struct list*, struct map*, struct variable*);
 static struct astNode* createBlockAST(struct list*, struct function*);
 static int matchTokens(struct list*, const enum tokenType[], int);
-static struct astNode* createAST(enum astType);
+static struct astNode* createAST(enum astType, const char*, int);
 static struct astNode* createExpressionAST(struct list*);
 static struct list* nextExpression(struct list*);
 static struct list* simplifyTokens(struct list*);
@@ -240,15 +240,14 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
     ASSERT(tokenQueue != NULL);
     struct astNode* retval = NULL;
     rejectUselessNewLines(tokenQueue);
-
+    struct token* topToken = queue_peek(tokenQueue);
     // VARIABLE
     if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
         ASSERT(function != NULL);
+        retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line);
         struct variable* var = createVar(tokenQueue, function);
         if(var->code == NULL) {
-            retval = createAST(AST_VARDECLARE);
-        } else {
-            retval = createAST(AST_VARDEFINE);
+            retval->type = AST_VARDECLARE;
         }
         retval->data = var;
         if(map_put(function->varMap, var->name, var) || map_get(function->argMap, var->name)) {
@@ -258,7 +257,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
     // IF
     else if (matchTokens(tokenQueue, IF, 1)) {
         ASSERT(function != NULL);
-        retval = createAST(AST_IF);
+        retval = createAST(AST_IF, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, function);
         struct astNode* body = createBlockAST(tokenQueue, function);
@@ -282,7 +281,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
     // WHILE
     else if (matchTokens(tokenQueue, WHILE, 1)) {
         ASSERT(function != NULL);
-        retval = createAST(AST_WHILE);
+        retval = createAST(AST_WHILE, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, function);
         struct astNode* body = createBlockAST(tokenQueue, function);
@@ -293,7 +292,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct function* funct
     // RETURN
     else if (matchTokens(tokenQueue, RETURN, 1)) {
         ASSERT(function != NULL);
-        retval = createAST(AST_RETURN);
+        retval = createAST(AST_RETURN, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_RETURN);
         struct astNode* expression = createExpressionAST(tokenQueue);
         queue_push(retval->children, expression);
@@ -515,7 +514,8 @@ static void parseParams(struct list* tokenQueue, struct map* argMap, struct vari
     
     DOES NOT REMOVE FINAL TOKEN! */
 static struct astNode* createBlockAST(struct list* tokenQueue, struct function* function) {
-    struct astNode* block = createAST(AST_BLOCK);
+    struct token* topToken = queue_peek(tokenQueue);
+    struct astNode* block = createAST(AST_BLOCK, topToken->filename, topToken->line);
     rejectUselessNewLines(tokenQueue);
     // Go through statements in token queue until an end token is found
     while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_END &&
@@ -545,10 +545,12 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
 
 /*
     Allocates and initializes an Abstract Syntax Tree node, with the proper type */
-static struct astNode* createAST(enum astType type) {
+static struct astNode* createAST(enum astType type, const char* filename, int line) {
     struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
+    retval->filename = filename;
+    retval->line = line;
     return retval;
 }
 
@@ -570,7 +572,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
     while (!list_isEmpty(expression)) {
         struct listElem* elem = NULL;
         token = (struct token*)queue_pop(expression);
-        astNode = createAST(AST_NOP);
+        astNode = createAST(AST_NOP, token->filename, token->line);
         int* intData;
         float* realData;
         char* charData;
