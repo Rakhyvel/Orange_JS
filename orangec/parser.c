@@ -63,6 +63,7 @@ struct program* parser_initProgram() {
     struct program* retval = (struct program*) calloc(1, sizeof(struct program));
     retval->modulesMap = map_create();
     retval->dataStructsMap = map_create();
+    retval->fileMap = map_create();
     return retval;
 }
 

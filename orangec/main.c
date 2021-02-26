@@ -89,10 +89,19 @@ int main(int argn, char** argv)
     for(int i = 1; i < argn; i++)
     {
         LOG("Reading file %s", argv[i]);
-        char* file = lexer_readFile(argv[i]);
+        FILE* file = fopen(argv[i], "r");
+        char* filestring = lexer_readFile(file);
+        fclose(file);
+        int numLines;
+        char** lines = lexer_getLines(filestring, &numLines);
+        struct file* fileStruct = malloc(sizeof(struct file));
+        fileStruct->lines = lines;
+        fileStruct->nLines = numLines;
+        map_put(program->fileMap, argv[i], fileStruct);
+        LOG("End file reading");
 
         LOG("\n\nBegin Tokenization.");
-        struct list* tokenQueue = lexer_tokenize(file);
+        struct list* tokenQueue = lexer_tokenize(filestring, argv[i]);
         LOG("\nEnd Tokenization\n");
 
         LOG("\n\nBegin Parsing.");

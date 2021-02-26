@@ -8,6 +8,7 @@
 #define PARSER_H
 
 #include <stdbool.h>
+#include "./main.h"
 #include "../util/list.h"
 
 /*
@@ -37,6 +38,9 @@ struct astNode {
     enum astType type;
     struct list* children; // list of OTHER AST's ONLY!
     void* data;
+
+	char* filename;
+	int line;
 };
 
 /*
@@ -44,7 +48,7 @@ struct astNode {
 struct program {
     struct map* modulesMap; // name -> struct module
     struct map* dataStructsMap; // name -> struct dataStruct
-    // moduleName -> array of lines
+    struct map* fileMap;
 };
 
 /*

@@ -29,6 +29,7 @@ static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',',
                                       '=', '\n', '~', ':'};
 
 // Private functions
+char* readLine(FILE* file);
 static bool charIsToken(char);
 static int nextToken(const char*, int);
 static int numIsFloat(const char*);
@@ -38,16 +39,13 @@ static void copyToken(const char* src, char* dst, int start, int end);
 /*
  * Read in a file given a filename, and extracts the characters to a single string
  */
-char* lexer_readFile(const char *filename)
-{
+char* lexer_readFile(FILE* file) {
     int buffer;
     char* fileContents;
-    int capacity = 10;
     int size = 0;
-    FILE* file = fopen(filename, "r");
 
     /* Add char to end of content, reallocate when necessary */
-    fileContents = malloc(sizeof(char) * capacity);
+    fileContents = malloc(sizeof(char));
     while((buffer = fgetc(file)) != EOF)
     {
         size++;
@@ -55,9 +53,25 @@ char* lexer_readFile(const char *filename)
         fileContents[size - 1] = (char)buffer;  /* Convert int buffer to char, append */
     }
     fileContents[size] = '\0'; /* Add the sentinel value */
-    fclose(file);
     
     return fileContents;
+}
+
+char** lexer_getLines(char* filestring, int* numLines) {
+    char** retval = calloc(1, sizeof(char*));
+    *numLines = 1;
+    int i = 0;
+    
+    while(filestring[i] != '\0') {
+        if(filestring[i] == '\n') {
+            (*numLines)++;
+            retval = realloc(retval, (*numLines + 1) * sizeof(char*));
+            retval[*numLines - 1] = filestring + (i - 1) * sizeof(char*);
+        }
+        i++;
+    }
+
+    return retval;
 }
 
 /*
@@ -67,13 +81,14 @@ char* lexer_readFile(const char *filename)
     substring(start, end) is token, interpret
     move start up to begining of next token
     if start or end is at the end of file, end. Otherwise, repeat. */
-struct list* lexer_tokenize(const char *file) {
+struct list* lexer_tokenize(const char *file, const char* filename) {
     struct list* tokenQueue = list_create();
     struct token* tempToken = NULL;
     enum tokenType tempType;
     int start = 0, end;
     char tokenBuffer[64];
     int fileLength = strlen(file);
+    int line = 0;
 
     do {
         end = nextToken(file, start);
@@ -88,6 +103,7 @@ struct list* lexer_tokenize(const char *file) {
         } else if(strcmp("]", tokenBuffer) == 0) {
             tempType = TOKEN_RSQUARE;
         } else if(strcmp("\n", tokenBuffer) == 0) {
+            line++;
             tempType = TOKEN_NEWLINE;
         } else if(strcmp("~", tokenBuffer) == 0) {
             tempType = TOKEN_TILDE;
@@ -164,6 +180,8 @@ struct list* lexer_tokenize(const char *file) {
         if(tempType != -1) {
             tempToken = lexer_createToken(tempType, tokenBuffer);
             queue_push(tokenQueue, tempToken);
+            tempToken->filename = filename;
+            tempToken->line = line;
             if(tempType == TOKEN_NEWLINE) {
                 LOG("Added token: %s %s", lexer_tokenToString(tempType), "\\n");
             } else {

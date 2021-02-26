@@ -41,10 +41,14 @@ struct token {
     enum tokenType type;
     char data[255];
 	struct list* list;
+	
+	const char* filename;
+	int line;
 };
 
-char* lexer_readFile(const char *filename);
-struct list* lexer_tokenize(const char *file);
+char* lexer_readFile(FILE*);
+char** lexer_getLines(char*, int*);
+struct list* lexer_tokenize(const char*, const char*);
 struct token* lexer_createToken(enum tokenType, char[]);
 int lexer_getTokenPrecedence(enum tokenType);
 char* lexer_tokenToString(enum tokenType);
