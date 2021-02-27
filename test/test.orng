@@ -1,7 +1,14 @@
-static module main
-    struct lol[poop]()
-
+static module Chess
     void start()
-        integer array i
+
+    end
+end
+
+module Board
+    struct Piece(int side, int type)
+    struct Board(Piece array grid)
+
+    Board create()
+        
     end
 end
