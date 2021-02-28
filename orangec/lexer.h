@@ -12,7 +12,7 @@
 /*
 	Tokens have types that distinguish them from other tokens easily */
 enum tokenType {
-    TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_LSQUARE, TOKEN_RSQUARE,
+    TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_LSQUARE, TOKEN_RSQUARE, TOKEN_LBRACE, TOKEN_RBRACE,
 	// Punctuation
 	TOKEN_COMMA, TOKEN_DOT, TOKEN_NEWLINE, TOKEN_TILDE, TOKEN_COLON,
 	// Literals

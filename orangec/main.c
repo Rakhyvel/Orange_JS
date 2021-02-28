@@ -62,11 +62,11 @@ int main(int argn, char** argv)
         parser_removeComments(tokenQueue);
         parser_addModules(program, tokenQueue);
         LOG("\nEnd Parsing.\n");
-
-        LOG("\nBegin Validating.");
-        validator_validate(program);
-        LOG("\nEnd Validating.\n");
     }
+
+    LOG("\nBegin Validating.");
+    validator_validate(program);
+    LOG("\nEnd Validating.\n");
     printf("Done.\n");
     return 0;
 }
@@ -97,7 +97,7 @@ void println(const char* line) {
 void error(const char* filename, int line, const char *message, ...) {
     va_list args;
     if(filename != NULL) {
-        fprintf(stderr, "%s:%d error: ", filename, line);
+        fprintf(stderr, "%s:%d error: ", filename, (line + 1));
     } else {
         fprintf(stderr, "error: ");
     }

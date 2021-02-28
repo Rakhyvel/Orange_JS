@@ -1,14 +1,25 @@
-static module Chess
+static module Main
+    int i = 4
+
     void start()
-
-    end
-end
-
-module Board
-    struct Piece(int side, int type)
-    struct Board(Piece array grid)
-
-    Board create()
+        char myFavoriteLetter = getFavoriteLetter()
         
+        Rect r = Rect(100, 100, 100, 50)
+        if true
+            Canvas:setColor(Color(255, 255, 0, 0))
+        else
+            Canvas:setColor(Color(255, 0, 0, 255))
+        end
+        Canvas:fillRect(i)
+        Canvas:setColor(Color(255, 255, 255, 255))
+        Canvas:drawString("Click me!", 150, 125, 16)
+    end
+    
+    char getFavoriteLetter()
+        return 'M'
+    end
+
+    boolean isHovered(Rect r) 
+        return Canvas:getMouseX() > r.x and Canvas:getMouseX() < r.x + r.w and Canvas:getMouseY() > r.y and Canvas:getMouseY() < r.y + r.h
     end
 end

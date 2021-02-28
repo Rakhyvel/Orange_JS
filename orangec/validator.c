@@ -25,11 +25,11 @@ struct dataStruct* extendStructs(char*, struct program*, const char*, int);
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
-char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int);
-static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int);
+char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int, int);
+static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int, int);
 static void removeArray(char*);
 static struct variable* findVariable(char*, const struct function*, const struct module*, const char*, int);
-static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, const char*, int);
+static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, int, const char*, int);
 static char* validateStructField(char*, char*, struct program*, const char*, int);
 
 /*
@@ -68,7 +68,7 @@ void validator_validate(struct program* program) {
             if(global->code == NULL) {
                 error(global->filename, global->line, "Global \"%s\" was not initialized");
             }
-            char *initType = validateExpressionAST(global->code, NULL, module, 1);
+            char *initType = validateExpressionAST(global->code, NULL, module, 1, 1);
             if(strcmp(global->type, initType)) {
                 error(global->filename, global->line, "Value type mismatch when assigning to variable \"%s\". Expected \"%s\" type, actual type was \"%s\" ", global->name, global->type, initType);
             }
@@ -215,7 +215,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
         var = (struct variable*) node->data;
         var->isDeclared = 1;
         validateType(var->type, module, var->filename, var->line);
-        char *initType = validateExpressionAST(var->code, function, module, 0);
+        char *initType = validateExpressionAST(var->code, function, module, 0, 0);
         if(!typesMatch(var->type, initType, module->program, var->filename, var->line)) {
             error(var->filename, var->line, "Value type mismatch when assigning to variable \"%s\". Expected \"%s\" type, actual type was \"%s\" ", var->name, var->type, initType);
         }
@@ -224,7 +224,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
     case AST_IF: {
         struct astNode* condition = node->children->head.next->data;
         struct astNode* block = node->children->head.next->next->data;
-        char *conditionType = validateExpressionAST(condition, function, module, 0);
+        char *conditionType = validateExpressionAST(condition, function, module, 0, 0);
         if(strcmp("boolean", conditionType)) {
             error(condition->filename, condition->line, "If expected boolean type, actual type was \"%s\" ", conditionType);
         }
@@ -238,7 +238,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
     case AST_WHILE: {
         struct astNode* condition = node->children->head.next->data;
         struct astNode* block = node->children->head.next->next->data;
-        char *conditionType = validateExpressionAST(condition, function, module, 0);
+        char *conditionType = validateExpressionAST(condition, function, module, 0, 0);
         if(strcmp("boolean", conditionType)) {
             error(condition->filename, condition->line,"While expected boolean type, actual type was \"%s\" ", conditionType);
         }
@@ -252,7 +252,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
                 error(retval->filename, retval->line,"Cannot return value from void type function");
             }
         } else {
-            char *returnType = validateExpressionAST(retval, function, module, 0);
+            char *returnType = validateExpressionAST(retval, function, module, 0, 0);
             if(strcmp(function->self.type, returnType)) {
                 error(retval->filename, retval->line,"Return values do not match, expected \"%s\" , actual was \"%s\" ", function->self.type, returnType);
             }
@@ -260,14 +260,14 @@ static void validateAST(struct astNode* node, const struct function* function, c
         break;
     }
     default:
-        LOG("%p", validateExpressionAST(node, function, module, 0));
+        LOG("%p", validateExpressionAST(node, function, module, 0, 0));
     }
 }
 
 /*
     Recursively goes through expression, checks to make sure that the type of 
     the inputs is correct, returns output type based on input */
-char* validateExpressionAST(struct astNode* node, const struct function* function, const struct module* module, int isGlobal) {
+char* validateExpressionAST(struct astNode* node, const struct function* function, const struct module* module, int isGlobal, int external) {
     char left[255], right[255];
     char* retval = (char*)malloc(sizeof(char) * 255);
 
@@ -300,7 +300,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     case AST_SUBTRACT:
     case AST_MULTIPLY:
     case AST_DIVIDE: {
-        validateBinaryOp(node->children, left, right, function, module, isGlobal);
+        validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
         if((!strcmp(left, "real") && !strcmp(right, "real")) || 
             (!strcmp(left, "real") && !strcmp(right, "int")) || 
             (!strcmp(left, "int") && !strcmp(right, "real"))) {
@@ -338,7 +338,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             error(node->filename, node->line, "Cannot assign to constant \"%s\" ", var->name);
         }
         // Left/right type matching
-        validateBinaryOp(node->children, left, right, function, module, isGlobal);
+        validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
         if(!typesMatch(left, right, module->program, node->filename, node->line)) {
             error(node->filename, node->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", left, right);
         }
@@ -347,7 +347,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     }
     case AST_OR:
     case AST_AND:
-        validateBinaryOp(node->children, left, right, function, module, isGlobal);
+        validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
          if(!strcmp(left, "boolean") && !strcmp(right, "boolean")) {
             strcpy(retval, "boolean");
             return retval;
@@ -356,7 +356,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
     case AST_GREATER:
     case AST_LESSER:{
-        validateBinaryOp(node->children, left, right, function, module, isGlobal);
+        validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
         if((!strcmp(left, "real") && !strcmp(right, "real")) || 
             (!strcmp(left, "real") && !strcmp(right, "int")) || 
             (!strcmp(left, "int") && !strcmp(right, "real")) ||
@@ -381,7 +381,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         } 
         // STRUCT INIT
         else if(dataStruct != NULL) {
-            int err = validateParamType(node->children, dataStruct->fieldMap, function, module, isGlobal, node->filename, node->line);
+            int err = validateParamType(node->children, dataStruct->fieldMap, function, module, isGlobal, external, node->filename, node->line);
             if(!err) {
                 strcpy(retval, node->data);
                 return retval;
@@ -396,7 +396,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             if(isGlobal && module->isStatic) {
                 error(node->filename, node->line, "Cannot call a static function from global scope");
             }
-            int err = validateParamType(node->children, callee->argMap, function, module, isGlobal, node->filename, node->line);
+            int err = validateParamType(node->children, callee->argMap, function, module, isGlobal, external, node->filename, node->line);
             
             if(!err) {
                 strcpy(retval, callee->self.type);
@@ -414,7 +414,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
 
-        char* type = validateExpressionAST(leftAST, function, module, isGlobal);
+        char* type = validateExpressionAST(leftAST, function, module, isGlobal, external);
         strcpy(retval, validateStructField(type, rightAST->data, module->program, node->filename, node->line));
         return retval;
     }
@@ -428,12 +428,12 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         } 
         // ARRAY INDEXING
         else {
-            char* rightType = validateExpressionAST(rightAST, function, module, isGlobal);
+            char* rightType = validateExpressionAST(rightAST, function, module, isGlobal, external);
             if(strcmp(rightType, "int")) {
                 error(node->filename, node->line, "Value type mismatch when indexing array. Expected int type, actual type was \"%s\" ", rightType);
             }
 
-            char* leftType = validateExpressionAST(leftAST, function, module, isGlobal);
+            char* leftType = validateExpressionAST(leftAST, function, module, isGlobal, external);
             if(!strstr(leftType, " array")) {
                 error(node->filename, node->line, "Value type mismatch when indexing array. Expected array type, actual type was \"%s\" ", leftType);
             }
@@ -469,7 +469,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         int varExists = (map_get(newModule->globalsMap, rightAST->data) != NULL &&
                         !((struct variable*)map_get(newModule->globalsMap, rightAST->data))->isPrivate);
         if(funcExists || varExists) {
-            return validateExpressionAST(rightAST, NULL, newModule, isGlobal);
+            return validateExpressionAST(rightAST, function, newModule, isGlobal, 1);
         } else if(rightAST->type == AST_CALL) {
             error(node->filename, node->line, "Module \"%s\" does not contain function \"%s\"", leftAST->data, rightAST->data);
         } else if(rightAST->type == AST_VAR) {
@@ -484,9 +484,9 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
 
 /*
     Copies the types of both the left expression and right expression to given strings. */
-static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module, int isGlobal) {
-    strcpy(rightType, validateExpressionAST(children->head.next->data, function, module, isGlobal));
-    strcpy(leftType, validateExpressionAST(children->head.next->next->data, function, module, isGlobal));
+static void validateBinaryOp(struct list* children, char* leftType, char* rightType, const struct function* function, const struct module* module, int isGlobal, int external) {
+    strcpy(rightType, validateExpressionAST(children->head.next->data, function, module, isGlobal, external));
+    strcpy(leftType, validateExpressionAST(children->head.next->next->data, function, module, isGlobal, external));
 }
 
 /*
@@ -506,14 +506,12 @@ static void removeArray(char* str) {
     Takes in a name, function, and module, and returns a variable, if it can be found */
 static struct variable* findVariable(char* name, const struct function* function, const struct module* module, const char* filename, int line) {
     struct variable* mod = map_get(module->globalsMap, name);
-    if(function != NULL) {
-        struct variable* var = map_get(function->varMap, name);
-        struct variable* arg = map_get(function->argMap, name);
-        if(var != NULL && var->isDeclared) {
-            return var;
-        } else if(arg != NULL) {
-            return arg;
-        }
+    struct variable* var = map_get(function->varMap, name);
+    struct variable* arg = map_get(function->argMap, name);
+    if(var != NULL && var->isDeclared) {
+        return var;
+    } else if(arg != NULL) {
+        return arg;
     }
     // Module global variable
     if(mod != NULL) {
@@ -530,7 +528,7 @@ static struct variable* findVariable(char* name, const struct function* function
     Returns: 1 when too many args, 
             -1 when too few args,
              0 when okay args. */
-static int validateParamType(struct list* args, struct map* paramMap, const struct function* function, const struct module* module, int isGlobal, const char* filename, int line) {
+static int validateParamType(struct list* args, struct map* paramMap, const struct function* function, const struct module* module, int isGlobal, int external,const char* filename, int line) {
     struct list* params = map_getKeyList(paramMap);
     struct listElem* paramElem;
     struct listElem* argElem;
@@ -538,7 +536,7 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
         paramElem != list_end(params) && argElem != list_end(args); 
         paramElem = list_next(paramElem), argElem = list_next(argElem)) {
         char* paramType = ((struct variable*)map_get(paramMap, ((char*)paramElem->data)))->type;
-        char* argType = validateExpressionAST((struct astNode*)argElem->data, function, module, isGlobal);
+        char* argType = validateExpressionAST((struct astNode*)argElem->data, function, module, isGlobal, external);
         if(strcmp(paramType, argType)) {
             error(filename, line, "Value type mismatch when passing argument to function. Expected \"%s\" type, actual type was \"%s\" ", argType, paramType);
         }
