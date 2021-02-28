@@ -26,7 +26,7 @@
 /* These characters are whole tokens themselves */
 static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
-                                      '=', '\n', '~', ':'};
+                                      '=', '~', ':'};
 
 // Private functions
 char* readLine(FILE* file);
@@ -109,13 +109,16 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_LSQUARE;
         } else if(strcmp("]", tokenBuffer) == 0) {
             tempType = TOKEN_RSQUARE;
-        } else if(strcmp("\n", tokenBuffer) == 0) {
-            line++;
-            tempType = TOKEN_NEWLINE;
+        } else if(strcmp("{", tokenBuffer) == 0) {
+            tempType = TOKEN_LBRACE;
+        } else if(strcmp("}", tokenBuffer) == 0) {
+            tempType = TOKEN_RBRACE;
         } else if(strcmp("~", tokenBuffer) == 0) {
             tempType = TOKEN_TILDE;
         } else if(strcmp(",", tokenBuffer) == 0) {
             tempType = TOKEN_COMMA;
+        } else if(strcmp(";", tokenBuffer) == 0) {
+            tempType = TOKEN_SEMICOLON;
         } else if(strcmp(".", tokenBuffer) == 0) {
             tempType = TOKEN_DOT;
         } else if(strcmp(":", tokenBuffer) == 0) {
@@ -189,11 +192,7 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             queue_push(tokenQueue, tempToken);
             tempToken->filename = filename;
             tempToken->line = line;
-            if(tempType == TOKEN_NEWLINE) {
-                LOG("Added token: %s %s", lexer_tokenToString(tempType), "\\n");
-            } else {
-                LOG("Added token: %s %s", lexer_tokenToString(tempType), tokenBuffer);
-            }
+            LOG("Added token: %s %s", lexer_tokenToString(tempType), tokenBuffer);
         }
         start = nextNonWhitespace(file, end);
         tempToken = NULL;
@@ -254,12 +253,16 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:LSQUARE";
     case TOKEN_RSQUARE:
         return "token:RSQUARE";
+    case TOKEN_LBRACE:
+        return "token:LBRACE";
+    case TOKEN_RBRACE:
+        return "token:RBRACE";
     case TOKEN_COMMA:
         return "token:COMMA";
     case TOKEN_DOT:
         return "token:DOT";
-    case TOKEN_NEWLINE:
-        return "token:NEWLINE";
+    case TOKEN_SEMICOLON:
+        return "token:SEMICOLON";
     case TOKEN_EOF:
         return "token:EOF";
     case TOKEN_IDENTIFIER:
@@ -350,7 +353,7 @@ static int nextNonWhitespace(const char* file, int start) {
     char nextChar = file[start];
     while (nextChar != '\0') {
         nextChar = file[start];
-        if(!isspace(nextChar) || nextChar == '\n') {
+        if(!isspace(nextChar)) {
             return start;
         }
         start++;

@@ -28,8 +28,9 @@ x line numbers/file info for tokens/ast, line list for each module
 x better error messages
 x program has starting point called "int start(char array args)"?
 
-- switch back to curly brace syntax to blocks
-- add back semicolon syntax
+x switch back to curly brace syntax to blocks
+x add back semicolon syntax
+- blocks scope variables, not functions
 - assert ifs must have block, else must have if or block
 - assert while must have block
 - struct parameters

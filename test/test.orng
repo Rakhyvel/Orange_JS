@@ -1,25 +1,22 @@
-static module Main
-    int i = 4
+module Main {
+    void start() {
+        int i = 4;
+        call(i);
+        if i > 0 {
 
-    void start()
-        char myFavoriteLetter = getFavoriteLetter()
-        
-        Rect r = Rect(100, 100, 100, 50)
-        if true
-            Canvas:setColor(Color(255, 255, 0, 0))
-        else
-            Canvas:setColor(Color(255, 0, 0, 255))
-        end
-        Canvas:fillRect(i)
-        Canvas:setColor(Color(255, 255, 255, 255))
-        Canvas:drawString("Click me!", 150, 125, 16)
-    end
-    
-    char getFavoriteLetter()
-        return 'M'
-    end
+        } else if i < 0 {
 
-    boolean isHovered(Rect r) 
-        return Canvas:getMouseX() > r.x and Canvas:getMouseX() < r.x + r.w and Canvas:getMouseY() > r.y and Canvas:getMouseY() < r.y + r.h
-    end
-end
+        } else {
+            i = 3;
+            i = call(call(i));
+        }
+
+        while i < 5 {
+            i = i + 1;
+        }
+    }
+
+    int call(int i) {
+
+    }
+}
