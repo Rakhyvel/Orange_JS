@@ -30,7 +30,7 @@ x program has starting point called "int start(char array args)"?
 
 x switch back to curly brace syntax to blocks
 x add back semicolon syntax
-- blocks scope variables, not functions
+x blocks scope variables, not functions
 - assert ifs must have block, else must have if or block
 - assert while must have block
 - struct parameters

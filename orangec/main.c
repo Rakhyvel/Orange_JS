@@ -25,8 +25,6 @@
 #include "../util/list.h"
 #include "../util/map.h"
 
-static struct program* program; // Represents the program as a whole
-
 /*
  * Takes in an array of files to compile
  * 

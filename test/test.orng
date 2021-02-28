@@ -1,22 +1,16 @@
-module Main {
+static module Main {
     void start() {
         int i = 4;
-        call(i);
-        if i > 0 {
-
-        } else if i < 0 {
-
-        } else {
-            i = 3;
-            i = call(call(i));
-        }
-
-        while i < 5 {
-            i = i + 1;
+        if i < 4 {
+            i = 4;
         }
     }
+}
 
-    int call(int i) {
+static module Test {
+    int i = 4;
+
+    int test() {
 
     }
 }

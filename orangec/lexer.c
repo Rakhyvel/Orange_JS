@@ -192,7 +192,7 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             queue_push(tokenQueue, tempToken);
             tempToken->filename = filename;
             tempToken->line = line;
-            LOG("Added token: %s %s", lexer_tokenToString(tempType), tokenBuffer);
+            LOG("Added token: %s \"%s\"", lexer_tokenToString(tempType), tokenBuffer);
         }
         start = nextNonWhitespace(file, end);
         tempToken = NULL;

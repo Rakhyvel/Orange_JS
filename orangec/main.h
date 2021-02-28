@@ -7,6 +7,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+#include "./parser.h"
+
 /*
     Represents a file, holds an array of lines, and the number of lines.
     
@@ -17,6 +19,8 @@ struct file {
     char** lines;
     int nLines;
 };
+
+struct program* program;
 
 void error(const char* filename, int line, const char* msg, ...);
 

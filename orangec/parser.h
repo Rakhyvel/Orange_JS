@@ -51,6 +51,11 @@ struct program {
     struct map* fileMap;
 };
 
+struct block {
+    struct block* parent;
+    struct map* varMap;
+};
+
 /*
     Modules are a way of collecting functions and module together in one place.
     They offer a namespace to help keep code readable and organized. They can 
@@ -58,7 +63,7 @@ struct program {
 struct module {
     char name[255];
     struct map* functionsMap; // name -> struct function
-    struct map* globalsMap; // name -> struct variable
+    struct block* block;
 
     int isStatic;
 
@@ -88,8 +93,8 @@ struct variable {
     Functions take in input, perform actions on that input, and produce output. */
 struct function {
     struct variable self;
-    struct map* argMap; // name -> struct variable
-    struct map* varMap; // name -> struct variable
+    struct block* argBlock;
+    struct block* codeBlock;
 
     struct module* module;
     struct program* program;
@@ -111,6 +116,7 @@ struct program* parser_initProgram();
 struct module* parser_initModule(struct program*, const char*, int);
 struct function* parser_initFunction(const char*, int);
 struct dataStruct* parser_initDataStruct(const char*, int);
+struct block* parser_initBlock(struct block*);
 
 // Pre-processing
 void parser_removeComments(struct list*);
@@ -120,7 +126,7 @@ void parser_addModules(struct program*, struct list*);
 void parser_addElements(struct module*, struct list*);
 
 // AST functions
-struct astNode* parser_createAST(struct list*, struct function*);
+struct astNode* parser_createAST(struct list*, struct block*);
 void parser_printAST(struct astNode*, int);
 char* parser_astToString(enum astType);
 

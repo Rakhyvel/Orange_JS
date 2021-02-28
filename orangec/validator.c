@@ -21,21 +21,23 @@
 #include "../util/debug.h"
 
 // Private functions
-struct dataStruct* extendStructs(char*, struct program*, const char*, int);
+struct dataStruct* extendStructs(char*, const char*, int);
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
 char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int, int);
 static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int, int);
 static void removeArray(char*);
-static struct variable* findVariable(char*, const struct function*, const struct module*, const char*, int);
+static struct variable* findGlobal(char* moduleName, char* name, const char* filename, int line);
+static struct variable* findFunction(char* moduleName, char* name, const char* filename, int line);
+static struct variable* findVariable(char*, struct block*, const char*, int);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, int, const char*, int);
-static char* validateStructField(char*, char*, struct program*, const char*, int);
+static char* validateStructField(char*, char*, const char*, int);
 
 /*
     Takes in a program, looks through structures, modules, globals, and 
     functions, and validates that they make sense as an Orange program */
-void validator_validate(struct program* program) {
+void validator_validate() {
     ASSERT(program != NULL);
 
     int hasStart = 0;
@@ -44,7 +46,7 @@ void validator_validate(struct program* program) {
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
-        extendStructs(dataStruct->self.name, program, dataStruct->self.filename, dataStruct->self.line);
+        extendStructs(dataStruct->self.name, dataStruct->self.filename, dataStruct->self.line);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -53,10 +55,10 @@ void validator_validate(struct program* program) {
         struct module* module = map_get(program->modulesMap, (char*)moduleElem->data);
 
         // VALIDATE GLOBALS
-        struct list* globals = map_getKeyList(module->globalsMap);
+        struct list* globals = map_getKeyList(module->block->varMap);
         struct listElem* globalElem;
         for(globalElem = list_begin(globals); globalElem != list_end(globals); globalElem = list_next(globalElem)) {
-            struct variable* global = map_get(module->globalsMap, (char*)globalElem->data);
+            struct variable* global = map_get(module->block->varMap, (char*)globalElem->data);
             // VALIDATE STATE
             if(!module->isStatic && !global->isConstant) {
                 error(global->filename, global->line, "Global variable \"%s\" declared in non-state module \"%s\"", global->name, module->name);
@@ -101,13 +103,13 @@ void validator_validate(struct program* program) {
 /*
     Takes in a name of a struct, copies in it's parent struct's fields if any, 
     and copies in the parent struct's ancestor structs */
-struct dataStruct* extendStructs(char* name, struct program* program, const char* filename, int line) {
+struct dataStruct* extendStructs(char* name, const char* filename, int line) {
     struct dataStruct* dataStruct = map_get(program->dataStructsMap, name);
     if(dataStruct == NULL) {
         return NULL;
     }
     if(dataStruct->self.type[0] != '\0') {
-        struct dataStruct* parent = extendStructs(dataStruct->self.type, program, filename, line);
+        struct dataStruct* parent = extendStructs(dataStruct->self.type, filename, line);
         if(parent == NULL) {
             error(filename, line, "Struct \"%s\" inherits from unknown struct \"%s\"", name, dataStruct->self.type);
         }
@@ -160,7 +162,7 @@ static void validateType(const char* type, const struct module* module, const ch
     memset(temp, 0, 254);
     strncpy(temp, type, end);
     if(!isPrimitive(temp)) {
-        struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, temp);
+        struct dataStruct* dataStruct = map_get(program->dataStructsMap, temp);
         if(dataStruct == NULL || (dataStruct->self.isPrivate && dataStruct->module != module)) {
             error(filename, line, "Unknown type \"%s\" ", type);
         }
@@ -170,7 +172,7 @@ static void validateType(const char* type, const struct module* module, const ch
 /*
     Determines if two types are the same. For structs, the expected type may 
     be a parent struct of the actual struct */
-static int typesMatch(const char* expected, const char* actual, const struct program* program, const char* filename, int line) {
+static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
     if(isPrimitive(expected)) {
         return !strcmp(expected, actual);
     } else if(strstr(expected, " array") != NULL){
@@ -216,7 +218,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
         var->isDeclared = 1;
         validateType(var->type, module, var->filename, var->line);
         char *initType = validateExpressionAST(var->code, function, module, 0, 0);
-        if(!typesMatch(var->type, initType, module->program, var->filename, var->line)) {
+        if(!typesMatch(var->type, initType, var->filename, var->line)) {
             error(var->filename, var->line, "Value type mismatch when assigning to variable \"%s\". Expected \"%s\" type, actual type was \"%s\" ", var->name, var->type, initType);
         }
         break;
@@ -291,7 +293,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, "boolean");
         return retval;
     case AST_VAR: {
-        struct variable* var = findVariable(node->data, function, module, node->filename, node->line);
+        struct variable* var = findVariable(node->data, function->codeBlock, node->filename, node->line);
         strcpy(retval, var->type);
         return retval;
     }
@@ -315,31 +317,28 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     }
     case AST_ASSIGN: {
         struct astNode* leftAST = node->children->head.next->next->data;
-        struct variable* var = NULL;
+        struct variable* var = NULL; // Needs to have a var to assign to
         if(leftAST->type != AST_VAR && leftAST->type != AST_DOT && leftAST->type != AST_INDEX && leftAST->type != AST_MODULEACCESS) {
             error(node->filename, node->line, "Left side of assignment must be a location");
         }
-        // Constant assignment validation
+        // Constant assignment validation- find variable associated with assignment
         if(leftAST->type == AST_VAR) {
-            var = findVariable(leftAST->data, function, module, node->filename, node->line);
+            var = findVariable(leftAST->data, function->codeBlock, node->filename, node->line);
         } else if(leftAST->type == AST_MODULEACCESS) {
-            struct module* newModule = map_get(module->program->modulesMap, ((struct astNode*)leftAST->children->head.next->next->data)->data);
-            struct astNode* modRight = (struct astNode*)leftAST->children->head.next->data;
-            if(modRight->type == AST_VAR) {
-                var = findVariable(((struct astNode*)leftAST->children->head.next->data)->data, NULL, newModule, node->filename, node->line);
-                if(var->isPrivate) {
-                    error(node->filename, node->line, "Unknown variable");
-                }
-            } else if(modRight->type != AST_INDEX) {
+            struct astNode* moduleIdent = leftAST->children->head.next->next->data;
+            struct astNode* nameIdent = leftAST->children->head.next->data;
+            if(nameIdent->type != AST_VAR) {
                 error(node->filename, node->line, "Left side of assignment must be a location");
             }
+            var = findGlobal(moduleIdent->data, nameIdent->data, node->filename, node->line);
         }
+        // Indexing is not checked, you can change the contents of an array if it is constant
         if(var != NULL && var->isConstant) {
             error(node->filename, node->line, "Cannot assign to constant \"%s\" ", var->name);
         }
         // Left/right type matching
         validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
-        if(!typesMatch(left, right, module->program, node->filename, node->line)) {
+        if(!typesMatch(left, right, node->filename, node->line)) {
             error(node->filename, node->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", left, right);
         }
         strcpy(retval, left);
@@ -372,7 +371,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, "boolean");
         return retval;
     case AST_CALL: {
-        struct dataStruct* dataStruct = map_get(module->program->dataStructsMap, node->data);
+        struct dataStruct* dataStruct = map_get(program->dataStructsMap, node->data);
         struct function* callee = map_get(module->functionsMap, (char*)node->data);
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
@@ -396,7 +395,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             if(isGlobal && module->isStatic) {
                 error(node->filename, node->line, "Cannot call a static function from global scope");
             }
-            int err = validateParamType(node->children, callee->argMap, function, module, isGlobal, external, node->filename, node->line);
+            int err = validateParamType(node->children, callee->argBlock->varMap, function, module, isGlobal, external, node->filename, node->line);
             
             if(!err) {
                 strcpy(retval, callee->self.type);
@@ -415,7 +414,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* rightAST = node->children->head.next->data;
 
         char* type = validateExpressionAST(leftAST, function, module, isGlobal, external);
-        strcpy(retval, validateStructField(type, rightAST->data, module->program, node->filename, node->line));
+        strcpy(retval, validateStructField(type, rightAST->data, node->filename, node->line));
         return retval;
     }
     case AST_INDEX: {
@@ -455,7 +454,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
 
         // Check module exists
-        struct module* newModule = map_get(module->program->modulesMap, leftAST->data);
+        struct module* newModule = map_get(program->modulesMap, leftAST->data);
         if(newModule == NULL) {
             error(node->filename, node->line, "Unknown module \"%s\"", leftAST->data);
         }
@@ -464,12 +463,12 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             error(node->filename, node->line, "Cannot access static members from a non static module");
         }
         // Check either function/variable exist
-        int funcExists = (map_get(newModule->functionsMap, rightAST->data) != NULL && 
-                        !((struct function*)map_get(newModule->functionsMap, rightAST->data))->self.isPrivate);
-        int varExists = (map_get(newModule->globalsMap, rightAST->data) != NULL &&
-                        !((struct variable*)map_get(newModule->globalsMap, rightAST->data))->isPrivate);
-        if(funcExists || varExists) {
-            return validateExpressionAST(rightAST, function, newModule, isGlobal, 1);
+        struct variable* var = findGlobal(newModule->name, rightAST->data, node->filename, node->line);
+        struct variable* func = findFunction(newModule->name, rightAST->data, node->filename, node->line);
+        if(var != NULL && rightAST->type == AST_VAR) {
+            return var->type;
+        } else if (func != NULL && rightAST->type == AST_CALL) {
+            return func->type;
         } else if(rightAST->type == AST_CALL) {
             error(node->filename, node->line, "Module \"%s\" does not contain function \"%s\"", leftAST->data, rightAST->data);
         } else if(rightAST->type == AST_VAR) {
@@ -502,22 +501,49 @@ static void removeArray(char* str) {
     }
 }
 
+static struct variable* findGlobal(char* modName, char* name, const char* filename, int line) {
+    struct module* module = map_get(program->modulesMap, modName);
+    if(module == NULL) {
+        return NULL;
+    } else {
+        struct variable* var = map_get(module->block->varMap, name);
+        if(var == NULL || var->isPrivate) {
+            return NULL;
+        } else {
+            return var;
+        }
+    }
+    return NULL;
+}
+
+static struct variable* findFunction(char* modName, char* name, const char* filename, int line) {
+    struct module* module = map_get(program->modulesMap, modName);
+    if(module == NULL) {
+        return NULL;
+    } else {
+        struct variable* var = (struct variable*)map_get(module->functionsMap, name);
+        if(var == NULL || var->isPrivate) {
+            return NULL;
+        } else {
+            return var;
+        }
+    }
+    return NULL;
+}
+
 /*
     Takes in a name, function, and module, and returns a variable, if it can be found */
-static struct variable* findVariable(char* name, const struct function* function, const struct module* module, const char* filename, int line) {
-    struct variable* mod = map_get(module->globalsMap, name);
-    struct variable* var = map_get(function->varMap, name);
-    struct variable* arg = map_get(function->argMap, name);
-    if(var != NULL && var->isDeclared) {
-        return var;
-    } else if(arg != NULL) {
-        return arg;
+static struct variable* findVariable(char* name, struct block* block, const char* filename, int line) {
+    if(block == NULL) {
+        error(filename, line, "Unknown variable \"%s\"", name);
+    } else {
+        struct variable* var = map_get(block->varMap, name);
+        if(var == NULL) {
+            return findVariable(name, block->parent, filename, line);
+        } else {
+            return var;
+        }
     }
-    // Module global variable
-    if(mod != NULL) {
-        return mod;
-    }
-    error(filename, line, "Unknown variable \"%s\"", name);
     return NULL;
 }
 
@@ -552,7 +578,7 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
 
 /*
     Checks to see if a struct contains a field, or if a super struct contains the field. */
-static char* validateStructField(char* structName, char* fieldName, struct program* program, const char* filename, int line) {
+static char* validateStructField(char* structName, char* fieldName, const char* filename, int line) {
     struct dataStruct* dataStruct = map_get(program->dataStructsMap, structName);
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
