@@ -31,8 +31,9 @@ x program has starting point called "int start(char array args)"?
 x switch back to curly brace syntax to blocks
 x add back semicolon syntax
 x blocks scope variables, not functions
-- assert ifs must have block, else must have if or block
-- assert while must have block
+x assert ifs must have block, else must have if or block
+x assert while must have block
+- add brackets back to tmLang
 - struct parameters
 - multiple char punctuation
 - array block syntax

@@ -1,9 +1,10 @@
 static module Main {
     void start() {
         int i = 4;
-        if i < 4 {
-            i = 4;
-        }
+    }
+
+    void test() {
+
     }
 }
 

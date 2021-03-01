@@ -217,6 +217,9 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
 
             parseParams(tokenQueue, function->argBlock->varMap, &function->self);
             function->self.code = parser_createAST(tokenQueue, argBlock);
+            if(function->self.code == NULL || function->self.code->type != AST_BLOCK) {
+                error(function->self.filename, function->self.line, "Functions statements must be followed by block statements");
+            }
             function->codeBlock = (struct block*)(function->self.code->data);
             LOG("Function %s %s's AST", function->self.type, function->self.name);
 
@@ -281,6 +284,9 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, block);
         struct astNode* body = parser_createAST(tokenQueue, block);
+        if(body == NULL || body->type != AST_BLOCK) {
+            error(retval->filename, retval->line, "If statements must be followed by block statements");
+        }
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
@@ -298,6 +304,9 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, block);
         struct astNode* body = parser_createAST(tokenQueue, block);
+        if(body == NULL || body->type != AST_BLOCK) {
+            error(retval->filename, retval->line, "While statements must be followed by block statements");
+        }
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
     }
