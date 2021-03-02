@@ -94,7 +94,7 @@ struct variable {
 struct function {
     struct variable self;
     struct block* argBlock;
-    struct block* codeBlock;
+    struct block* block;
 
     struct module* module;
     struct program* program;
@@ -103,8 +103,9 @@ struct function {
 /*
     Structs are a collection of variables that can be packaged and moved as one */
 struct dataStruct {
-    struct variable self;
-    struct map* fieldMap; // name -> struct variable
+    struct variable self; // name
+    struct block* argBlock; // name -> struct variable* arguments
+    struct function* definition;
     struct map* parentSet; // names of parents, and self
 
     struct module* module;

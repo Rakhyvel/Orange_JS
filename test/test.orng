@@ -1,17 +1,17 @@
 static module Main {
     void start() {
-        int i = 4;
+        ~~ Main#Vector ~~
+        Vector array v1 = Vector array[4];
     }
-
-    void test() {
-
+    ~~ Main#Vector() ~~
+    struct Vector(int x1, int y1) {
+        int x = x1;
+        int y = y1;
     }
 }
 
-static module Test {
-    int i = 4;
-
-    int test() {
-
+module Apricot {
+    struct Entity() {
+        Vector pos;
     }
 }

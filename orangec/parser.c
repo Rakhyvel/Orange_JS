@@ -25,8 +25,8 @@
 
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_LBRACE};
-static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType FUNCTION_BOX[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LESSER};
 static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 
 // Lower level token signatures
@@ -94,7 +94,6 @@ struct function* parser_initFunction(const char* filename, int line) {
 struct dataStruct* parser_initDataStruct(const char* filename, int line) {
     struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
     strcpy(retval->self.varType, "struct");
-    retval->fieldMap = map_create();
     retval->parentSet = map_create();
     retval->self.filename = filename;
     retval->self.line = line;
@@ -182,67 +181,63 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         if(isPrivate) free(queue_pop(tokenQueue));
 
         struct token* topToken = queue_peek(tokenQueue);
-        // STRUCT
-        if(matchTokens(tokenQueue, STRUCT, 2)) {
-            assertRemove(tokenQueue, TOKEN_STRUCT);
-            struct dataStruct* dataStruct = parser_initDataStruct(topToken->filename, topToken->line);
-            copyNextTokenString(tokenQueue, dataStruct->self.name);
-
-            // Check for parent struct
-            if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LSQUARE) {
-                assertRemove(tokenQueue, TOKEN_LSQUARE);
-                assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-                copyNextTokenString(tokenQueue, dataStruct->self.type);
-                assertRemove(tokenQueue, TOKEN_RSQUARE);
-            }
-            LOG("New struct: %s", dataStruct->self.name);
-
-            parseParams(tokenQueue, dataStruct->fieldMap, &dataStruct->self);
-            if(map_put(module->program->dataStructsMap, dataStruct->self.name, dataStruct)) {
-                error(dataStruct->self.filename, dataStruct->self.line, "Struct \"%s\" defined in more than one place!", dataStruct->self.name);
-            }
-            dataStruct->module = module;
-            dataStruct->program = module->program;
-            dataStruct->self.isPrivate = isPrivate;
-        }
         // FUNCTION
-        else if(matchTokens(tokenQueue, FUNCTION, 3)) {
+        if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, FUNCTION_BOX, 3)) {
             struct function* function = parser_initFunction(topToken->filename, topToken->line);
             struct block* argBlock = parser_initBlock(module->block);
+            char* parentType = NULL;
             function->argBlock = argBlock;
-
             copyNextTokenString(tokenQueue, function->self.type);
             copyNextTokenString(tokenQueue, function->self.name);
             LOG("New function: %s %s", function->self.type, function->self.name);
 
-            parseParams(tokenQueue, function->argBlock->varMap, &function->self);
-            function->self.code = parser_createAST(tokenQueue, argBlock);
+            if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LESSER) { // Struct only (maybe?) 
+                assertRemove(tokenQueue, TOKEN_LESSER);
+                assertPeek(tokenQueue, TOKEN_IDENTIFIER);
+                copyNextTokenString(tokenQueue, function->self.type);
+                assertRemove(tokenQueue, TOKEN_GREATER);
+            }
+
+            parseParams(tokenQueue, function->argBlock->varMap, &function->self); // Parameters
+
+            function->self.code = parser_createAST(tokenQueue, argBlock); // Parse AST
             if(function->self.code == NULL || function->self.code->type != AST_BLOCK) {
                 error(function->self.filename, function->self.line, "Functions statements must be followed by block statements");
             }
-            function->codeBlock = (struct block*)(function->self.code->data);
+            function->block = (struct block*)function->self.code->data; // 
             LOG("Function %s %s's AST", function->self.type, function->self.name);
-
             parser_printAST(function->self.code, 0);
+            
             if(map_put(module->functionsMap, function->self.name, function)) {
-                error(function->self.filename, function->self.line, "Function \"%s\" defined in more than one place in module \"%s\"!", function->self.name, module->name);
+                error(function->self.filename, function->self.line, "Function \"%s\" already defined in module \"%s\"", function->self.name, module->name);
             }
             function->module = module;
             function->program = module->program;
             function->self.isPrivate = isPrivate;
+
+            // STRUCT DEFINITION
+            if(!strcmp(function->self.type, "struct")) {
+                struct dataStruct* dataStruct = parser_initDataStruct(function->self.code->filename, function->self.code->line);
+                if(map_put(program->dataStructsMap, function->self.name, dataStruct)) {
+                    error(function->self.filename, function->self.line, "Struct \"%s\" already defined", function->self.name, module->name);
+                }
+                dataStruct->definition = function;
+                strcpy(function->self.type, function->self.name);
+                strcpy(dataStruct->self.name, function->self.name);
+            }
         }
         // GLOBAL
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
             struct variable* var = createVar(tokenQueue, module->block);
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
             if(map_put(module->block->varMap, var->name, var)) {
-                error(topToken->filename, topToken->line, "Global \"%s\"s defined in more than one place in module!", var->name, module->name);
+                error(topToken->filename, topToken->line, "Global \"%s\"s defined in more than one place in module", var->name, module->name);
             }
             var->isPrivate = isPrivate;
         }
         // ERROR
         else {
-            error(module->filename, module->line, "\nUnexpected token %s in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);   
+            error(topToken->filename, topToken->line, "\nUnexpected token %s in module %s", ((struct token*)queue_peek(tokenQueue))->data, module->name);   
         }
     }
 }

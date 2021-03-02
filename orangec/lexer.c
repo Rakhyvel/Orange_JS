@@ -26,7 +26,7 @@
 /* These characters are whole tokens themselves */
 static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
                                       '.', '+', '-', '*', '/', '^', '>', '<', 
-                                      '=', '~', ':'};
+                                      '=', '~', ':', '\n'};
 
 // Private functions
 char* readLine(FILE* file);
@@ -101,7 +101,9 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
         end = nextToken(file, start);
         copyToken(file, tokenBuffer, start, end);
         tempType = -1;
-        if(strcmp("(", tokenBuffer) == 0) {
+        if(strcmp("\n", tokenBuffer) == 0) {
+            line++;
+        } else if(strcmp("(", tokenBuffer) == 0) {
             tempType = TOKEN_LPAREN;
         } else if(strcmp(")", tokenBuffer) == 0) {
             tempType = TOKEN_RPAREN;
@@ -151,10 +153,6 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_FALSE;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
-        } else if(strcmp("struct", tokenBuffer) == 0) {
-            tempType = TOKEN_STRUCT;
-        } else if(strcmp("interface", tokenBuffer) == 0) {
-            tempType = TOKEN_INTERFACE;
         } else if(strcmp("return", tokenBuffer) == 0) {
             tempType = TOKEN_RETURN;
         } else if(strcmp("end", tokenBuffer) == 0) {
@@ -192,7 +190,7 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             queue_push(tokenQueue, tempToken);
             tempToken->filename = filename;
             tempToken->line = line;
-            LOG("Added token: %s \"%s\"", lexer_tokenToString(tempType), tokenBuffer);
+            LOG("Added token: %p %d %s \"%s\"", tempToken, line, lexer_tokenToString(tempType), tokenBuffer);
         }
         start = nextNonWhitespace(file, end);
         tempToken = NULL;
@@ -353,7 +351,7 @@ static int nextNonWhitespace(const char* file, int start) {
     char nextChar = file[start];
     while (nextChar != '\0') {
         nextChar = file[start];
-        if(!isspace(nextChar)) {
+        if(!isspace(nextChar) || nextChar == '\n') {
             return start;
         }
         start++;

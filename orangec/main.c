@@ -9,6 +9,8 @@
     on to other languages will have an easier time transfering concepts over,
     and will think about programming the way they did in Orange. 
 
+    My goal is to keep the source code under 3,600 lines of code.
+
     Author: Joseph Shimel
     Date: 2/2/21
 */

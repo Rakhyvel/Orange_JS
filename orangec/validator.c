@@ -47,6 +47,7 @@ void validator_validate() {
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
         extendStructs(dataStruct->self.name, dataStruct->self.filename, dataStruct->self.line);
+        // @Todo validate struct definition is only vardefines
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -114,12 +115,11 @@ struct dataStruct* extendStructs(char* name, const char* filename, int line) {
             error(filename, line, "Struct \"%s\" inherits from unknown struct \"%s\"", name, dataStruct->self.type);
         }
         map_copy(dataStruct->parentSet, parent->parentSet);
-
         struct map* newFieldMap = map_create();
-        struct map* oldMap = dataStruct->fieldMap;
-        map_copy(newFieldMap, parent->fieldMap);
-        map_copy(newFieldMap, dataStruct->fieldMap);
-        dataStruct->fieldMap = newFieldMap;
+        struct map* oldMap = dataStruct->definition->block->varMap;
+        map_copy(newFieldMap, parent->definition->block->varMap);
+        map_copy(newFieldMap, dataStruct->definition->block->varMap);
+        dataStruct->definition->block->varMap = newFieldMap;
         map_destroy(oldMap);
     }
     set_add(dataStruct->parentSet, name);
@@ -146,7 +146,8 @@ static int findTypeEnd(const char* type) {
 static int isPrimitive(const char* type) {
     if(!strcmp(type,  "int") || !strcmp(type, "char") ||
         !strcmp(type, "boolean") || !strcmp(type, "void") || 
-        !strcmp(type, "real") || !strcmp(type, "byte")) {
+        !strcmp(type, "real") || !strcmp(type, "byte") || 
+        !strcmp(type, "struct")) {
         return 1;
     } else {
         return 0;
@@ -293,7 +294,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, "boolean");
         return retval;
     case AST_VAR: {
-        struct variable* var = findVariable(node->data, function->codeBlock, node->filename, node->line);
+        struct variable* var = findVariable(node->data, function->block, node->filename, node->line);
         strcpy(retval, var->type);
         return retval;
     }
@@ -323,7 +324,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
         // Constant assignment validation- find variable associated with assignment
         if(leftAST->type == AST_VAR) {
-            var = findVariable(leftAST->data, function->codeBlock, node->filename, node->line);
+            var = findVariable(leftAST->data, function->block, node->filename, node->line);
         } else if(leftAST->type == AST_MODULEACCESS) {
             struct astNode* moduleIdent = leftAST->children->head.next->next->data;
             struct astNode* nameIdent = leftAST->children->head.next->data;
@@ -377,20 +378,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         if(strstr(node->data, " array")){
             strcpy(retval, node->data);
             return retval;
-        } 
-        // STRUCT INIT
-        else if(dataStruct != NULL) {
-            int err = validateParamType(node->children, dataStruct->fieldMap, function, module, isGlobal, external, node->filename, node->line);
-            if(!err) {
-                strcpy(retval, node->data);
-                return retval;
-            } else if(err > 0){
-                error(node->filename, node->line, "Too many arguments for struct \"%s\" initialization", dataStruct->self.name);
-            } else if(err < 0){
-                error(node->filename, node->line, "Too few arguments for struct \"%s\" initialization", dataStruct->self.name);
-            }
-        } 
-        // FUNCTION CALL
+        }
         else if(callee != NULL) {
             if(isGlobal && module->isStatic) {
                 error(node->filename, node->line, "Cannot call a static function from global scope");
@@ -583,9 +571,11 @@ static char* validateStructField(char* structName, char* fieldName, const char* 
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
     }
-    if(map_get(dataStruct->fieldMap, fieldName) == NULL) {
+    if(map_get(dataStruct->definition->block->varMap, fieldName) == NULL) {
         error(filename, line, "Unknown field \"%s\" for struct \"%s\" ", fieldName, structName);
     }
 
-    return ((struct variable*)map_get(dataStruct->fieldMap, fieldName))->type;
+    return ((struct variable*)map_get(dataStruct->definition->block->varMap, fieldName))->type;
+   
+    return NULL;
 }
