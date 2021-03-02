@@ -185,7 +185,6 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, FUNCTION_BOX, 3)) {
             struct function* function = parser_initFunction(topToken->filename, topToken->line);
             struct block* argBlock = parser_initBlock(module->block);
-            char* parentType = NULL;
             function->argBlock = argBlock;
             copyNextTokenString(tokenQueue, function->self.type);
             copyNextTokenString(tokenQueue, function->self.name);
@@ -286,6 +285,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         queue_push(retval->children, body);
         if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
             assertRemove(tokenQueue, TOKEN_ELSE);
+            retval->type = AST_IFELSE;
             if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_IF) {
                 queue_push(retval->children, parser_createAST(tokenQueue, block));
             } else {
@@ -370,6 +370,8 @@ char* parser_astToString(enum astType type) {
         return "astType.VARDECLARE";
     case AST_IF: 
         return "astType.IF";
+    case AST_IFELSE: 
+        return "astType.IFELSE";
     case AST_WHILE: 
         return "astType.WHILE";
     case AST_RETURN: 

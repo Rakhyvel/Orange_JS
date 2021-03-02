@@ -2,6 +2,12 @@ static module Main {
     void start() {
         ~~ Main#Vector ~~
         Vector array v1 = Vector array[4];
+        Vector pos;
+        if 3 < 4 {
+            
+        } else {
+            
+        }
     }
     ~~ Main#Vector() ~~
     struct Vector(int x1, int y1) {
@@ -12,6 +18,6 @@ static module Main {
 
 module Apricot {
     struct Entity() {
-        Vector pos;
+        Vector pos = Vector(0, 0);
     }
 }

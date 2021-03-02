@@ -35,7 +35,7 @@ x assert ifs must have block, else must have if or block
 x assert while must have block
 x add brackets back to tmLang
 x struct parameters
-- structs cannot have any statements besides var defines, and no non-static access!
+x structs cannot have any statements besides var defines, and no non-static access!
 - multiple char punctuation
 - C like comment syntax
 - new/delete operators

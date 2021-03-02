@@ -22,6 +22,7 @@
 
 // Private functions
 struct dataStruct* extendStructs(char*, const char*, int);
+void validateStructFields(struct astNode*);
 static int findTypeEnd(const char*);
 static void validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
@@ -47,7 +48,7 @@ void validator_validate() {
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
         extendStructs(dataStruct->self.name, dataStruct->self.filename, dataStruct->self.line);
-        // @Todo validate struct definition is only vardefines
+        validateStructFields(dataStruct->definition->self.code);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -124,6 +125,16 @@ struct dataStruct* extendStructs(char* name, const char* filename, int line) {
     }
     set_add(dataStruct->parentSet, name);
     return dataStruct;
+}
+
+void validateStructFields(struct astNode* block) {
+    struct listElem* elem;
+    for(elem = list_begin(block->children); elem != list_end(block->children); elem = list_next(elem)) {
+        struct astNode* node = ((struct astNode*) elem->data);
+        if(node->type != AST_VARDEFINE) {
+            error(node->filename, node->line, "Structs may only define field definitions");
+        }
+    }
 }
 
 /*
@@ -225,6 +236,16 @@ static void validateAST(struct astNode* node, const struct function* function, c
         break;
     }
     case AST_IF: {
+        struct astNode* condition = node->children->head.next->data;
+        struct astNode* block = node->children->head.next->next->data;
+        char *conditionType = validateExpressionAST(condition, function, module, 0, 0);
+        if(strcmp("boolean", conditionType)) {
+            error(condition->filename, condition->line, "If expected boolean type, actual type was \"%s\" ", conditionType);
+        }
+        validateAST(block, function, module);
+        break;
+    }
+    case AST_IFELSE: {
         struct astNode* condition = node->children->head.next->data;
         struct astNode* block = node->children->head.next->next->data;
         char *conditionType = validateExpressionAST(condition, function, module, 0, 0);
@@ -379,6 +400,19 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             strcpy(retval, node->data);
             return retval;
         }
+        // STRUCT INIT
+        else if(dataStruct != NULL) {
+            int err = validateParamType(node->children, dataStruct->definition->argBlock->varMap, function, module, isGlobal, external, node->filename, node->line);
+            if(!err) {
+                strcpy(retval, node->data);
+                return retval;
+            } else if(err > 0){
+                error(node->filename, node->line, "Too many arguments for struct \"%s\" initialization", dataStruct->self.name);
+            } else if(err < 0){
+                error(node->filename, node->line, "Too few arguments for struct \"%s\" initialization", dataStruct->self.name);
+            }
+        } 
+        // FUNCTION CALL
         else if(callee != NULL) {
             if(isGlobal && module->isStatic) {
                 error(node->filename, node->line, "Cannot call a static function from global scope");
@@ -464,7 +498,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
     }
     default:
-        PANIC("AST \"%s\" is not an expression", parser_astToString(node->type));
+        PANIC("AST \"%s\" is not an expression", "lol");
     }
     return NULL;
 }
