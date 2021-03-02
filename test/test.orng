@@ -1,14 +1,15 @@
 static module Main {
+    /*
+    Make this a comment
+    */
+
+    // And this too
     void start() {
         int i = Math:rand(100);
-        if i <= 50 {
+        if i != 50 {
+
+        } else if i <= 50 || i >= 50 {
 
         }
-    }
-}
-
-module Math {
-    int rand(int range) {
-        return 25;
     }
 }

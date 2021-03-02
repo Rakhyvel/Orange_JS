@@ -22,7 +22,7 @@ enum astType {
     // Math operators
 	AST_ADD, AST_SUBTRACT, AST_MULTIPLY, AST_DIVIDE, AST_ASSIGN,
     // Branch operators
-    AST_IS, AST_ISNT, AST_GREATER, AST_LESSER,
+    AST_IS, AST_ISNT, AST_GREATER, AST_LESSER, AST_GREATEREQUAL, AST_LESSEREQUAL,
     // Boolean operators
     AST_AND, AST_OR, 
     // Indexing

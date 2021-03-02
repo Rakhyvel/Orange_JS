@@ -410,7 +410,9 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             error(node->filename, node->line, "Value type mismatch. Expected boolean type, actual types were \"%s\" and \"%s\" ", left, right);
         }
     case AST_GREATER:
-    case AST_LESSER:{
+    case AST_LESSER:
+    case AST_GREATEREQUAL:
+    case AST_LESSEREQUAL: {
         validateBinaryOp(node->children, left, right, function, module, isGlobal, external);
         if((!strcmp(left, "real") && !strcmp(right, "real")) || 
             (!strcmp(left, "real") && !strcmp(right, "int")) || 

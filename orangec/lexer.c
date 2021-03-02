@@ -25,8 +25,8 @@
 
 /* These characters are whole tokens themselves */
 static const char oneCharTokens[] = {'{', '}', '(', ')', ';', ',', 
-                                      '.', '+', '-', '*', '/', '^', '~', ':', '\n'};
-static const char punctuationChars[] = {'<', '>', '=', '[', ']'};
+                                      '.', '+', '-', '^', '~', ':', '\n'};
+static const char punctuationChars[] = {'<', '>', '=', '[', ']', '&', '|', '!', '/', '*'};
 
 // Private functions
 char* readLine(FILE* file);
@@ -112,8 +112,10 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_LBRACE;
         } else if(strcmp("}", tokenBuffer) == 0) {
             tempType = TOKEN_RBRACE;
-        } else if(strcmp("~", tokenBuffer) == 0) {
-            tempType = TOKEN_TILDE;
+        } else if(strcmp("/*", tokenBuffer) == 0) {
+            tempType = TOKEN_LBLOCK;
+        } else if(strcmp("*/", tokenBuffer) == 0) {
+            tempType = TOKEN_RBLOCK;
         } else if(strcmp(",", tokenBuffer) == 0) {
             tempType = TOKEN_COMMA;
         } else if(strcmp(";", tokenBuffer) == 0) {
@@ -132,17 +134,21 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_STAR;
         } else if(strcmp("=", tokenBuffer) == 0) {
             tempType = TOKEN_EQUALS;
-        } else if(strcmp("is", tokenBuffer) == 0) {
+        } else if(strcmp("==", tokenBuffer) == 0) {
             tempType = TOKEN_IS;
-        } else if(strcmp("isnt", tokenBuffer) == 0) {
+        } else if(strcmp("!=", tokenBuffer) == 0) {
             tempType = TOKEN_ISNT;
         } else if(strcmp("<", tokenBuffer) == 0) {
             tempType = TOKEN_LESSER;
         } else if(strcmp(">", tokenBuffer) == 0) {
             tempType = TOKEN_GREATER;
-        } else if(strcmp("and", tokenBuffer) == 0) {
+        } else if(strcmp("<=", tokenBuffer) == 0) {
+            tempType = TOKEN_LESSEREQUAL;
+        } else if(strcmp(">=", tokenBuffer) == 0) {
+            tempType = TOKEN_GREATEREQUAL;
+        } else if(strcmp("&&", tokenBuffer) == 0) {
             tempType = TOKEN_AND;
-        } else if(strcmp("or", tokenBuffer) == 0) {
+        } else if(strcmp("||", tokenBuffer) == 0) {
             tempType = TOKEN_OR;
         } else if(strcmp("true", tokenBuffer) == 0) {
             tempType = TOKEN_TRUE;
@@ -220,6 +226,8 @@ int lexer_getTokenPrecedence(enum tokenType type) {
 			return 4;
 		case TOKEN_GREATER:
 		case TOKEN_LESSER:
+		case TOKEN_GREATEREQUAL:
+		case TOKEN_LESSEREQUAL:
 			return 5;
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:
@@ -292,6 +300,10 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:GREATER";
     case TOKEN_LESSER:
         return "token:LESSER";
+    case TOKEN_GREATEREQUAL: 
+        return "token:GREATEREQUAL";
+    case TOKEN_LESSEREQUAL:
+        return "token:LESSEREQUAL";
 	case TOKEN_AND: 
         return "token:AND";
     case TOKEN_OR:

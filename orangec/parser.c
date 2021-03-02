@@ -41,7 +41,8 @@ static const enum tokenType INDEX[] = {TOKEN_LSQUARE};
 static const enum tokenType EMPTY[] = {TOKEN_SEMICOLON};
 
 // Private functions
-static int matchComment(struct list*, struct listElem*);
+static int matchOpenComment(struct list*, struct listElem*);
+static int matchEndComment(struct list*, struct listElem*);
 static void condenseArrayIdentifiers(struct list*);
 static void copyNextTokenString(struct list*, char*);
 static struct variable* createVar(struct list*, struct block*);
@@ -115,7 +116,7 @@ void parser_removeComments(struct list* tokenQueue) {
 
     for(elem=list_begin(tokenQueue);elem!=list_end(tokenQueue);elem=list_next(elem)) {
         if(withinComment) {
-            if(matchComment(tokenQueue, elem)) {
+            if(matchEndComment(tokenQueue, elem)) {
                 withinComment = 0;
                 elem = elem->prev;
                 free(list_remove(tokenQueue, list_next(elem)));
@@ -125,7 +126,7 @@ void parser_removeComments(struct list* tokenQueue) {
                 free(list_remove(tokenQueue, list_next(elem)));
             }
         } else {
-            if(matchComment(tokenQueue, elem)) {
+            if(matchOpenComment(tokenQueue, elem)) {
                 withinComment = 1;
                 elem = elem->prev;
                 free(list_remove(tokenQueue, list_next(elem)));
@@ -403,6 +404,10 @@ char* parser_astToString(enum astType type) {
         return "astType.GREATER";
     case AST_LESSER: 
         return "astType.LESSER";
+    case AST_GREATEREQUAL: 
+        return "astType.GREATEREQUAL";
+    case AST_LESSEREQUAL: 
+        return "astType.LESSEREQUAL";
     case AST_IS:
         return "astType.IS";
     case AST_ISNT: 
@@ -441,19 +446,8 @@ char* parser_astToString(enum astType type) {
     return "";
 }
 
-/*
-    Determines if the list element is the beginning of a comment delimiter */
-static int matchComment(struct list* list, struct listElem* elem) {
-    if(elem != list_end(list) && list_next(elem) != list_end(list)) {
-        if( ((struct token*)elem->data)->type == TOKEN_TILDE &&  
-            ((struct token*)list_next(elem)->data)->type == TOKEN_TILDE) {
-            return 1;
-        } else {
-            return 0;
-        }
-    } else {
-        return 0;
-    }
+static int topMatches(struct list* tokenQueue, enum tokenType type) {
+    return ((struct token*)queue_peek(tokenQueue))->type == type;
 }
 
 static void condenseArrayIdentifiers(struct list* tokenQueue) {
@@ -667,7 +661,6 @@ static struct list* nextExpression(struct list* tokenQueue) {
         LOG("%s %s", lexer_tokenToString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
         queue_push(retval, queue_pop(tokenQueue));
     }
-    LOG("");
     return retval;
 }
 
@@ -804,6 +797,10 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_GREATER;
     case TOKEN_LESSER:
         return AST_LESSER;
+    case TOKEN_GREATEREQUAL: 
+        return AST_GREATEREQUAL;
+    case TOKEN_LESSEREQUAL:
+        return AST_LESSEREQUAL;
 	case TOKEN_AND: 
         return AST_AND;
     case TOKEN_OR:
@@ -872,6 +869,8 @@ static void assertOperator(enum astType type, const char* filename, int line) {
     case AST_ISNT: 
     case AST_GREATER:
     case AST_LESSER:
+    case AST_GREATEREQUAL:
+    case AST_LESSEREQUAL:
     case AST_AND:
     case AST_OR: 
     case AST_DOT:
@@ -879,6 +878,6 @@ static void assertOperator(enum astType type, const char* filename, int line) {
     case AST_MODULEACCESS:
         return;
     default:
-        error(filename, line, "Operator stack corrupted, %s was assumed to be operator!\n", parser_astToString(type));
+        error(filename, line, "Operator stack corrupted, %s was assumed to be operator!", parser_astToString(type));
     }
 }

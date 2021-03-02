@@ -37,7 +37,7 @@ x add brackets back to tmLang
 x struct parameters
 x structs cannot have any statements besides var defines, and no non-static access!
 x super token for structs with parents (parents definition call)
-- multiple char punctuation
+x multiple char punctuation
 - C like comment syntax
 x array [] syntax
     x int[] a = new int[5];
