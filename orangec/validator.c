@@ -21,18 +21,19 @@
 #include "../util/debug.h"
 
 // Private functions
-struct dataStruct* extendStructs(char*, const char*, int);
-void validateStructFields(struct astNode*);
+static struct dataStruct* extendStructs(char*, const char*, int);
+static void validateStructDefs(struct dataStruct*);
 static int findTypeEnd(const char*);
-static void validateType(const char*, const struct module*, const char*, int);
+static int validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
-char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int, int);
+static char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int, int);
 static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int, int);
 static void removeArray(char*);
 static struct variable* findGlobal(char* moduleName, char* name, const char* filename, int line);
 static struct variable* findFunction(char* moduleName, char* name, const char* filename, int line);
 static struct variable* findVariable(char*, struct block*, const char*, int);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, int, const char*, int);
+static int validateArrayType(struct list*, char*, const struct function*, const struct module*, int, int, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
 
 /*
@@ -48,7 +49,7 @@ void validator_validate() {
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
         extendStructs(dataStruct->self.name, dataStruct->self.filename, dataStruct->self.line);
-        validateStructFields(dataStruct->definition->self.code);
+        validateStructDefs(dataStruct);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -105,7 +106,7 @@ void validator_validate() {
 /*
     Takes in a name of a struct, copies in it's parent struct's fields if any, 
     and copies in the parent struct's ancestor structs */
-struct dataStruct* extendStructs(char* name, const char* filename, int line) {
+static struct dataStruct* extendStructs(char* name, const char* filename, int line) {
     struct dataStruct* dataStruct = map_get(program->dataStructsMap, name);
     if(dataStruct == NULL) {
         return NULL;
@@ -127,11 +128,34 @@ struct dataStruct* extendStructs(char* name, const char* filename, int line) {
     return dataStruct;
 }
 
-void validateStructFields(struct astNode* block) {
-    struct listElem* elem;
-    for(elem = list_begin(block->children); elem != list_end(block->children); elem = list_next(elem)) {
-        struct astNode* node = ((struct astNode*) elem->data);
-        if(node->type != AST_VARDEFINE) {
+static void validateStructDefs(struct dataStruct* dataStruct) {
+    struct astNode* block = dataStruct->definition->self.code;
+    struct listElem* elem = list_begin(block->children);
+    struct astNode* node = ((struct astNode*) elem->data);
+    if(elem == list_end(block->children)) {
+        error(dataStruct->self.filename, dataStruct->self.line, "Structs may not be empty");
+    }
+
+    if(node->type == AST_CALL) {
+        if(dataStruct->self.type[0] == '\0') {
+            error(dataStruct->self.filename, dataStruct->self.line, "Struct must inherit from parent struct to use super call");
+        } else {
+            elem = list_next(elem);
+        }
+    } else if(dataStruct->self.type[0] != '\0') {
+        error(dataStruct->self.filename, dataStruct->self.line, "Struct must call super as first instruction when inheriting");
+    }
+
+    for(; elem != list_end(block->children); elem = list_next(elem)) {
+        node = ((struct astNode*) elem->data);
+        if(node == NULL) continue;
+        if(node->type == AST_CALL && !strcmp(node->data, "super")) {
+            if(dataStruct->self.type[0] == '\0') {
+                error(node->filename, node->line, "Structs must inherit from another struct before using the super call");
+            } else {
+                error(node->filename, node->line, "Super call must be first instruction in struct");
+            }
+        } else if(node->type != AST_VARDEFINE) {
             error(node->filename, node->line, "Structs may only define field definitions");
         }
     }
@@ -165,9 +189,7 @@ static int isPrimitive(const char* type) {
     }
 }
 
-/*
-    Checks that a type exists either as a primitive type, or as a user defined struct */
-static void validateType(const char* type, const struct module* module, const char* filename, int line) {
+static int checkType(const char* type, const struct module* module, const char* filename, int line) {
     // Check primitives
     int end = findTypeEnd(type);
     char temp[255];
@@ -176,26 +198,38 @@ static void validateType(const char* type, const struct module* module, const ch
     if(!isPrimitive(temp)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, temp);
         if(dataStruct == NULL || (dataStruct->self.isPrivate && dataStruct->module != module)) {
-            error(filename, line, "Unknown type \"%s\" ", type);
+            return 0;
         }
     }
+    return 1;
+}
+
+/*
+    Checks that a type exists either as a primitive type, or as a user defined struct */
+static int validateType(const char* type, const struct module* module, const char* filename, int line) {
+    if(!checkType(type,module,filename,line)) {
+        error(filename, line, "Unknown type %s", type);
+    }
+    return 1;
 }
 
 /*
     Determines if two types are the same. For structs, the expected type may 
     be a parent struct of the actual struct */
 static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
-    if(isPrimitive(expected)) {
+    if(isPrimitive(expected) || isPrimitive(actual)) {
         return !strcmp(expected, actual);
-    } else if(strstr(expected, " array") != NULL){
+    } else if(strstr(expected, " array")){
         char expectedBase[255];
         char actualBase[255];
         if(strcmp(expected, actual)){
             return 0;
         }
-        strncpy(expectedBase, expected, findTypeEnd(expected));
-        strncpy(actualBase, actual, findTypeEnd(actual));
-        return !strcmp(expectedBase, actualBase);
+        strcpy(expectedBase, expected);
+        strcpy(actualBase, actual);
+        removeArray(expectedBase);
+        removeArray(actualBase);
+        return typesMatch(expectedBase, actualBase, filename, line);
     } else {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, actual);
         if(dataStruct == NULL) {
@@ -397,6 +431,10 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct function* callee = map_get(module->functionsMap, (char*)node->data);
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
+            char base[255];
+            strcpy(base, node->data);
+            removeArray(base);
+            validateArrayType(node->children, base, function, module, isGlobal, external, node->filename, node->line);
             strcpy(retval, node->data);
             return retval;
         }
@@ -427,6 +465,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             } else if(err < 0){
                 error(node->filename, node->line, "Too few arguments for function call");
             }
+        } else if(map_get(program->dataStructsMap, function->self.name) && !strcmp(node->data, "super")) {
+            break;
         } else {
             error(node->filename, node->line, "Unknown function or struct \"%s\" ", node->data);
         }
@@ -442,18 +482,19 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     case AST_INDEX: {
         struct astNode* leftAST = node->children->head.next->next->data;
         struct astNode* rightAST = node->children->head.next->data;
+
+        char* rightType = validateExpressionAST(rightAST, function, module, isGlobal, external);
+        if(strcmp(rightType, "int")) {
+            error(node->filename, node->line, "Value type mismatch when indexing array. Expected int type, actual type was \"%s\" ", rightType);
+        }
         // SIZE ARRAY INIT
-        if(leftAST->type == AST_VAR && strstr(leftAST->data, " array")){
+        if(leftAST->type == AST_VAR && checkType(leftAST->data, module, node->filename, node->line)){
             strcpy(retval, leftAST->data);
+            strcat(retval, " array");
             return retval;
         } 
         // ARRAY INDEXING
         else {
-            char* rightType = validateExpressionAST(rightAST, function, module, isGlobal, external);
-            if(strcmp(rightType, "int")) {
-                error(node->filename, node->line, "Value type mismatch when indexing array. Expected int type, actual type was \"%s\" ", rightType);
-            }
-
             char* leftType = validateExpressionAST(leftAST, function, module, isGlobal, external);
             if(!strstr(leftType, " array")) {
                 error(node->filename, node->line, "Value type mismatch when indexing array. Expected array type, actual type was \"%s\" ", leftType);
@@ -596,6 +637,17 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
     } else {
         return 0;
     }
+}
+
+static int validateArrayType(struct list* args, char* expected, const struct function* function, const struct module* module, int isGlobal, int external, const char* filename, int line) {
+    struct listElem* argElem;
+    for(argElem = list_begin(args); argElem != list_end(args); argElem = list_next(argElem)) {
+        char* argType = validateExpressionAST((struct astNode*)argElem->data, function, module, isGlobal, external);
+        if(strcmp(expected, argType)) {
+            error(filename, line, "Value type mismatch when creating array. Expected \"%s\" type, actual type was \"%s\" ", argType, expected);
+        }
+    }
+    return 1;
 }
 
 /*

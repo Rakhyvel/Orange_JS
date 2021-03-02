@@ -52,7 +52,7 @@ char** lexer_getLines(char*, int*);
 
 // Token functions
 struct list* lexer_tokenize(const char*, const char*);
-struct token* lexer_createToken(enum tokenType, char[]);
+struct token* lexer_createToken(enum tokenType, char[], const char*, int);
 int lexer_getTokenPrecedence(enum tokenType);
 char* lexer_tokenToString(enum tokenType);
 

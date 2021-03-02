@@ -24,13 +24,14 @@
 #include "../util/debug.h"
 
 /* These characters are whole tokens themselves */
-static const char oneCharTokens[] = {'{', '}', '[', ']', '(', ')', ';', ',', 
-                                      '.', '+', '-', '*', '/', '^', '>', '<', 
-                                      '=', '~', ':', '\n'};
+static const char oneCharTokens[] = {'{', '}', '(', ')', ';', ',', 
+                                      '.', '+', '-', '*', '/', '^', '~', ':', '\n'};
+static const char punctuationChars[] = {'<', '>', '=', '[', ']'};
 
 // Private functions
 char* readLine(FILE* file);
 static bool charIsToken(char);
+static bool charIsPunctuation(char c);
 static int nextToken(const char*, int);
 static int numIsFloat(const char*);
 static int nextNonWhitespace(const char*, int);
@@ -64,14 +65,15 @@ char* lexer_readFile(FILE* file) {
     Used for setting up the data structure for error message printing, where
     errors print out the line where an error occured */
 char** lexer_getLines(char* filestring, int* numLines) {
-    char** retval = malloc(sizeof(char*));
+    char** retval = (char**)malloc(sizeof(char*));
     *numLines = 1;
     int i = 0;
     retval[0] = filestring;
     
+    // Go through file string, stop when reached end
     while(filestring[i] != '\0') {
         if(filestring[i] == '\n') {
-            (*numLines)++;
+            (*numLines)++; // Add new char pointer pointer, pointing to just after new line
             retval = realloc(retval, (*numLines + 1) * sizeof(char*));
             retval[*numLines - 1] = filestring + (i + 1);
         }
@@ -82,12 +84,7 @@ char** lexer_getLines(char* filestring, int* numLines) {
 }
 
 /*
-    Takes in a file represented as a string, and creates a list of tokens 
-    
-    Extend end until reach end of token
-    substring(start, end) is token, interpret
-    move start up to begining of next token
-    if start or end is at the end of file, end. Otherwise, repeat. */
+    Takes in a file represented as a string, and creates a list of tokens */
 struct list* lexer_tokenize(const char *file, const char* filename) {
     struct list* tokenQueue = list_create();
     struct token* tempToken = NULL;
@@ -157,7 +154,7 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_RETURN;
         } else if(strcmp("end", tokenBuffer) == 0) {
             tempType = TOKEN_END;
-        } else if(strcmp("array", tokenBuffer) == 0) {
+        } else if(strcmp("[]", tokenBuffer) == 0) {
             tempType = TOKEN_ARRAY;
         } else if(strcmp("static", tokenBuffer) == 0) {
             tempType = TOKEN_STATIC;
@@ -186,25 +183,25 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
         }
 
         if(tempType != -1) {
-            tempToken = lexer_createToken(tempType, tokenBuffer);
+            tempToken = lexer_createToken(tempType, tokenBuffer, filename, line);
             queue_push(tokenQueue, tempToken);
-            tempToken->filename = filename;
-            tempToken->line = line;
             LOG("Added token: %p %d %s \"%s\"", tempToken, line, lexer_tokenToString(tempType), tokenBuffer);
         }
         start = nextNonWhitespace(file, end);
         tempToken = NULL;
     } while(end < fileLength);
-    queue_push(tokenQueue, lexer_createToken(TOKEN_EOF, "EOF"));
+    queue_push(tokenQueue, lexer_createToken(TOKEN_EOF, "EOF", filename, line));
     return tokenQueue;
 }
 
 /*
     Creates a token with a given type and data */
-struct token* lexer_createToken(enum tokenType type, char data[]) {
+struct token* lexer_createToken(enum tokenType type, char data[], const char* filename, int line) {
     struct token* retval = (struct token*) malloc(sizeof(struct token));
     retval->type = type;
     retval->list = list_create();
+    retval->filename = filename;
+    retval->line = line;
     strncpy(retval->data, data, 254);
     return retval;
 }
@@ -344,6 +341,14 @@ static bool charIsToken(char c) {
     return false;
 }
 
+/* Determines if the given character is a token all on it's own */
+static bool charIsPunctuation(char c) {
+    for(int i = 0; i < sizeof(punctuationChars); i++) {
+        if(c == punctuationChars[i]) return true;
+    }
+    return false;
+}
+
 /*
     Advances the start of the character stream until a non-whitespace 
     character is found */
@@ -369,7 +374,7 @@ static int nextNonWhitespace(const char* file, int start) {
     Returns the index of the begining of the next token */
 static int nextToken(const char* file, int start) {
     enum tokenState {
-        BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING
+        BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING, PUNCTUATION
     };
 
     enum tokenState state = BEGIN;
@@ -398,6 +403,10 @@ static int nextToken(const char* file, int start) {
             else if(nextChar == '"') {
                 state = STRING;
             }
+            // Check punctuation
+            else if(charIsPunctuation(nextChar)) {
+                state = PUNCTUATION;
+            }
         } else if(state == TEXT) {
             // Ends on non-alphanumeric character
             if(!isalpha(nextChar) && !isdigit(nextChar) && nextChar != '_') {
@@ -422,6 +431,12 @@ static int nextToken(const char* file, int start) {
         } else if (state == STRING) {
             if(nextChar == '"'){
                 return start + 1;
+            }
+        } else if (state == PUNCTUATION) {
+            if(nextChar == ']'){
+                return start + 1;
+            } else if(isdigit(nextChar) || isalpha(nextChar) || charIsToken(nextChar) || isspace(nextChar)) {
+                return start;
             }
         }
     }

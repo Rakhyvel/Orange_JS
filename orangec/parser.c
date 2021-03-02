@@ -185,6 +185,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, FUNCTION_BOX, 3)) {
             struct function* function = parser_initFunction(topToken->filename, topToken->line);
             struct block* argBlock = parser_initBlock(module->block);
+            char* parentType = malloc(sizeof(char*) * 255);
             function->argBlock = argBlock;
             copyNextTokenString(tokenQueue, function->self.type);
             copyNextTokenString(tokenQueue, function->self.name);
@@ -193,7 +194,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LESSER) { // Struct only (maybe?) 
                 assertRemove(tokenQueue, TOKEN_LESSER);
                 assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-                copyNextTokenString(tokenQueue, function->self.type);
+                copyNextTokenString(tokenQueue, parentType);
                 assertRemove(tokenQueue, TOKEN_GREATER);
             }
 
@@ -217,12 +218,19 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             // STRUCT DEFINITION
             if(!strcmp(function->self.type, "struct")) {
                 struct dataStruct* dataStruct = parser_initDataStruct(function->self.code->filename, function->self.code->line);
+                strcpy(dataStruct->self.name, function->self.name);
                 if(map_put(program->dataStructsMap, function->self.name, dataStruct)) {
                     error(function->self.filename, function->self.line, "Struct \"%s\" already defined", function->self.name, module->name);
                 }
-                dataStruct->definition = function;
                 strcpy(function->self.type, function->self.name);
-                strcpy(dataStruct->self.name, function->self.name);
+                dataStruct->definition = function;
+                if(parentType != NULL) {
+                    strcpy(dataStruct->self.type, parentType);
+                } else {
+                    free(parentType);
+                }
+            } else {
+                free(parentType);
             }
         }
         // GLOBAL
@@ -262,6 +270,8 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
     }
     // VARIABLE
     else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
+        LOG("Found varibale");
+        LOG("%s", ((struct token*)queue_peek(tokenQueue))->data);
         retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line);
         struct variable* var = createVar(tokenQueue, block);
         if(var->code == NULL) {
@@ -271,6 +281,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         map_put(block->varMap, var->name, var);
         // @todo create an assertDoesntExist which recursively goes up the blocks until null, asserting that the var doesnt exist
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        LOG("Added variable");
     }
     // IF
     else if (matchTokens(tokenQueue, IF, 1)) {
@@ -553,6 +564,7 @@ static struct astNode* createAST(enum astType type, const char* filename, int li
     Given a token queue, extracts the front expression, parses it into an
     Abstract Syntax Tree. */
 static struct astNode* createExpressionAST(struct list* tokenQueue) {
+    LOG("Create Expression AST");
     ASSERT(tokenQueue != NULL);
     struct astNode* astNode = NULL;
     struct token* token = NULL;
@@ -617,6 +629,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
     Takes a queue of tokens, pops off the first expression and returns as a new
     queue. */
 static struct list* nextExpression(struct list* tokenQueue) {
+    LOG("Next expression");
     ASSERT(tokenQueue != NULL);
 
     struct list* retval = list_create();
@@ -651,9 +664,10 @@ static struct list* nextExpression(struct list* tokenQueue) {
         if(depth < 0) {
             break;
         }
-        LOG("%s", lexer_tokenToString(nextType));
+        LOG("%s %s", lexer_tokenToString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
         queue_push(retval, queue_pop(tokenQueue));
     }
+    LOG("");
     return retval;
 }
 
@@ -661,6 +675,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
     Takes in a queue representing an expression, and if it can, transforms 
     function calls/index token structures into proper call/index tokens */
 static struct list* simplifyTokens(struct list* tokenQueue) {
+    LOG("Simplify Tokens");
     struct list* retval = list_create();
 
     // Go through each token in given expression token queue, add/reject/parse to retval
@@ -669,7 +684,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
         if(matchTokens(tokenQueue, CALL, 2)) {
             assertPeek(tokenQueue, TOKEN_IDENTIFIER);
             struct token* callName = ((struct token*)queue_pop(tokenQueue));
-            struct token* call = lexer_createToken(TOKEN_CALL, callName->data);
+            struct token* call = lexer_createToken(TOKEN_CALL, callName->data, callName->filename, callName->line);
             call->line = callName->line;
             free(callName);
 
@@ -690,19 +705,20 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
         } 
         // INDEX
         else if(matchTokens(tokenQueue, INDEX, 1)) {
-            queue_push(retval, lexer_createToken(TOKEN_INDEX, ""));
-            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "("));
+            struct token* topToken = queue_peek(tokenQueue);
+            queue_push(retval, lexer_createToken(TOKEN_INDEX, "", topToken->filename, topToken->line));
+            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "(", topToken->filename, topToken->line));
             assertRemove(tokenQueue, TOKEN_LSQUARE);
 
             // extract expression for index, add to retval list, between anonymous parens
-            struct list* innerExpression = nextExpression(tokenQueue);
+            struct list* innerExpression = infixToPostfix(simplifyTokens(nextExpression(tokenQueue)));
             struct listElem* elem;
             for(elem = list_begin(innerExpression); elem != list_end(innerExpression); elem=list_next(elem)) {
                 queue_push(retval, elem->data);
             }
 
             assertRemove(tokenQueue, TOKEN_RSQUARE);
-            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")"));
+            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")", topToken->filename, topToken->line));
         }
         // OTHER (just add to queue)
         else {
@@ -716,6 +732,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
     Consumes a queue of tokens representing an expression in infix order, 
     converts it to postfix order */
 static struct list* infixToPostfix(struct list* tokenQueue) {
+    LOG("Infix to Postfix");
     struct list* retval = list_create();
     struct list* opStack = list_create();
     struct token* token = NULL;
@@ -739,6 +756,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
             while(!list_isEmpty(opStack) && ((struct token*)stack_peek(opStack))->type != TOKEN_LPAREN) {
                 queue_push(retval, stack_pop(opStack));
             }
+            ASSERT(!list_isEmpty(opStack));
             stack_pop(opStack); // Remove (
         } 
         // OPERATOR
@@ -756,7 +774,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
     while(!list_isEmpty(opStack)) {
         queue_push(retval, stack_pop(opStack));
     }
-
+    LOG("end Infix to Postfix");
     return retval;
 }
 

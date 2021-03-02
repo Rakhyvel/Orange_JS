@@ -1,23 +1,14 @@
 static module Main {
     void start() {
-        ~~ Main#Vector ~~
-        Vector array v1 = Vector array[4];
-        Vector pos;
-        if 3 < 4 {
-            
-        } else {
-            
+        int i = Math:rand(100);
+        if i <= 50 {
+
         }
-    }
-    ~~ Main#Vector() ~~
-    struct Vector(int x1, int y1) {
-        int x = x1;
-        int y = y1;
     }
 }
 
-module Apricot {
-    struct Entity() {
-        Vector pos = Vector(0, 0);
+module Math {
+    int rand(int range) {
+        return 25;
     }
 }

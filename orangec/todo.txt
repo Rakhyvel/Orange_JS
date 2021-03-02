@@ -36,11 +36,16 @@ x assert while must have block
 x add brackets back to tmLang
 x struct parameters
 x structs cannot have any statements besides var defines, and no non-static access!
+x super token for structs with parents (parents definition call)
 - multiple char punctuation
 - C like comment syntax
-- new/delete operators
-- array [] syntax
-    - int[] a = new int[5];
-    - int[] a = new int[](1, 2, 3, 4, 5);
+x array [] syntax
+    x int[] a = new int[5];
+    x int[] a = new int[](1, 2, 3, 4, 5);
+- tokens have start and end
+- asts have start and end
 - casting
 - null
+- the Any type
+- text type
+- finish tmLang(null, text, struct <>, array, multi char, super, cast)
