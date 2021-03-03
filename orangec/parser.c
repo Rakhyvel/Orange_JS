@@ -41,8 +41,7 @@ static const enum tokenType INDEX[] = {TOKEN_LSQUARE};
 static const enum tokenType EMPTY[] = {TOKEN_SEMICOLON};
 
 // Private functions
-static int matchOpenComment(struct list*, struct listElem*);
-static int matchEndComment(struct list*, struct listElem*);
+static int topMatches(struct list*, enum tokenType);
 static void condenseArrayIdentifiers(struct list*);
 static void copyNextTokenString(struct list*, char*);
 static struct variable* createVar(struct list*, struct block*);
@@ -113,23 +112,36 @@ struct block* parser_initBlock(struct block* parent) {
 void parser_removeComments(struct list* tokenQueue) {
     struct listElem* elem;
     int withinComment = 0;
+    int tokenLine = -1;
 
     for(elem=list_begin(tokenQueue);elem!=list_end(tokenQueue);elem=list_next(elem)) {
-        if(withinComment) {
-            if(matchEndComment(tokenQueue, elem)) {
+        if(withinComment == 1) {
+            if(((struct token*)elem->data)->type == TOKEN_RBLOCK) {
                 withinComment = 0;
                 elem = elem->prev;
-                free(list_remove(tokenQueue, list_next(elem)));
                 free(list_remove(tokenQueue, list_next(elem)));
             } else {
                 elem = elem->prev;
                 free(list_remove(tokenQueue, list_next(elem)));
             }
-        } else {
-            if(matchOpenComment(tokenQueue, elem)) {
-                withinComment = 1;
+        } else if(withinComment == 2) {
+            if(((struct token*)elem->data)->line != tokenLine) {
+                withinComment = 0;
+                tokenLine = -1;
+                elem = elem->prev;
+            } else {
                 elem = elem->prev;
                 free(list_remove(tokenQueue, list_next(elem)));
+            }
+        } else {
+            if(((struct token*)elem->data)->type == TOKEN_LBLOCK) {
+                withinComment = 1;
+                elem = elem->prev; // iterated at end of for loop
+                free(list_remove(tokenQueue, list_next(elem)));
+            } else if(((struct token*)elem->data)->type == TOKEN_DSLASH) {
+                withinComment = 2;
+                tokenLine = ((struct token*)elem->data)->line;
+                elem = elem->prev; // iterated at end of for loop
                 free(list_remove(tokenQueue, list_next(elem)));
             }
         }
@@ -145,7 +157,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
     condenseArrayIdentifiers(tokenQueue);
     // Find all modules in a given token queue
     while(!list_isEmpty(tokenQueue)) {
-        int isStatic = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_STATIC;
+        int isStatic = topMatches(tokenQueue, TOKEN_STATIC);
         if(isStatic) free(queue_pop(tokenQueue));
         struct token* topToken = queue_peek(tokenQueue);
         if(matchTokens(tokenQueue, MODULE, 3)) {
@@ -162,7 +174,7 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
             parser_addElements(module, tokenQueue);
 
             assertRemove(tokenQueue, TOKEN_RBRACE);
-        } else if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_EOF) {
+        } else if(topMatches(tokenQueue, TOKEN_EOF)) {
             free(queue_pop(tokenQueue));
         } else {
             error(topToken->filename, topToken->line, "Unnecessary token %s found", ((struct token*)queue_peek(tokenQueue))->data);
@@ -176,9 +188,8 @@ void parser_addModules(struct program* program, struct list* tokenQueue) {
 void parser_addElements(struct module* module, struct list* tokenQueue) {
 
     // Find all functions until a function's end is reached
-    while(!list_isEmpty(tokenQueue) && 
-    ((struct token*) queue_peek(tokenQueue))->type != TOKEN_RBRACE) {
-        int isPrivate = ((struct token*)queue_peek(tokenQueue))->type == TOKEN_PRIVATE;
+    while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
+        int isPrivate = topMatches(tokenQueue, TOKEN_PRIVATE);
         if(isPrivate) free(queue_pop(tokenQueue));
 
         struct token* topToken = queue_peek(tokenQueue);
@@ -192,7 +203,7 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             copyNextTokenString(tokenQueue, function->self.name);
             LOG("New function: %s %s", function->self.type, function->self.name);
 
-            if(((struct token*) queue_peek(tokenQueue))->type == TOKEN_LESSER) { // Struct only (maybe?) 
+            if(topMatches(tokenQueue, TOKEN_LESSER)) { // Struct only (maybe?) 
                 assertRemove(tokenQueue, TOKEN_LESSER);
                 assertPeek(tokenQueue, TOKEN_IDENTIFIER);
                 copyNextTokenString(tokenQueue, parentType);
@@ -264,7 +275,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         retval = createAST(AST_BLOCK, topToken->filename, topToken->line);
         retval->data = parser_initBlock(block);
         assertRemove(tokenQueue, TOKEN_LBRACE);
-        while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RBRACE) {
+        while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
             queue_push(retval->children, parser_createAST(tokenQueue, retval->data));
         }
         assertRemove(tokenQueue, TOKEN_RBRACE);
@@ -295,10 +306,10 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         }
         queue_push(retval->children, expression);
         queue_push(retval->children, body);
-        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_ELSE) {
+        if(topMatches(tokenQueue, TOKEN_ELSE)) {
             assertRemove(tokenQueue, TOKEN_ELSE);
             retval->type = AST_IFELSE;
-            if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_IF) {
+            if(topMatches(tokenQueue, TOKEN_IF)) {
                 queue_push(retval->children, parser_createAST(tokenQueue, block));
             } else {
                 queue_push(retval->children, parser_createAST(tokenQueue, block));
@@ -483,7 +494,7 @@ static struct variable* createVar(struct list* tokenQueue, struct block* block) 
     retval->filename = topToken->filename;
     retval->line = topToken->line;
 
-    if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_CONST) {
+    if(topMatches(tokenQueue, TOKEN_CONST)) {
         retval->isConstant = 1;
         free(queue_pop(tokenQueue));
     }
@@ -493,10 +504,10 @@ static struct variable* createVar(struct list* tokenQueue, struct block* block) 
     assertPeek(tokenQueue, TOKEN_IDENTIFIER);
     copyNextTokenString(tokenQueue, retval->name);
 
-    if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_EQUALS) {
+    if(topMatches(tokenQueue, TOKEN_EQUALS)) {
         assertRemove(tokenQueue, TOKEN_EQUALS);
         retval->code = parser_createAST(tokenQueue, block);
-    } else if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_SEMICOLON) {
+    } else if(topMatches(tokenQueue, TOKEN_SEMICOLON)) {
         retval->code = NULL;
     }
     return retval;
@@ -511,14 +522,14 @@ static void parseParams(struct list* tokenQueue, struct map* argMap, struct vari
     assertRemove(tokenQueue, TOKEN_LPAREN);
 
     // Parse parameters of function
-    while(((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
+    while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
         struct variable* arg = createVar(tokenQueue, NULL);
         struct token* topToken = queue_peek(tokenQueue);
         if(map_put(argMap, arg->name, arg)) {
             error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place in %s \"%s\"!\n", arg->name, variable->varType, variable->name);
         }
     
-        if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
+        if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
         }
         LOG("New arg: %s %s", arg->type, arg->name);
@@ -684,11 +695,11 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             assertRemove(tokenQueue, TOKEN_LPAREN);
             
             // Go through each argument, create AST representing it
-            while(!list_isEmpty(tokenQueue) && ((struct token*)queue_peek(tokenQueue))->type != TOKEN_RPAREN) {
+            while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
                 struct astNode* argAST = createExpressionAST(tokenQueue);
                 queue_push(call->list, argAST);
 
-                if(((struct token*)queue_peek(tokenQueue))->type == TOKEN_COMMA) {
+                if(topMatches(tokenQueue, TOKEN_COMMA)) {
                     free(queue_pop(tokenQueue));
                 }
             }

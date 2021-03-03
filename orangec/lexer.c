@@ -116,6 +116,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_LBLOCK;
         } else if(strcmp("*/", tokenBuffer) == 0) {
             tempType = TOKEN_RBLOCK;
+        } else if(strcmp("//", tokenBuffer) == 0) {
+            tempType = TOKEN_DSLASH;
         } else if(strcmp(",", tokenBuffer) == 0) {
             tempType = TOKEN_COMMA;
         } else if(strcmp(";", tokenBuffer) == 0) {
@@ -340,6 +342,12 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:COLON";
     case TOKEN_INDEX:
         return "token:INDEX";
+    case TOKEN_LBLOCK:
+        return "token:LBLOCK";
+    case TOKEN_RBLOCK:
+        return "token:RBLOCK";
+    case TOKEN_DSLASH:
+        return "token:DSLASH";
     }
     ASSERT(0); // Unreachable
     return "";

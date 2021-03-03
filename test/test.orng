@@ -5,11 +5,6 @@ static module Main {
 
     // And this too
     void start() {
-        int i = Math:rand(100);
-        if i != 50 {
-
-        } else if i <= 50 || i >= 50 {
-
-        }
+        int i = 40;
     }
 }
