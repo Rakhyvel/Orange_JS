@@ -25,6 +25,8 @@ enum astType {
     AST_IS, AST_ISNT, AST_GREATER, AST_LESSER, AST_GREATEREQUAL, AST_LESSEREQUAL,
     // Boolean operators
     AST_AND, AST_OR, 
+    // Type operators
+    AST_CAST,
     // Indexing
     AST_DOT, AST_INDEX, AST_MODULEACCESS,
     // Unused

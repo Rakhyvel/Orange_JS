@@ -152,6 +152,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_AND;
         } else if(strcmp("||", tokenBuffer) == 0) {
             tempType = TOKEN_OR;
+        } else if(strcmp("cast", tokenBuffer) == 0) {
+            tempType = TOKEN_CAST;
         } else if(strcmp("true", tokenBuffer) == 0) {
             tempType = TOKEN_TRUE;
         } else if(strcmp("false", tokenBuffer) == 0) {
@@ -237,10 +239,12 @@ int lexer_getTokenPrecedence(enum tokenType type) {
 		case TOKEN_STAR:
 		case TOKEN_SLASH:
 			return 7;
+        case TOKEN_CAST:
+            return 8;
         case TOKEN_DOT:
         case TOKEN_COLON:
         case TOKEN_INDEX:
-            return 8;
+            return 9;
 		default:
 			return 0;
     }
@@ -310,6 +314,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:AND";
     case TOKEN_OR:
         return "token:OR";
+    case TOKEN_CAST:
+        return "token:CAST";
     case TOKEN_MODULE:
         return "token:MODULE";
     case TOKEN_STRUCT:

@@ -26,19 +26,13 @@
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType FUNCTION_BOX[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LESSER};
+static const enum tokenType FUNCTION_BOX[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COLON};
 static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 
 // Lower level token signatures
-static const enum tokenType BLOCK[] = {TOKEN_LBRACE};
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
 static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
-static const enum tokenType IF[] = {TOKEN_IF};
-static const enum tokenType WHILE[] = {TOKEN_WHILE};
-static const enum tokenType RETURN[] = {TOKEN_RETURN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType INDEX[] = {TOKEN_LSQUARE};
-static const enum tokenType EMPTY[] = {TOKEN_SEMICOLON};
 
 // Private functions
 static int topMatches(struct list*, enum tokenType);
@@ -203,11 +197,10 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             copyNextTokenString(tokenQueue, function->self.name);
             LOG("New function: %s %s", function->self.type, function->self.name);
 
-            if(topMatches(tokenQueue, TOKEN_LESSER)) { // Struct only (maybe?) 
-                assertRemove(tokenQueue, TOKEN_LESSER);
+            if(topMatches(tokenQueue, TOKEN_COLON)) { // Struct only (maybe?) 
+                assertRemove(tokenQueue, TOKEN_COLON);
                 assertPeek(tokenQueue, TOKEN_IDENTIFIER);
                 copyNextTokenString(tokenQueue, parentType);
-                assertRemove(tokenQueue, TOKEN_GREATER);
             }
 
             parseParams(tokenQueue, function->argBlock->varMap, &function->self); // Parameters
@@ -271,7 +264,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
     struct token* topToken = queue_peek(tokenQueue);
 
     // BLOCK
-    if(matchTokens(tokenQueue, BLOCK, 1)) {
+    if(topMatches(tokenQueue, TOKEN_LBRACE)) {
         retval = createAST(AST_BLOCK, topToken->filename, topToken->line);
         retval->data = parser_initBlock(block);
         assertRemove(tokenQueue, TOKEN_LBRACE);
@@ -296,7 +289,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         LOG("Added variable");
     }
     // IF
-    else if (matchTokens(tokenQueue, IF, 1)) {
+    else if (topMatches(tokenQueue, TOKEN_IF)) {
         retval = createAST(AST_IF, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, block);
@@ -317,7 +310,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         }
     }
     // WHILE
-    else if (matchTokens(tokenQueue, WHILE, 1)) {
+    else if (topMatches(tokenQueue, TOKEN_WHILE)) {
         retval = createAST(AST_WHILE, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, block);
@@ -329,13 +322,13 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         queue_push(retval->children, body);
     }
     // RETURN
-    else if (matchTokens(tokenQueue, RETURN, 1)) {
+    else if (topMatches(tokenQueue, TOKEN_RETURN)) {
         retval = createAST(AST_RETURN, topToken->filename, topToken->line);
         assertRemove(tokenQueue, TOKEN_RETURN);
         struct astNode* expression = createExpressionAST(tokenQueue);
         queue_push(retval->children, expression);
     }
-    else if (matchTokens(tokenQueue, EMPTY, 1)) {
+    else if (topMatches(tokenQueue, TOKEN_SEMICOLON)) {
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
     }
     // EXPRESSION
@@ -353,27 +346,36 @@ void parser_printAST(struct astNode* node, int n) {
     #else
     for(int i = 0; i < n; i++) printf("  "); // print spaces
     LOG("%s", parser_astToString(node->type));
+    if(node->type == AST_VARDEFINE) {
+        for(int i = 0; i < n; i++) printf("  ");
+        LOG("%s %s =", ((struct variable*)node->data)->type, (((struct variable*)node->data)->name));
+        parser_printAST(((struct variable*)node->data)->code, n+1);
+    } else if(node->type == AST_INTLITERAL) {
+        for(int i = 0; i < n; i++) printf("  "); 
+        printf("^-: "); // print spaces
+        int* data = (int*)(node->data);
+        LOG("%d", *data);
+    } else if(node->type == AST_REALLITERAL) {
+        for(int i = 0; i < n; i++) printf("  "); 
+        printf("^-: "); // print spaces
+        float* data = (float*)(node->data);
+        LOG("%f", *data);
+    } else if(node->type == AST_CHARLITERAL || node->type == AST_STRINGLITERAL) {
+        for(int i = 0; i < n; i++) printf("  "); 
+        printf("^-: "); // print spaces
+        LOG("%s", (char*)(node->data));
+    } else if(node->type == AST_VAR) {
+        for(int i = 0; i < n; i++) printf("  "); 
+        printf("^-: "); // print spaces
+        LOG("%s", (char*)node->data);
+    }
 
     // Go through children of passed in AST node
     struct listElem* elem = NULL;
     for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
         if(elem->data == NULL) {
             continue;
-        } else if(node->type == AST_INTLITERAL) {
-            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
-            int* data = (int*)(elem->data);
-            LOG("%d", *data);
-        } else if(node->type == AST_REALLITERAL) {
-            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
-            float* data = (float*)(elem->data);
-            LOG("%f", *data);
-        } else if(node->type == AST_CHARLITERAL || node->type == AST_STRINGLITERAL) {
-            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
-            LOG("%s", (char*)(elem->data));
-        } else if(node->type == AST_VAR) {
-            for(int i = 0; i < n + 1; i++) printf("  "); // print spaces
-            LOG("%s", (char*)elem->data);
-        } else{
+        } else {
             parser_printAST(((struct astNode*)elem->data), n+1);
         }
     }
@@ -411,6 +413,8 @@ char* parser_astToString(enum astType type) {
         return "astType.AND";
     case AST_OR: 
         return "astType.OR";
+    case AST_CAST: 
+        return "astType.CAST";
     case AST_GREATER: 
         return "astType.GREATER";
     case AST_LESSER: 
@@ -621,12 +625,18 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         default: // Assume operator
             assertOperator(astNode->type, token->filename, token->line);
             queue_push(astNode->children, stack_pop(argStack)); // Right
-            queue_push(astNode->children, stack_pop(argStack)); // Left
+            if(astNode->type != AST_CAST) { // Don't do left side for unary operators
+                queue_push(astNode->children, stack_pop(argStack)); // Left
+            } else {
+                astNode->data = (char*)malloc(sizeof(char) * 255);
+                strcpy(astNode->data, token->data);
+            }
             stack_push(argStack, astNode);
             break;
         }
         free(token);
     }
+    LOG("end Create Expression AST");
     return stack_peek(argStack);
 }
 
@@ -672,6 +682,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
         LOG("%s %s", lexer_tokenToString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
         queue_push(retval, queue_pop(tokenQueue));
     }
+    LOG("end Next Expression");
     return retval;
 }
 
@@ -708,7 +719,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             queue_push(retval, call);
         } 
         // INDEX
-        else if(matchTokens(tokenQueue, INDEX, 1)) {
+        else if(topMatches(tokenQueue, TOKEN_LSQUARE)) {
             struct token* topToken = queue_peek(tokenQueue);
             queue_push(retval, lexer_createToken(TOKEN_INDEX, "", topToken->filename, topToken->line));
             queue_push(retval, lexer_createToken(TOKEN_LPAREN, "(", topToken->filename, topToken->line));
@@ -724,11 +735,22 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             assertRemove(tokenQueue, TOKEN_RSQUARE);
             queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")", topToken->filename, topToken->line));
         }
+        // CAST
+        else if(topMatches(tokenQueue, TOKEN_CAST)) {
+            struct token* cast = queue_pop(tokenQueue);
+            assertRemove(tokenQueue, TOKEN_LPAREN);
+            struct token* type = queue_pop(tokenQueue);
+            strcpy(cast->data, type->data);
+            assertRemove(tokenQueue, TOKEN_RPAREN);
+            free(type);
+            queue_push(retval, cast);
+        }
         // OTHER (just add to queue)
         else {
             queue_push(retval, queue_pop(tokenQueue));
         }
     }
+    LOG("end Simplify Tokens");
     return retval;
 }
 
@@ -816,6 +838,8 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_AND;
     case TOKEN_OR:
         return AST_OR;
+    case TOKEN_CAST:
+        return AST_CAST;
     case TOKEN_IDENTIFIER:
         return AST_VAR;
     case TOKEN_CALL:
@@ -884,11 +908,12 @@ static void assertOperator(enum astType type, const char* filename, int line) {
     case AST_LESSEREQUAL:
     case AST_AND:
     case AST_OR: 
+    case AST_CAST: 
     case AST_DOT:
     case AST_INDEX:
     case AST_MODULEACCESS:
         return;
     default:
-        error(filename, line, "Operator stack corrupted, %s was assumed to be operator!", parser_astToString(type));
+        error(filename, line, "Operator stack corrupted, %s was assumed to be operator", parser_astToString(type));
     }
 }

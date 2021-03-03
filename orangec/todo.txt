@@ -38,14 +38,14 @@ x struct parameters
 x structs cannot have any statements besides var defines, and no non-static access!
 x super token for structs with parents (parents definition call)
 x multiple char punctuation
-- C like comment syntax
+x C like comment syntax
 x array [] syntax
     x int[] a = new int[5];
     x int[] a = new int[](1, 2, 3, 4, 5);
-- tokens have start and end
-- asts have start and end
 - casting
+- instanceof
 - null
 - the Any type
 - text type
+- validate super parameters
 - finish tmLang(null, text, struct <>, array, multi char, super, cast)

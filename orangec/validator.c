@@ -353,6 +353,10 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, var->type);
         return retval;
     }
+    case AST_CAST: {
+        strcpy(retval, node->data);
+        return retval;
+    }
     // RECURSIVE CASES
     case AST_ADD:
     case AST_SUBTRACT:

@@ -1,10 +1,21 @@
 static module Main {
-    /*
-    Make this a comment
-    */
+    struct Person(char[] n, int a) {
+        char[] name = n;
+        int age = a;
+    }
 
-    // And this too
+    struct Student:Person(char[] n, int a, real g) {
+        super(n, a);
+        real gpa = g;
+    }
+
     void start() {
-        int i = 40;
+        Person[] p = Person[5];
+        p[0] = Student("Joseph", 22, 4.0);
+        graduate(cast(Student)p[0]);
+    }
+
+    void graduate(Student s) {
+        
     }
 }

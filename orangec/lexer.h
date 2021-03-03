@@ -24,6 +24,8 @@ enum tokenType {
 	TOKEN_IS, TOKEN_ISNT, TOKEN_GREATER, TOKEN_LESSER, TOKEN_GREATEREQUAL, TOKEN_LESSEREQUAL,
 	// Boolean operators
 	TOKEN_AND, TOKEN_OR,
+	// Type operators
+	TOKEN_CAST,
 	// Programatic structures
 	TOKEN_MODULE, TOKEN_STRUCT, TOKEN_INTERFACE, TOKEN_END,
 	// Modifiers
