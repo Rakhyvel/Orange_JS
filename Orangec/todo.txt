@@ -52,7 +52,7 @@ x casting
 x the Any type
 x null
 
-- add file error messages
+x add file error messages
 - zero arg struct init
 - add output name flag
 - add target flag

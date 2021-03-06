@@ -390,7 +390,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         // STRUCT INIT
         else if(dataStruct != NULL) {
             int err = validateParamType(node->children, dataStruct->argBlock->varMap, function, module, isGlobal, external, node->filename, node->line);
-            if(!err) {
+            
+            if(!err || list_isEmpty(node->children)) {
                 strcpy(retval, node->data);
                 return retval;
             } else if(err > 0){

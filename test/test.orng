@@ -1,6 +1,7 @@
 module Main {
     void start() {
         List list = List:create();
+        list = List();
     }
 }
 
