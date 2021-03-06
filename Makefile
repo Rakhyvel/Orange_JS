@@ -1,10 +1,10 @@
 run:
-	gcc orangec/*.c util/*.c -Wall -o BloodOrange
-	./BloodOrange test/*.orng
+	gcc Orangec/*.c util/*.c -Wall -o orangec
+	./orangec test/*.orng
 
 verbose:
-	gcc orangec/*.c util/*.c -Wall -o BloodOrange -DVERBOSE
-	./BloodOrange test/*.orng
+	gcc Orangec/*.c util/*.c -Wall -o orangec -DVERBOSE
+	./orangec test/*.orng
 
 git-commit:
 	git add .
@@ -14,4 +14,4 @@ git-push:
 	git push origin master
 
 clean:
-	rm BloodOrange
+	rm orangec

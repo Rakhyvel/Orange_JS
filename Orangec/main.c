@@ -38,14 +38,26 @@
  */
 int main(int argn, char** argv)
 {
+    if(argn < 2) {
+        printf("Usage: orangec filename_1 filename_2 ... filename_n\n");
+        exit(1);
+    }
+
     program = parser_initProgram();
 
     for(int i = 1; i < argn; i++)
     {
         LOG("Reading file %s", argv[i]);
         FILE* file = fopen(argv[i], "r");
+        if(file == NULL) {
+            perror(argv[i]);
+            exit(1);
+        }
         char* filestring = lexer_readFile(file);
-        fclose(file);
+        if(fclose(file) == EOF) {
+            perror(argv[i]);
+            exit(1);
+        }
         int numLines;
         char** lines = lexer_getLines(filestring, &numLines);
         struct file* fileStruct = malloc(sizeof(struct file));
