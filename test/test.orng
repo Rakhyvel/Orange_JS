@@ -1,21 +1,9 @@
-static module Main {
-    struct Person(char[] n, int a) {
-        char[] name = n;
-        int age = a;
-    }
-
-    struct Student:Person(char[] n, int a, real g) {
-        super(n, a);
-        real gpa = g;
-    }
+module Main {
+    struct ListNode(ListNode next, Any data);
+    struct List(ListNode head, ListNode tail);
 
     void start() {
-        Person[] p = Person[5];
-        p[0] = Student("Joseph", 22, 4.0);
-        graduate(cast(Student)p[0]);
-    }
-
-    void graduate(Student s) {
-        
+        ListNode node;
+        ListNode node1 = ListNode(node, Any(char[255]));
     }
 }

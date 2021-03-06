@@ -160,6 +160,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_FALSE;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
+        } else if(strcmp("struct", tokenBuffer) == 0) {
+            tempType = TOKEN_STRUCT;
         } else if(strcmp("return", tokenBuffer) == 0) {
             tempType = TOKEN_RETURN;
         } else if(strcmp("end", tokenBuffer) == 0) {

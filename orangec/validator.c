@@ -21,8 +21,6 @@
 #include "../util/debug.h"
 
 // Private functions
-static struct dataStruct* extendStructs(char*, const char*, int);
-static void validateStructDefs(struct dataStruct*);
 static int findTypeEnd(const char*);
 static int validateType(const char*, const struct module*, const char*, int);
 static void validateAST(struct astNode*, const struct function*, const struct module*);
@@ -48,8 +46,6 @@ void validator_validate() {
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
-        extendStructs(dataStruct->self.name, dataStruct->self.filename, dataStruct->self.line);
-        validateStructDefs(dataStruct);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -86,6 +82,7 @@ void validator_validate() {
             struct function* function = map_get(module->functionsMap, (char*)functionElem->data);
             // VALIDATE TYPE EXISTS
             validateType(function->self.type, module, function->self.filename, function->self.line);
+            // VALIDATE PARAM TYPES EXISTS
             // VALIDATE CODE AST
             validateAST(function->self.code, function, module);
             if(!strcmp(function->self.name, "start")) {
@@ -101,64 +98,6 @@ void validator_validate() {
         error(NULL, 0, "No starting point (function named \"start\") for program found\n");
     }
     return;
-}
-
-/*
-    Takes in a name of a struct, copies in it's parent struct's fields if any, 
-    and copies in the parent struct's ancestor structs */
-static struct dataStruct* extendStructs(char* name, const char* filename, int line) {
-    struct dataStruct* dataStruct = map_get(program->dataStructsMap, name);
-    if(dataStruct == NULL) {
-        return NULL;
-    }
-    if(dataStruct->self.type[0] != '\0') {
-        struct dataStruct* parent = extendStructs(dataStruct->self.type, filename, line);
-        if(parent == NULL) {
-            error(filename, line, "Struct \"%s\" inherits from unknown struct \"%s\"", name, dataStruct->self.type);
-        }
-        map_copy(dataStruct->parentSet, parent->parentSet);
-        struct map* newFieldMap = map_create();
-        struct map* oldMap = dataStruct->definition->block->varMap;
-        map_copy(newFieldMap, parent->definition->block->varMap);
-        map_copy(newFieldMap, dataStruct->definition->block->varMap);
-        dataStruct->definition->block->varMap = newFieldMap;
-        map_destroy(oldMap);
-    }
-    set_add(dataStruct->parentSet, name);
-    return dataStruct;
-}
-
-static void validateStructDefs(struct dataStruct* dataStruct) {
-    struct astNode* block = dataStruct->definition->self.code;
-    struct listElem* elem = list_begin(block->children);
-    struct astNode* node = ((struct astNode*) elem->data);
-    if(elem == list_end(block->children)) {
-        error(dataStruct->self.filename, dataStruct->self.line, "Structs may not be empty");
-    }
-
-    if(node->type == AST_CALL) {
-        if(dataStruct->self.type[0] == '\0') {
-            error(dataStruct->self.filename, dataStruct->self.line, "Struct must inherit from parent struct to use super call");
-        } else {
-            elem = list_next(elem);
-        }
-    } else if(dataStruct->self.type[0] != '\0') {
-        error(dataStruct->self.filename, dataStruct->self.line, "Struct must call super as first instruction when inheriting");
-    }
-
-    for(; elem != list_end(block->children); elem = list_next(elem)) {
-        node = ((struct astNode*) elem->data);
-        if(node == NULL) continue;
-        if(node->type == AST_CALL && !strcmp(node->data, "super")) {
-            if(dataStruct->self.type[0] == '\0') {
-                error(node->filename, node->line, "Structs must inherit from another struct before using the super call");
-            } else {
-                error(node->filename, node->line, "Super call must be first instruction in struct");
-            }
-        } else if(node->type != AST_VARDEFINE) {
-            error(node->filename, node->line, "Structs may only define field definitions");
-        }
-    }
 }
 
 /*
@@ -218,7 +157,7 @@ static int validateType(const char* type, const struct module* module, const cha
     be a parent struct of the actual struct */
 static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
-        return !strcmp(expected, actual);
+        ;
     } else if(strstr(expected, " array")){
         char expectedBase[255];
         char actualBase[255];
@@ -230,13 +169,11 @@ static int typesMatch(const char* expected, const char* actual, const char* file
         removeArray(expectedBase);
         removeArray(actualBase);
         return typesMatch(expectedBase, actualBase, filename, line);
-    } else {
-        struct dataStruct* dataStruct = map_get(program->dataStructsMap, actual);
-        if(dataStruct == NULL) {
-            error(filename, line, "Unknown struct \"%s\" ", actual);
-        }
-        return set_contains(dataStruct->parentSet, expected);
+    } else if(map_get(program->dataStructsMap, actual) == NULL) {
+        error(filename, line, "Unknown struct \"%s\" ", actual);
     }
+
+    return !strcmp(expected, actual);
 }
 
 /*
@@ -353,10 +290,6 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, var->type);
         return retval;
     }
-    case AST_CAST: {
-        strcpy(retval, node->data);
-        return retval;
-    }
     // RECURSIVE CASES
     case AST_ADD:
     case AST_SUBTRACT:
@@ -446,7 +379,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
         // STRUCT INIT
         else if(dataStruct != NULL) {
-            int err = validateParamType(node->children, dataStruct->definition->argBlock->varMap, function, module, isGlobal, external, node->filename, node->line);
+            int err = validateParamType(node->children, dataStruct->argBlock->varMap, function, module, isGlobal, external, node->filename, node->line);
             if(!err) {
                 strcpy(retval, node->data);
                 return retval;
@@ -544,8 +477,12 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             error(node->filename, node->line, "Module \"%s\" does not contain variable \"%s\"", leftAST->data, rightAST->data);
         }
     }
+    case AST_CAST: {
+        strcpy(retval, node->data);
+        return retval;
+    }
     default:
-        PANIC("AST \"%s\" is not an expression", "lol");
+        PANIC("AST \"%s\" validation is not implemented yet", parser_astToString(node->type));
     }
     return NULL;
 }
@@ -633,7 +570,7 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
         char* paramType = ((struct variable*)map_get(paramMap, ((char*)paramElem->data)))->type;
         char* argType = validateExpressionAST((struct astNode*)argElem->data, function, module, isGlobal, external);
         if(strcmp(paramType, argType)) {
-            error(filename, line, "Value type mismatch when passing argument to function. Expected \"%s\" type, actual type was \"%s\" ", argType, paramType);
+            error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", argType, paramType);
         }
     }
     if(argElem != list_end(args)) {
@@ -663,11 +600,11 @@ static char* validateStructField(char* structName, char* fieldName, const char* 
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
     }
-    if(map_get(dataStruct->definition->block->varMap, fieldName) == NULL) {
+    if(map_get(dataStruct->argBlock->varMap, fieldName) == NULL) {
         error(filename, line, "Unknown field \"%s\" for struct \"%s\" ", fieldName, structName);
     }
 
-    return ((struct variable*)map_get(dataStruct->definition->block->varMap, fieldName))->type;
+    return ((struct variable*)map_get(dataStruct->argBlock->varMap, fieldName))->type;
    
     return NULL;
 }

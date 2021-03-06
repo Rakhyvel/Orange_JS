@@ -105,9 +105,8 @@ struct function {
 /*
     Structs are a collection of variables that can be packaged and moved as one */
 struct dataStruct {
-    struct variable self; // name
-    struct function* definition;
-    struct map* parentSet; // names of parents, and self
+    struct variable self;
+    struct block* argBlock;
 
     struct module* module;
     struct program* program;

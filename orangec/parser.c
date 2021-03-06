@@ -26,7 +26,7 @@
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_MODULE, TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
-static const enum tokenType FUNCTION_BOX[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COLON};
+static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType CONST[] = {TOKEN_CONST, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER};
 
 // Lower level token signatures
@@ -88,7 +88,6 @@ struct function* parser_initFunction(const char* filename, int line) {
 struct dataStruct* parser_initDataStruct(const char* filename, int line) {
     struct dataStruct* retval = (struct dataStruct*) calloc(1, sizeof(struct dataStruct));
     strcpy(retval->self.varType, "struct");
-    retval->parentSet = map_create();
     retval->self.filename = filename;
     retval->self.line = line;
     return retval;
@@ -187,21 +186,33 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
         if(isPrivate) free(queue_pop(tokenQueue));
 
         struct token* topToken = queue_peek(tokenQueue);
+        // STRUCT
+        if(matchTokens(tokenQueue, STRUCT, 3)) {
+            struct dataStruct* dataStruct = parser_initDataStruct(topToken->filename, topToken->line);
+            struct block* argBlock = parser_initBlock(module->block);
+            dataStruct->argBlock = argBlock;
+            assertRemove(tokenQueue, TOKEN_STRUCT);
+            copyNextTokenString(tokenQueue, dataStruct->self.name);
+            if(map_put(program->dataStructsMap, dataStruct->self.name, dataStruct)) {
+                error(dataStruct->self.filename, dataStruct->self.line, "Struct \"%s\" already defined", dataStruct->self.name, module->name);
+            }
+            LOG("New struct: %s %s", dataStruct->self.type, dataStruct->self.name);
+
+            parseParams(tokenQueue, dataStruct->argBlock->varMap, &dataStruct->self); // Parameters
+            assertRemove(tokenQueue, TOKEN_SEMICOLON);
+            
+            dataStruct->module = module;
+            dataStruct->program = module->program;
+            dataStruct->self.isPrivate = isPrivate;
+        }
         // FUNCTION
-        if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, FUNCTION_BOX, 3)) {
+        else if(matchTokens(tokenQueue, FUNCTION, 3)) {
             struct function* function = parser_initFunction(topToken->filename, topToken->line);
             struct block* argBlock = parser_initBlock(module->block);
-            char* parentType = malloc(sizeof(char*) * 255);
             function->argBlock = argBlock;
             copyNextTokenString(tokenQueue, function->self.type);
             copyNextTokenString(tokenQueue, function->self.name);
             LOG("New function: %s %s", function->self.type, function->self.name);
-
-            if(topMatches(tokenQueue, TOKEN_COLON)) { // Struct only (maybe?) 
-                assertRemove(tokenQueue, TOKEN_COLON);
-                assertPeek(tokenQueue, TOKEN_IDENTIFIER);
-                copyNextTokenString(tokenQueue, parentType);
-            }
 
             parseParams(tokenQueue, function->argBlock->varMap, &function->self); // Parameters
 
@@ -219,24 +230,6 @@ void parser_addElements(struct module* module, struct list* tokenQueue) {
             function->module = module;
             function->program = module->program;
             function->self.isPrivate = isPrivate;
-
-            // STRUCT DEFINITION
-            if(!strcmp(function->self.type, "struct")) {
-                struct dataStruct* dataStruct = parser_initDataStruct(function->self.code->filename, function->self.code->line);
-                strcpy(dataStruct->self.name, function->self.name);
-                if(map_put(program->dataStructsMap, function->self.name, dataStruct)) {
-                    error(function->self.filename, function->self.line, "Struct \"%s\" already defined", function->self.name, module->name);
-                }
-                strcpy(function->self.type, function->self.name);
-                dataStruct->definition = function;
-                if(parentType != NULL) {
-                    strcpy(dataStruct->self.type, parentType);
-                } else {
-                    free(parentType);
-                }
-            } else {
-                free(parentType);
-            }
         }
         // GLOBAL
         else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
