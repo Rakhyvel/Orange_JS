@@ -58,6 +58,14 @@ struct program* parser_initProgram() {
     retval->modulesMap = map_create();
     retval->dataStructsMap = map_create();
     retval->fileMap = map_create();
+
+    struct dataStruct* anyType = parser_initDataStruct("", 0);
+    
+    strcpy(anyType->self.name, "Any");
+    strcpy(anyType->self.type, "Any");
+    anyType->argBlock = parser_initBlock(NULL);
+    map_put(retval->dataStructsMap, anyType->self.name, anyType);
+
     return retval;
 }
 

@@ -1,9 +1,8 @@
 module Main {
-    struct ListNode(ListNode next, Any data);
-    struct List(ListNode head, ListNode tail);
-
+    struct Test();
     void start() {
-        ListNode node;
-        ListNode node1 = ListNode(node, Any(char[255]));
+        Any lol = Test();
+        f(cast(Test)lol);
     }
+    void f(Test x) {}
 }

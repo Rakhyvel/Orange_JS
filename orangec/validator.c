@@ -31,6 +31,7 @@ static struct variable* findGlobal(char* moduleName, char* name, const char* fil
 static struct variable* findFunction(char* moduleName, char* name, const char* filename, int line);
 static struct variable* findVariable(char*, struct block*, const char*, int);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, int, const char*, int);
+static void validateParamTypeExist(struct map*, const struct module*, const char*, int);
 static int validateArrayType(struct list*, char*, const struct function*, const struct module*, int, int, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
 
@@ -46,6 +47,7 @@ void validator_validate() {
     struct listElem* dataStructElem;
     for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
+        validateParamTypeExist(dataStruct->argBlock->varMap, dataStruct->module, dataStruct->self.filename, dataStruct->self.line);
     }
 
     struct list* modules = map_getKeyList(program->modulesMap);   
@@ -83,6 +85,7 @@ void validator_validate() {
             // VALIDATE TYPE EXISTS
             validateType(function->self.type, module, function->self.filename, function->self.line);
             // VALIDATE PARAM TYPES EXISTS
+            validateParamTypeExist(function->argBlock->varMap, function->module, function->self.filename, function->self.line);
             // VALIDATE CODE AST
             validateAST(function->self.code, function, module);
             if(!strcmp(function->self.name, "start")) {
@@ -158,6 +161,8 @@ static int validateType(const char* type, const struct module* module, const cha
 static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
         ;
+    } else if (!strcmp(expected, "Any") && !isPrimitive(actual)) {
+        return 1;
     } else if(strstr(expected, " array")){
         char expectedBase[255];
         char actualBase[255];
@@ -415,7 +420,11 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* rightAST = node->children->head.next->data;
 
         char* type = validateExpressionAST(leftAST, function, module, isGlobal, external);
-        strcpy(retval, validateStructField(type, rightAST->data, node->filename, node->line));
+        if(strstr(type, " array") && !strcmp(rightAST->data, "length")) {
+            strcpy(retval, "int");
+        } else {
+            strcpy(retval, validateStructField(type, rightAST->data, node->filename, node->line));
+        }
         return retval;
     }
     case AST_INDEX: {
@@ -478,6 +487,14 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         }
     }
     case AST_CAST: {
+        struct astNode* rightAST = node->children->head.next->data;
+        char* oldType = validateExpressionAST(rightAST, function, module, isGlobal, external);
+        char* newType = node->data;
+        if(strcmp(oldType, newType)) {
+            if(strcmp(oldType, "Any") && strcmp(newType, "Any")) {
+                error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
+            }
+        }
         strcpy(retval, node->data);
         return retval;
     }
@@ -569,8 +586,8 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
         paramElem = list_next(paramElem), argElem = list_next(argElem)) {
         char* paramType = ((struct variable*)map_get(paramMap, ((char*)paramElem->data)))->type;
         char* argType = validateExpressionAST((struct astNode*)argElem->data, function, module, isGlobal, external);
-        if(strcmp(paramType, argType)) {
-            error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", argType, paramType);
+        if(!typesMatch(paramType, argType, filename, line)) {
+            error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
         }
     }
     if(argElem != list_end(args)) {
@@ -579,6 +596,14 @@ static int validateParamType(struct list* args, struct map* paramMap, const stru
         return -1;
     } else {
         return 0;
+    }
+}
+
+static void validateParamTypeExist(struct map* paramMap, const struct module* module, const char* filename, int line) {
+    struct list* paramList = map_getKeyList(paramMap);
+    struct listElem* elem;
+    for(elem = list_begin(paramList); elem != list_end(paramList); elem = list_next(elem)) {
+        validateType(((struct variable*)map_get(paramMap,(char*)elem->data))->type, module, filename, line);
     }
 }
 

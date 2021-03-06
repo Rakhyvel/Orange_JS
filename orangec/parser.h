@@ -55,7 +55,7 @@ struct program {
 
 struct block {
     struct block* parent;
-    struct map* varMap;
+    struct map* varMap; // name -> struct variable
 };
 
 /*

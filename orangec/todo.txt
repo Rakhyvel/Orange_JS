@@ -46,9 +46,8 @@ x finish tmLang(null, text, struct name:parent, array, multi char punc, super, c
 x remove struct inheritance
 x remove struct initializer functions
 x return struct function signature syntax
-- length field for arrays
-- validate parameter types exist for functions
-- casting
-- instanceof
+x length field for arrays
+x validate parameter types exist for functions, structs
+x casting
+x the Any type
 - null
-- the Any type
