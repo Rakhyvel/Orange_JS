@@ -1,7 +1,33 @@
 module Main {
-    struct List(List next, Any data);
-
     void start() {
-        List list = List(null, null);
+        List list = List:create();
+    }
+}
+
+module List {
+    struct ListNode(ListNode prev, ListNode next, Any data);
+    struct List(ListNode head, ListNode tail);
+
+    List create() {
+        List retval = List(null, null);
+        retval.head = ListNode(null, null, null);
+        retval.tail = ListNode(retval.head, null, null);
+        retval.head.next = retval.tail;
+    }
+
+    ListNode begin(List list) {
+        return list.head.next;
+    }
+
+    ListNode end(List list) {
+        return list.tail;
+    }
+
+    ListNode next(ListNode node) {
+        return node.next;
+    }
+
+    boolean isEmpty(List list) {
+        return list.head.next == list.tail;
     }
 }

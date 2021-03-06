@@ -166,8 +166,6 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_STRUCT;
         } else if(strcmp("return", tokenBuffer) == 0) {
             tempType = TOKEN_RETURN;
-        } else if(strcmp("end", tokenBuffer) == 0) {
-            tempType = TOKEN_END;
         } else if(strcmp("[]", tokenBuffer) == 0) {
             tempType = TOKEN_ARRAY;
         } else if(strcmp("static", tokenBuffer) == 0) {
@@ -326,10 +324,6 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:MODULE";
     case TOKEN_STRUCT:
         return "token:STRUCT";
-    case TOKEN_INTERFACE:
-        return "token:INTERFACE";
-    case TOKEN_END:
-        return "token:END";
     case TOKEN_ARRAY:
         return "token:ARRAY";
     case TOKEN_STATIC:

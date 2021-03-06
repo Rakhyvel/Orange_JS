@@ -27,7 +27,7 @@ enum tokenType {
 	// Type operators
 	TOKEN_CAST,
 	// Programatic structures
-	TOKEN_MODULE, TOKEN_STRUCT, TOKEN_INTERFACE, TOKEN_END,
+	TOKEN_MODULE, TOKEN_STRUCT,
 	// Modifiers
 	TOKEN_ARRAY, TOKEN_STATIC, TOKEN_CONST, TOKEN_PRIVATE,
 	// Control flow structures

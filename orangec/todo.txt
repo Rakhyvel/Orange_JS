@@ -51,3 +51,8 @@ x validate parameter types exist for functions, structs
 x casting
 x the Any type
 x null
+
+- add file error messages
+- add output name flag
+- add target flag
+- add code generation
