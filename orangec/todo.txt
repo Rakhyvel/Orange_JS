@@ -50,4 +50,4 @@ x length field for arrays
 x validate parameter types exist for functions, structs
 x casting
 x the Any type
-- null
+x null

@@ -161,6 +161,8 @@ static int validateType(const char* type, const struct module* module, const cha
 static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
         ;
+    } else if (!isPrimitive(expected) && !strcmp(actual, "None")) {
+        return 1;
     } else if (!strcmp(expected, "Any") && !isPrimitive(actual)) {
         return 1;
     } else if(strstr(expected, " array")){
@@ -289,6 +291,9 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
     case AST_FALSE:
     case AST_TRUE:
         strcpy(retval, "boolean");
+        return retval;
+    case AST_NULL:
+        strcpy(retval, "None");
         return retval;
     case AST_VAR: {
         struct variable* var = findVariable(node->data, function->block, node->filename, node->line);
@@ -490,6 +495,9 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         struct astNode* rightAST = node->children->head.next->data;
         char* oldType = validateExpressionAST(rightAST, function, module, isGlobal, external);
         char* newType = node->data;
+        if(!strcmp(newType, "None")) {
+            error(node->filename, node->line, "Cannot cast %s to None", oldType);
+        }
         if(strcmp(oldType, newType)) {
             if(strcmp(oldType, "Any") && strcmp(newType, "Any")) {
                 error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);

@@ -158,6 +158,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_TRUE;
         } else if(strcmp("false", tokenBuffer) == 0) {
             tempType = TOKEN_FALSE;
+        } else if(strcmp("null", tokenBuffer) == 0) {
+            tempType = TOKEN_NULL;
         } else if(strcmp("module", tokenBuffer) == 0) {
             tempType = TOKEN_MODULE;
         } else if(strcmp("struct", tokenBuffer) == 0) {
@@ -290,6 +292,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:TRUE";
     case TOKEN_FALSE:
         return "token:FALSE";
+    case TOKEN_NULL:
+        return "token:NULL";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 

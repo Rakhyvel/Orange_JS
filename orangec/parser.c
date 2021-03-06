@@ -60,11 +60,16 @@ struct program* parser_initProgram() {
     retval->fileMap = map_create();
 
     struct dataStruct* anyType = parser_initDataStruct("", 0);
-    
     strcpy(anyType->self.name, "Any");
     strcpy(anyType->self.type, "Any");
     anyType->argBlock = parser_initBlock(NULL);
     map_put(retval->dataStructsMap, anyType->self.name, anyType);
+
+    struct dataStruct* nothingType = parser_initDataStruct("", 0);
+    strcpy(nothingType->self.name, "None");
+    strcpy(nothingType->self.type, "None");
+    nothingType->argBlock = parser_initBlock(NULL);
+    map_put(retval->dataStructsMap, nothingType->self.name, nothingType);
 
     return retval;
 }
@@ -442,6 +447,8 @@ char* parser_astToString(enum astType type) {
         return "astType:TRUE";
     case AST_FALSE: 
         return "astType:FALSE";
+    case AST_NULL: 
+        return "astType:NULL";
     case AST_CALL:
         return "astType.CALL";
     case AST_VAR: 
@@ -618,6 +625,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         case TOKEN_IDENTIFIER:
         case TOKEN_TRUE:
         case TOKEN_FALSE:
+        case TOKEN_NULL:
             charData = (char*)malloc(sizeof(char) * 255);
             strncpy(charData, token->data, 254);
             astNode->data = charData;
@@ -863,6 +871,8 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_FALSE;
     case TOKEN_FALSE:
         return AST_FALSE;
+    case TOKEN_NULL:
+        return AST_NULL;
     default:
         printf("Cannot directly convert %s to AST\n", lexer_tokenToString(type));
         NOT_REACHED();

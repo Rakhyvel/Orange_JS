@@ -1,8 +1,7 @@
 module Main {
-    struct Test();
+    struct List(List next, Any data);
+
     void start() {
-        Any lol = Test();
-        f(cast(Test)lol);
+        List list = List(null, null);
     }
-    void f(Test x) {}
 }
