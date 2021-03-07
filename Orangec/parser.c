@@ -421,6 +421,10 @@ char* parser_astToString(enum astType type) {
         return "astType.OR";
     case AST_CAST: 
         return "astType.CAST";
+    case AST_NEW: 
+        return "astType.NEW";
+    case AST_FREE: 
+        return "astType.FREE";
     case AST_GREATER: 
         return "astType.GREATER";
     case AST_LESSER: 
@@ -637,11 +641,8 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             astNode->data = charData;
             assertOperator(astNode->type, token->filename, token->line);
             queue_push(astNode->children, stack_pop(argStack)); // Right
-            if(astNode->type != AST_CAST) { // Don't do left side for unary operators
+            if(astNode->type != AST_CAST && astNode->type != AST_NEW && astNode->type != AST_FREE) { // Don't do left side for unary operators
                 queue_push(astNode->children, stack_pop(argStack)); // Left
-            } else {
-                astNode->data = (char*)malloc(sizeof(char) * 255);
-                strcpy(astNode->data, token->data);
             }
             stack_push(argStack, astNode);
             break;
@@ -852,6 +853,10 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_OR;
     case TOKEN_CAST:
         return AST_CAST;
+    case TOKEN_NEW:
+        return AST_NEW;
+    case TOKEN_FREE:
+        return AST_FREE;
     case TOKEN_IDENTIFIER:
         return AST_VAR;
     case TOKEN_CALL:
@@ -923,6 +928,8 @@ static void assertOperator(enum astType type, const char* filename, int line) {
     case AST_AND:
     case AST_OR: 
     case AST_CAST: 
+    case AST_NEW: 
+    case AST_FREE: 
     case AST_DOT:
     case AST_INDEX:
     case AST_MODULEACCESS:

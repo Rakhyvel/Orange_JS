@@ -26,7 +26,7 @@ enum astType {
     // Boolean operators
     AST_AND, AST_OR, 
     // Type operators
-    AST_CAST,
+    AST_CAST, AST_NEW, AST_FREE,
     // Indexing
     AST_DOT, AST_INDEX, AST_MODULEACCESS,
     // Unused

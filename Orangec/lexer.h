@@ -25,7 +25,7 @@ enum tokenType {
 	// Boolean operators
 	TOKEN_AND, TOKEN_OR,
 	// Type operators
-	TOKEN_CAST,
+	TOKEN_CAST, TOKEN_NEW, TOKEN_FREE,
 	// Programatic structures
 	TOKEN_MODULE, TOKEN_STRUCT,
 	// Modifiers

@@ -1,44 +1,8 @@
-static module Main {
-    int testGlobal = 4;
-
+module Main {
     void start() {
-        List list = List:create();
-        list = List();
-        1+1;
-    }
-}
-
-static module List {
-    private int numLists = 0;
-    struct ListNode(ListNode prev, ListNode next, Any data);
-    struct List(ListNode head, ListNode tail);
-
-    List create() {
-        List retval = List(null, null);
-        retval.head = ListNode(null, null, null);
-        retval.tail = ListNode(retval.head, null, null);
-        retval.head.next = retval.tail;
-    }
-
-    ListNode begin(List list) {
-        return list.head.next;
-    }
-
-    ListNode end(List list) {
-        return list.tail;
-    }
-
-    ListNode next(ListNode node) {
-        return node.next;
-    }
-
-    boolean isEmpty(List list) {
-        return list.head.next == list.tail;
-    }
-
-    void insert(List list, ListNode before, Any data) {
-        ListNode node = ListNode(before.prev, before, data);
-        before.prev.next = node;
-        before.prev = node;
+        int i = 0;
+        while i < 5 {
+            i = i + 1;
+        }
     }
 }

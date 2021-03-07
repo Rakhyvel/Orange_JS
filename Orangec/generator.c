@@ -11,6 +11,7 @@
 
 #include "./generator.h"
 #include <stdlib.h>
+#include <string.h>
 
 #include "./main.h"
 
@@ -105,7 +106,6 @@ static void printTabs(FILE* out, int tabs) {
 
 static void generateAST(FILE* out, int tabs, char* moduleName, struct astNode* node) {
     if(node == NULL) return;
-    printTabs(out, tabs);
 
     switch(node->type) {
     case AST_BLOCK: {
@@ -114,21 +114,51 @@ static void generateAST(FILE* out, int tabs, char* moduleName, struct astNode* n
         for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
             generateAST(out, tabs + 1, moduleName, (struct astNode*)elem->data);
         }
+        printTabs(out, tabs);
         fprintf(out, "}\n");
         break;
     }
     case AST_VARDECLARE:
+        printTabs(out, tabs);
         fprintf(out, "let %s;\n", ((struct variable*)node->data)->name);
         break;
     case AST_VARDEFINE:
-        fprintf(out, "let %s;\n", ((struct variable*)node->data)->name);
-        // @todo implement generateExpression
+        printTabs(out, tabs);
+        fprintf(out, "let %s=", ((struct variable*)node->data)->name);
+        generateExpression(out, moduleName, ((struct variable*)node->data)->code);
+        fprintf(out, ";\n");
         break;
     case AST_IF:
+        printTabs(out, tabs);
+        fprintf(out, "if(");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        fprintf(out, ")");
+        generateAST(out, tabs, moduleName, node->children->head.next->next->data);
+        break;
     case AST_IFELSE:
+        printTabs(out, tabs);
+        fprintf(out, "if(");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        fprintf(out, ")");
+        generateAST(out, tabs, moduleName, node->children->head.next->next->data);
+        printTabs(out, tabs);
+        fprintf(out, "else");
+        generateAST(out, tabs, moduleName, node->children->head.next->next->next->data);
+        break;
     case AST_WHILE:
+        printTabs(out, tabs);
+        fprintf(out, "while(");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        fprintf(out, ")");
+        generateAST(out, tabs, moduleName, node->children->head.next->next->data);
+        break;
     case AST_RETURN:
+        printTabs(out, tabs);
+        fprintf(out, "return ");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        break;
     default:
+        printTabs(out, tabs);
         generateExpression(out, moduleName, node);
         fprintf(out, ";\n");
         break;
@@ -136,6 +166,7 @@ static void generateAST(FILE* out, int tabs, char* moduleName, struct astNode* n
 }
 
 static void generateExpression(FILE* out, char* moduleName, struct astNode* node) {
+    if(node == NULL) return;
     switch(node->type){
     case AST_INTLITERAL:
         fprintf(out, "%d", *(int*)node->data);
@@ -165,10 +196,47 @@ static void generateExpression(FILE* out, char* moduleName, struct astNode* node
     case AST_IS:
     case AST_ISNT:
     case AST_DOT:
-    case AST_MODULEACCESS:
         generateExpression(out, moduleName, node->children->head.next->next->data);
         fprintf(out, "%s", (char*)node->data);
         generateExpression(out, moduleName, node->children->head.next->data);
+        break;
+    case AST_MODULEACCESS:
+        generateExpression(out, moduleName, node->children->head.next->next->data);
+        fprintf(out, "_");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        break;
+    case AST_CALL: {
+        if(strstr(node->data, " array")) {
+            fprintf(out, "Array(");
+        } else {
+            fprintf(out, "%s(", (char*)node->data);
+        }
+        struct listElem* elem;
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            generateExpression(out, moduleName, (struct astNode*)elem->data);
+            if(elem->next != list_end(node->children)){
+                fprintf(out, ", ");
+            }
+        }
+        fprintf(out, ")");
+        break;
+    }
+    case AST_INDEX:
+        generateExpression(out, moduleName, node->children->head.next->next->data);
+        fprintf(out, "[");
+        generateExpression(out, moduleName, node->children->head.next->data);
+        fprintf(out, "]");
+        break;
+    case AST_NEW: {
+        struct astNode* rightAST = node->children->head.next->data;
+        fprintf(out, "new ");
+        if(rightAST->type == AST_CALL) {
+            generateExpression(out, moduleName, node->children->head.next->data);
+        } else if(rightAST->type == AST_INDEX) {
+            fprintf(out, "Array(%d)", *(int*)(((struct astNode*)rightAST->children->head.next->data)->data));
+        }
+    }
+    case AST_FREE:
     default:
         break;
     }

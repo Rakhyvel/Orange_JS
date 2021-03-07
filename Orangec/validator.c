@@ -508,6 +508,23 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         strcpy(retval, node->data);
         return retval;
     }
+    case AST_NEW: {
+        struct astNode* rightAST = node->children->head.next->data;
+        if(rightAST->type != AST_CALL && rightAST->type != AST_INDEX) {
+            error(node->filename, node->line, "New operand must be a struct call");
+        }
+        char* oldType = validateExpressionAST(rightAST, function, module, isGlobal, external);
+        strcpy(retval, oldType);
+        return retval;
+    }
+    case AST_FREE: {
+        struct astNode* rightAST = node->children->head.next->data;
+        if(rightAST->type != AST_VAR && rightAST->type != AST_INDEX) {
+            error(node->filename, node->line, "Free operand must be a variable");
+        }
+        strcpy(retval, "None");
+        return retval;
+    }
     default:
         PANIC("AST \"%s\" validation is not implemented yet", parser_astToString(node->type));
     }
