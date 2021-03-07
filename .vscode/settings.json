@@ -10,6 +10,7 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "system_error": "c"
+        "system_error": "c",
+        "validator.h": "c"
     }
 }

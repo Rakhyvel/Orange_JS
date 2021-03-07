@@ -19,10 +19,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Each module, in order of execution
 #include "./main.h"
 #include "./lexer.h"
 #include "./parser.h"
 #include "./validator.h"
+#include "./generator.h"
 
 #include "../util/debug.h"
 #include "../util/list.h"
@@ -76,6 +78,20 @@ int main(int argn, char** argv) {
     LOG("\nBegin Validating.");
     validator_validate(program);
     LOG("\nEnd Validating.\n");
+
+    LOG("\nBegin Generation.");
+    FILE* out = fopen(program->output, "w");
+    if(out == NULL) {
+        perror(program->output);
+        exit(1);
+    }
+    generator_generate(out);
+    if(fclose(out) == EOF) {
+        perror(program->output);
+        exit(1);
+    }
+    LOG("\nEnd Generation.");
+
     printf("Done.\n");
     return 0;
 }
