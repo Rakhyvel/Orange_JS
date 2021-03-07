@@ -1,11 +1,15 @@
-module Main {
+static module Main {
+    int testGlobal = 4;
+
     void start() {
         List list = List:create();
         list = List();
+        1+1;
     }
 }
 
-module List {
+static module List {
+    private int numLists = 0;
     struct ListNode(ListNode prev, ListNode next, Any data);
     struct List(ListNode head, ListNode tail);
 

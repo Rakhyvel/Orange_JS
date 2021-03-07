@@ -11,6 +11,7 @@
         "type_traits": "c",
         "utility": "c",
         "system_error": "c",
-        "validator.h": "c"
+        "validator.h": "c",
+        "map.h": "c"
     }
 }

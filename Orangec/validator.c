@@ -60,6 +60,7 @@ void validator_validate() {
         struct listElem* globalElem;
         for(globalElem = list_begin(globals); globalElem != list_end(globals); globalElem = list_next(globalElem)) {
             struct variable* global = map_get(module->block->varMap, (char*)globalElem->data);
+
             // VALIDATE STATE
             if(!module->isStatic && !global->isConstant) {
                 error(global->filename, global->line, "Global variable \"%s\" declared in non-state module \"%s\"", global->name, module->name);
@@ -69,7 +70,7 @@ void validator_validate() {
             // VALIDATE CODE AST
             global->isDeclared = 1;
             if(global->code == NULL) {
-                error(global->filename, global->line, "Global \"%s\" was not initialized");
+                error(global->filename, global->line, "Global \"%s\" was not initialized", global->name);
             }
             char *initType = validateExpressionAST(global->code, NULL, module, 1, 1);
             if(strcmp(global->type, initType)) {

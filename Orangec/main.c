@@ -80,6 +80,7 @@ int main(int argn, char** argv) {
     LOG("\nEnd Validating.\n");
 
     LOG("\nBegin Generation.");
+    printf("%p", program->output);
     FILE* out = fopen(program->output, "w");
     if(out == NULL) {
         perror(program->output);

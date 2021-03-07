@@ -632,6 +632,9 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
             stack_push(argStack, astNode);
             break;
         default: // Assume operator
+            charData = (char*)malloc(sizeof(char) * 255);
+            strncpy(charData, token->data, 254);
+            astNode->data = charData;
             assertOperator(astNode->type, token->filename, token->line);
             queue_push(astNode->children, stack_pop(argStack)); // Right
             if(astNode->type != AST_CAST) { // Don't do left side for unary operators

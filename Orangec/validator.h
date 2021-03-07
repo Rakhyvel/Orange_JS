@@ -9,7 +9,6 @@
 
 #include "./parser.h"
 
-void validator_extendStructs();
 void validator_validate();
 
 #endif
