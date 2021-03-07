@@ -53,7 +53,7 @@ x the Any type
 x null
 
 x add file error messages
-- zero arg struct init
-- add output name flag
-- add target flag
+x zero arg struct init
+x add output name flag
+x add target flag
 - add code generation

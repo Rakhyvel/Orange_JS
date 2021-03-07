@@ -1,10 +1,10 @@
 run:
 	gcc Orangec/*.c util/*.c -Wall -o orangec
-	./orangec test/*.orng
+	./orangec test/*.orng -o test/test.js -t web
 
 verbose:
 	gcc Orangec/*.c util/*.c -Wall -o orangec -DVERBOSE
-	./orangec test/*.orng
+	./orangec test/*.orng -o test/test.js -t web
 
 git-commit:
 	git add .

@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "./main.h"
 #include "./lexer.h"
@@ -27,6 +28,8 @@
 #include "../util/list.h"
 #include "../util/map.h"
 
+static void readInputFile(char* filename);
+
 /*
  * Takes in an array of files to compile
  * 
@@ -36,44 +39,38 @@
  * 4. Validation: Look through AST's, validate type, struct members, module members, state access, etc.
  * 5. Generate code (compile, release) or evaluate tree (interpret, debug)
  */
-int main(int argn, char** argv)
-{
+int main(int argn, char** argv) {
     if(argn < 2) {
         printf("Usage: orangec filename_1 filename_2 ... filename_n\n");
         exit(1);
     }
 
+    enum argState {
+        NORMAL, TARGET, OUTPUT
+    };
+    enum argState state = NORMAL;
     program = parser_initProgram();
 
-    for(int i = 1; i < argn; i++)
-    {
-        LOG("Reading file %s", argv[i]);
-        FILE* file = fopen(argv[i], "r");
-        if(file == NULL) {
-            perror(argv[i]);
-            exit(1);
+    for(int i = 1; i < argn; i++) {
+        switch(state) {
+        case NORMAL:
+            if(!strcmp(argv[i], "-o")) {
+                state = OUTPUT;
+            } else if(!strcmp(argv[i], "-t")) {
+                state = TARGET;
+            } else {
+                readInputFile(argv[i]);
+            }
+            break;
+        case TARGET:
+            strncpy(program->target, argv[i], 255);
+            state = NORMAL;
+            break;
+        case OUTPUT:
+            strncpy(program->output, argv[i], 255);
+            state = NORMAL;
+            break;
         }
-        char* filestring = lexer_readFile(file);
-        if(fclose(file) == EOF) {
-            perror(argv[i]);
-            exit(1);
-        }
-        int numLines;
-        char** lines = lexer_getLines(filestring, &numLines);
-        struct file* fileStruct = malloc(sizeof(struct file));
-        fileStruct->lines = lines;
-        fileStruct->nLines = numLines;
-        map_put(program->fileMap, argv[i], fileStruct);
-        LOG("End file reading");
-
-        LOG("\n\nBegin Tokenization.");
-        struct list* tokenQueue = lexer_tokenize(filestring, argv[i]);
-        LOG("\nEnd Tokenization\n");
-
-        LOG("\n\nBegin Parsing.");
-        parser_removeComments(tokenQueue);
-        parser_addModules(program, tokenQueue);
-        LOG("\nEnd Parsing.\n");
     }
 
     LOG("\nBegin Validating.");
@@ -81,6 +78,36 @@ int main(int argn, char** argv)
     LOG("\nEnd Validating.\n");
     printf("Done.\n");
     return 0;
+}
+
+static void readInputFile(char* filename) {
+    LOG("Reading file %s", filename);
+    FILE* file = fopen(filename, "r");
+    if(file == NULL) {
+        perror(filename);
+        exit(1);
+    }
+    char* filestring = lexer_readFile(file);
+    if(fclose(file) == EOF) {
+        perror(filename);
+        exit(1);
+    }
+    int numLines;
+    char** lines = lexer_getLines(filestring, &numLines);
+    struct file* fileStruct = malloc(sizeof(struct file));
+    fileStruct->lines = lines;
+    fileStruct->nLines = numLines;
+    map_put(program->fileMap, filename, fileStruct);
+    LOG("End file reading");
+
+    LOG("\n\nBegin Tokenization.");
+    struct list* tokenQueue = lexer_tokenize(filestring, filename);
+    LOG("\nEnd Tokenization\n");
+
+    LOG("\n\nBegin Parsing.");
+    parser_removeComments(tokenQueue);
+    parser_addModules(program, tokenQueue);
+    LOG("\nEnd Parsing.\n");
 }
 
 /*

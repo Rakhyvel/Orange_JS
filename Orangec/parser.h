@@ -51,6 +51,9 @@ struct program {
     struct map* modulesMap; // name -> struct module
     struct map* dataStructsMap; // name -> struct dataStruct
     struct map* fileMap;
+
+    char output[255];
+    char target[255];
 };
 
 struct block {
