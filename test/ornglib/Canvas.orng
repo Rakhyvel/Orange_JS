@@ -1,59 +1,24 @@
-static module Canvas
-    struct Canvas()
-    struct Rect(int x, int y, int w, int h)
-    struct Point(int x, int y)
-    struct Color(int a, int r, int g, int b)
-    struct Event(int type, int key, int mouse, int wheel, int moved)
+static module Canvas {
+    struct Canvas();
+    struct Image();
+    struct Rect(int x, int y, int w, int h);
+    struct Point(int x, int y);
+    struct Color(int a, int r, int g, int b);
+    struct Event(int type, int key, int mouse, int wheel, int moved);
 
-    void init()
-    end
-
-    void destroy()
-    end
-
-    void setColor(Color color)
-    end
-
-    void setStroke(int w, Color color)
-    end
-
-    void setFont(char array font)
-    end
-
-    void drawLine(int x1, int y1, int x2, int y2)
-    end
-
-    void drawRect(Rect rect)
-    end
-
-    void fillRect(Rect rect)
-    end
-
-    void drawImage(Image image, int x, int y)
-    end
-
-    void drawString(char array text, int x, int y, int fontSize)
-    end
-
-    void drawPolygon(int array xPoints, int array yPoints)
-    end
-
-    void fillPolygon(int array xPoints, int array yPoints)
-    end
-
-    int getMouseX()
-    end
-
-    int getMouseY()
-    end
-
-    Event pollEvent()
-    end
-end
-
-module Image
-    struct Image()
-    
-    Image create(char array path)
-    end
-end
+    void init(char[] id){}
+    void destroy(){}
+    void setColor(Color color){}
+    void setStroke(int w, Color color){}
+    void setFont(char[] font){}
+    void drawLine(int x1, int y1, int x2, int y2){}
+    void drawRect(int x, int y, int w, int h){}
+    void fillRect(int x, int y, int w, int h){}
+    void drawImage(Image image, int x, int y){}
+    void drawString(char[] text, int x, int y){}
+    void drawPolygon(int[] xPoints, int[] yPoints){}
+    void fillPolygon(int[] xPoints, int[] yPoints){}
+    int getMouseX(){}
+    int getMouseY(){}
+    Event pollEvent(){}
+}

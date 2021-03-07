@@ -1,7 +1,10 @@
-module Main {
+static module Main {
     void start() {
+        Canvas:init("canvas");
+        Canvas:setColor(new Color(255, 255, 128, 0));
         int i = 0;
         while i < 5 {
+            Canvas:fillRect(i*10, i*10, 10, 10);
             i = i + 1;
         }
     }

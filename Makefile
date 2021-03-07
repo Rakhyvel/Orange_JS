@@ -1,6 +1,6 @@
 run:
 	gcc Orangec/*.c util/*.c -Wall -o orangec
-	./orangec test/*.orng -o test/test.js -t web
+	./orangec test/*.orng test/ornglib/*.orng -o test/test.js -t web
 
 verbose:
 	gcc Orangec/*.c util/*.c -Wall -o orangec -DVERBOSE

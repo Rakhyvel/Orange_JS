@@ -56,4 +56,7 @@ x add file error messages
 x zero arg struct init
 x add output name flag
 x add target flag
-- add code generation
+x add code generation
+x add system module
+- add canvas module
+- add image drawing

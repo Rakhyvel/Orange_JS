@@ -1,7 +1,7 @@
-static module System
-    void println(char array msg)
-    end
+static module System {
+    void println(char[] msg){
+    }
 
-    char array input(char array msg)
-    end
-end
+    char[] input(char[] msg){
+    }
+}

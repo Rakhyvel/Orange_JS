@@ -486,6 +486,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         if(var != NULL && rightAST->type == AST_VAR) {
             return var->type;
         } else if (func != NULL && rightAST->type == AST_CALL) {
+            validateExpressionAST(rightAST, function, newModule, isGlobal, 1);
             return func->type;
         } else if(rightAST->type == AST_CALL) {
             error(node->filename, node->line, "Module \"%s\" does not contain function \"%s\"", leftAST->data, rightAST->data);
