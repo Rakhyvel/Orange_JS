@@ -37,15 +37,6 @@ class Color {
 		this.b=b;
 	}
 }
-class Event {
-	constructor(type, key, mouse, wheel, moved) {
-		this.type=type;
-		this.key=key;
-		this.mouse=mouse;
-		this.wheel=wheel;
-		this.moved=moved;
-	}
-}
 
 /*** BEGIN SYSTEM/CANVAS ****/
 function System_println(msg){
@@ -53,21 +44,20 @@ function System_println(msg){
 }
 function System_input(msg){
 	return window.prompt(msg);
-}let canvas;let context;function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}
+}let canvas;let context;let mousePos = new Point(0, 0);canvas.addEventListener('mousemove', function(e) {var cRect = canvas.getBoundingClientRect();mousePos.x = Math.round(e.clientX - cRect.left); mousePos.y = Math.round(e.clientY - cRect.top);});function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}function Canvas_width(){return canvas.width;}function Canvas_height(){return canvas.height;}function Canvas_mouseX(){return mousePos.x;}function Canvas_mouseY(){return mousePos.y;}
 /*** BEGIN GLOBALS ****/
 
 /*** BEGIN FUNCTIONS ****/
-function Main_start(){
-	Canvas_init("canvas");
-	Canvas_setColor(new Color(255, 255, 128, 0));
-	let i=0;
-	while(i<5){
-		Canvas_fillRect(i*10, i*10, 10, 10);
-		i=i+1;
-	}
-	Main_otherFunc();
+function Main_start(i){
+	let func=Main_g;
+	Main_derivative(Main_f);
 }
-function Main_otherFunc(){
-	System_println("Hello, world!");
+function Main_f(x){
+	return x*x;
+}
+function Main_g(x, y){
+	return x*y;
+}
+function Main_derivative(f){
 }
 Main_start();

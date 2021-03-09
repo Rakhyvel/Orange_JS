@@ -4,7 +4,7 @@ run:
 
 verbose:
 	gcc Orangec/*.c util/*.c -Wall -o orangec -DVERBOSE
-	./orangec test/*.orng -o test/test.js -t web
+	./orangec test/*.orng test/ornglib/*.orng -o test/test.js -t web
 
 git-commit:
 	git add .

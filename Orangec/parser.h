@@ -33,9 +33,18 @@ enum astType {
     AST_NOP
 };
 
+enum symbolType {
+    SYMBOL_PROGRAM,
+    SYMBOL_MODULE,
+    SYMBOL_STRUCT,
+    SYMBOL_VARIABLE, 
+    SYMBOL_FUNCTION,
+    SYMBOL_BLOCK
+};
+
 /*
-    Abstract Syntax Trees describe the program and the language's grammar
-    in a far more effective way than text or tokens. */
+    Abstract Syntax Trees describe the actual code of a language in a more
+    efficient way. */
 struct astNode {
     enum astType type;
     struct list* children; // list of OTHER AST's ONLY!
@@ -43,6 +52,37 @@ struct astNode {
 
 	const char* filename;
 	int line;
+};
+
+/*
+    The Symbol Tree describes symbols and their relationship to other symbols.
+    
+    Symbols include:
+    - Modules
+    - Structs
+    - Variables
+    - Functions
+    - The program as a whole */
+struct symbolNode {
+    // Data
+    enum symbolType symbolType;
+    char type[255];
+    char name[255];
+    struct astNode* code;
+
+    // Parse tree
+    struct symbolNode* parent;
+    struct map* children; // name -> other symbolNodes
+
+    // Flags
+    int isConstant; // value cannot change
+    int isPrivate;  // only accessed by direct descendants (ie not root access operator ":")
+    int isDeclared; // has value been set or not
+    int isStatic;   // can access other static symbols
+
+    // Metadata
+    const char* filename;
+    int line;
 };
 
 /*
@@ -59,6 +99,8 @@ struct program {
 struct block {
     struct block* parent;
     struct map* varMap; // name -> struct variable
+    
+    struct module* module;
 };
 
 /*
@@ -84,6 +126,7 @@ struct variable {
     char varType[255];
     char type[255];
     char name[255];
+    struct list* paramTypes;
     struct astNode* code;
 
     const char* filename;

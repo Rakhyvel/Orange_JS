@@ -4,7 +4,6 @@ static module Canvas {
     struct Rect(int x, int y, int w, int h);
     struct Point(int x, int y);
     struct Color(int a, int r, int g, int b);
-    struct Event(int type, int key, int mouse, int wheel, int moved);
 
     void init(char[] id){}
     void destroy(){}
@@ -18,7 +17,8 @@ static module Canvas {
     void drawString(char[] text, int x, int y){}
     void drawPolygon(int[] xPoints, int[] yPoints){}
     void fillPolygon(int[] xPoints, int[] yPoints){}
-    int getMouseX(){}
-    int getMouseY(){}
-    Event pollEvent(){}
+    int mouseX(){}
+    int mouseY(){}
+    int width(){}
+    int height(){}
 }

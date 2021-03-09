@@ -27,8 +27,6 @@ static void validateAST(struct astNode*, const struct function*, const struct mo
 static char* validateExpressionAST(struct astNode*, const struct function*, const struct module*, int, int);
 static void validateBinaryOp(struct list*, char*, char*, const struct function*, const struct module*, int, int);
 static void removeArray(char*);
-static struct variable* findGlobal(char* moduleName, char* name, const char* filename, int line);
-static struct variable* findFunction(char* moduleName, char* name, const char* filename, int line);
 static struct variable* findVariable(char*, struct block*, const char*, int);
 static int validateParamType(struct list*, struct map*, const struct function*, const struct module*, int, int, const char*, int);
 static void validateParamTypeExist(struct map*, const struct module*, const char*, int);
@@ -158,7 +156,10 @@ static int validateType(const char* type, const struct module* module, const cha
 
 /*
     Determines if two types are the same. For structs, the expected type may 
-    be a parent struct of the actual struct */
+    be a parent struct of the actual struct 
+    
+    USE THIS FUNCTION for comapring two unknown types. Use strcmp ONLY if the 
+    expected type is fixed and known. */
 static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
         ;
@@ -256,7 +257,7 @@ static void validateAST(struct astNode* node, const struct function* function, c
             }
         } else {
             char *returnType = validateExpressionAST(retval, function, module, 0, 0);
-            if(strcmp(function->self.type, returnType)) {
+            if(!typesMatch(function->self.type, returnType, node->filename, node->line)) {
                 error(retval->filename, retval->line,"Return values do not match, expected \"%s\" , actual was \"%s\" ", function->self.type, returnType);
             }
         }
@@ -334,7 +335,8 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             if(nameIdent->type != AST_VAR) {
                 error(node->filename, node->line, "Left side of assignment must be a location");
             }
-            var = findGlobal(moduleIdent->data, nameIdent->data, node->filename, node->line);
+            struct module* newModule = map_get(program->modulesMap, moduleIdent->data);
+            var = findVariable(nameIdent->data, newModule->block, node->filename, node->line);
         }
         // Indexing is not checked, you can change the contents of an array if it is constant
         if(var != NULL && var->isConstant) {
@@ -378,6 +380,7 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
         return retval;
     case AST_CALL: {
         struct dataStruct* dataStruct = map_get(program->dataStructsMap, node->data);
+        struct variable* var = findVariable(node->data, function->block, node->filename, node->line);
         struct function* callee = map_get(module->functionsMap, (char*)node->data);
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
@@ -481,13 +484,12 @@ char* validateExpressionAST(struct astNode* node, const struct function* functio
             error(node->filename, node->line, "Cannot access static members from a non static module");
         }
         // Check either function/variable exist
-        struct variable* var = findGlobal(newModule->name, rightAST->data, node->filename, node->line);
-        struct variable* func = findFunction(newModule->name, rightAST->data, node->filename, node->line);
-        if(var != NULL && rightAST->type == AST_VAR) {
+        struct variable* var = findVariable(rightAST->data, newModule->block, node->filename, node->line);
+        if(var != NULL) {
+            if (rightAST->type == AST_CALL) {
+                validateExpressionAST(rightAST, function, newModule, isGlobal, 1);
+            }
             return var->type;
-        } else if (func != NULL && rightAST->type == AST_CALL) {
-            validateExpressionAST(rightAST, function, newModule, isGlobal, 1);
-            return func->type;
         } else if(rightAST->type == AST_CALL) {
             error(node->filename, node->line, "Module \"%s\" does not contain function \"%s\"", leftAST->data, rightAST->data);
         } else if(rightAST->type == AST_VAR) {
@@ -552,36 +554,6 @@ static void removeArray(char* str) {
     }
 }
 
-static struct variable* findGlobal(char* modName, char* name, const char* filename, int line) {
-    struct module* module = map_get(program->modulesMap, modName);
-    if(module == NULL) {
-        return NULL;
-    } else {
-        struct variable* var = map_get(module->block->varMap, name);
-        if(var == NULL || var->isPrivate) {
-            return NULL;
-        } else {
-            return var;
-        }
-    }
-    return NULL;
-}
-
-static struct variable* findFunction(char* modName, char* name, const char* filename, int line) {
-    struct module* module = map_get(program->modulesMap, modName);
-    if(module == NULL) {
-        return NULL;
-    } else {
-        struct variable* var = (struct variable*)map_get(module->functionsMap, name);
-        if(var == NULL || var->isPrivate) {
-            return NULL;
-        } else {
-            return var;
-        }
-    }
-    return NULL;
-}
-
 /*
     Takes in a name, function, and module, and returns a variable, if it can be found */
 static struct variable* findVariable(char* name, struct block* block, const char* filename, int line) {
@@ -589,10 +561,13 @@ static struct variable* findVariable(char* name, struct block* block, const char
         error(filename, line, "Unknown variable \"%s\"", name);
     } else {
         struct variable* var = map_get(block->varMap, name);
-        if(var == NULL) {
-            return findVariable(name, block->parent, filename, line);
-        } else {
+        struct variable* func = map_get(block->module->functionsMap, name);
+        if(var != NULL) {
             return var;
+        } else if(func != NULL) {
+            return func;
+        } else {
+            return findVariable(name, block->parent, filename, line);
         }
     }
     return NULL;

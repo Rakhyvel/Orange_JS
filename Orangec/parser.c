@@ -80,6 +80,7 @@ struct module* parser_initModule(struct program* program, const char* filename, 
     struct module* retval = (struct module*) calloc(1, sizeof(struct module));
     retval->functionsMap = map_create();
     retval->block = parser_initBlock(NULL);
+    retval->block->module = retval;
     retval->program = program;
     retval->filename = filename;
     retval->line = line;
@@ -110,6 +111,9 @@ struct block* parser_initBlock(struct block* parent) {
     struct block* retval = (struct block*) malloc(sizeof(struct block));
     retval->varMap = map_create();
     retval->parent = parent;
+    if(parent != NULL) {
+        retval->module = parent->module;
+    }
     return retval;
 }
 
@@ -280,7 +284,9 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct block* block) {
         assertRemove(tokenQueue, TOKEN_RBRACE);
     }
     // VARIABLE
-    else if (matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, CONST, 3)) {
+    else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
+             matchTokens(tokenQueue, VARDEFINE, 3) || 
+             matchTokens(tokenQueue, CONST, 3) || matchTokens(tokenQueue, FUNCTION, 3)) {
         LOG("Found varibale");
         LOG("%s", ((struct token*)queue_peek(tokenQueue))->data);
         retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line);
@@ -509,16 +515,28 @@ static struct variable* createVar(struct list* tokenQueue, struct block* block) 
     struct token* topToken = queue_peek(tokenQueue);
     retval->filename = topToken->filename;
     retval->line = topToken->line;
+    retval->paramTypes = NULL;
 
     if(topMatches(tokenQueue, TOKEN_CONST)) {
         retval->isConstant = 1;
         free(queue_pop(tokenQueue));
     }
 
-    assertPeek(tokenQueue, TOKEN_IDENTIFIER);
     copyNextTokenString(tokenQueue, retval->type);
-    assertPeek(tokenQueue, TOKEN_IDENTIFIER);
     copyNextTokenString(tokenQueue, retval->name);
+    // FUNCTION POINTER
+    if(topMatches(tokenQueue, TOKEN_LPAREN)) {
+        retval->paramTypes = list_create();
+        assertRemove(tokenQueue, TOKEN_LPAREN); // Remove (
+        while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
+            queue_push(retval->paramTypes, ((struct token*)queue_peek(tokenQueue))->data);
+            free(queue_pop(tokenQueue)); // Remove type token
+            if(topMatches(tokenQueue, TOKEN_COMMA)) {
+                free(queue_pop(tokenQueue)); // Remove ,
+            }
+        }
+        free(queue_pop(tokenQueue)); // Remove )
+    }
 
     if(topMatches(tokenQueue, TOKEN_EQUALS)) {
         assertRemove(tokenQueue, TOKEN_EQUALS);
@@ -542,7 +560,7 @@ static void parseParams(struct list* tokenQueue, struct map* argMap, struct vari
         struct variable* arg = createVar(tokenQueue, NULL);
         struct token* topToken = queue_peek(tokenQueue);
         if(map_put(argMap, arg->name, arg)) {
-            error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place in %s \"%s\"!\n", arg->name, variable->varType, variable->name);
+            error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place in %s \"%s\"", arg->name, variable->varType, variable->name);
         }
     
         if(topMatches(tokenQueue, TOKEN_COMMA)) {

@@ -20,7 +20,7 @@
 #include "../util/map.h"
 
 static const char* systemDef = "function System_println(msg){\n\tconsole.log(msg);\n}\nfunction System_input(msg){\n\treturn window.prompt(msg);\n}";
-static const char* canvasDef = "let canvas;let context;function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}";
+static const char* canvasDef = "let canvas;let context;let mousePos = new Point(0, 0);canvas.addEventListener('mousemove', function(e) {var cRect = canvas.getBoundingClientRect();mousePos.x = Math.round(e.clientX - cRect.left); mousePos.y = Math.round(e.clientY - cRect.top);});function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}function Canvas_width(){return canvas.width;}function Canvas_height(){return canvas.height;}function Canvas_mouseX(){return mousePos.x;}function Canvas_mouseY(){return mousePos.y;}";
 
 static void generateStruct(FILE*, struct dataStruct*);
 static void generateGlobal(FILE*, char*, struct variable*);
@@ -176,6 +176,7 @@ static void generateAST(FILE* out, int tabs, char* moduleName, struct astNode* n
         printTabs(out, tabs);
         fprintf(out, "return ");
         generateExpression(out, moduleName, node->children->head.next->data, 0);
+        fprintf(out, ";\n");
         break;
     default:
         printTabs(out, tabs);
@@ -199,9 +200,18 @@ static void generateExpression(FILE* out, char* moduleName, struct astNode* node
     case AST_TRUE:
     case AST_FALSE:
     case AST_NULL:
-    case AST_VAR:
         fprintf(out, "%s", (char*)node->data);
         break;
+    case AST_VAR: {
+        // Check to see if variable is a function, add module superscript if so
+        struct module* module = map_get(program->modulesMap, moduleName);
+        struct variable* var = map_get(module->functionsMap, (char*)node->data);
+        if(var == NULL || external) {
+            fprintf(out, "%s", (char*)node->data);
+        } else {
+            fprintf(out, "%s_%s", moduleName, (char*)node->data);
+        }
+    } break;
     case AST_ADD:
     case AST_SUBTRACT:
     case AST_MULTIPLY:

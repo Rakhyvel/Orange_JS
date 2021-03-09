@@ -58,5 +58,14 @@ x add output name flag
 x add target flag
 x add code generation
 x add system module
-- add canvas module
+x add canvas module
+x width(), height()
+x mouseX, mouseY
+- items
+- prerequisite: function references
+    - keyboard input
+    - requestAnimationFrame()
+- add function pointer to blocks as well, replace (function, module) parameters in validator with blocks
 - add image drawing
+- enums
+- throw/catch (which just sets errno, but predictably)
