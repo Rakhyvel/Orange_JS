@@ -20,7 +20,8 @@ struct file {
     int nLines;
 };
 
-struct program* program;
+struct symbolNode* program;
+struct map* fileMap;
 
 void error(const char* filename, int line, const char* msg, ...);
 

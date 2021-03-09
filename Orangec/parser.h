@@ -34,6 +34,7 @@ enum astType {
 };
 
 enum symbolType {
+    SYMBOL_UNSURE,
     SYMBOL_PROGRAM,
     SYMBOL_MODULE,
     SYMBOL_STRUCT,
@@ -75,105 +76,28 @@ struct symbolNode {
     struct map* children; // name -> other symbolNodes
 
     // Flags
-    int isConstant; // value cannot change
     int isPrivate;  // only accessed by direct descendants (ie not root access operator ":")
-    int isDeclared; // has value been set or not
     int isStatic;   // can access other static symbols
+    int isConstant; // value cannot change
+    int isDeclared; // has value been set or not
 
     // Metadata
     const char* filename;
     int line;
 };
 
-/*
-    Stores information about the program being compiled. */
-struct program {
-    struct map* modulesMap; // name -> struct module
-    struct map* dataStructsMap; // name -> struct dataStruct
-    struct map* fileMap;
-
-    char output[255];
-    char target[255];
-};
-
-struct block {
-    struct block* parent;
-    struct map* varMap; // name -> struct variable
-    
-    struct module* module;
-};
-
-/*
-    Modules are a way of collecting functions and module together in one place.
-    They offer a namespace to help keep code readable and organized. They can 
-    be used to maintain state and keep a project manageable. */
-struct module {
-    char name[255];
-    struct map* functionsMap; // name -> struct function
-    struct block* block;
-
-    int isStatic;
-
-    const char* filename;
-	int line;
-    struct program* program;
-};
-
-/*
-    Holds common data for function, structs, and variables such as type, name,
-    an AST, and some flags */
-struct variable {
-    char varType[255];
-    char type[255];
-    char name[255];
-    struct list* paramTypes;
-    struct astNode* code;
-
-    const char* filename;
-	int line;
-
-    int isConstant;
-    int isPrivate;
-    int isDeclared;
-};
-
-/*
-    Functions take in input, perform actions on that input, and produce output. */
-struct function {
-    struct variable self;
-    struct block* argBlock;
-    struct block* block;
-
-    struct module* module;
-    struct program* program;
-};
-
-/*
-    Structs are a collection of variables that can be packaged and moved as one */
-struct dataStruct {
-    struct variable self;
-    struct block* argBlock;
-
-    struct module* module;
-    struct program* program;
-};
-
 // Init functions
-struct program* parser_initProgram();
-struct module* parser_initModule(struct program*, const char*, int);
-struct function* parser_initFunction(const char*, int);
-struct dataStruct* parser_initDataStruct(const char*, int);
-struct block* parser_initBlock(struct block*);
+struct symbolNode* parser_createSymbolNode(enum symbolType, struct symbolNode*, const char*, int);
 
 // Pre-processing
 void parser_removeComments(struct list*);
+void parser_condenseArrayIdentifiers(struct list*);
 
-// Parsing elements
-void parser_addModules(struct program*, struct list*);
-void parser_addElements(struct module*, struct list*);
+// Symbol tree functions
+struct symbolNode* parser_parseTokens(struct list*, struct symbolNode*);
 
 // AST functions
-struct astNode* parser_createAST(struct list*, struct block*);
+struct astNode* parser_createAST(struct list*, struct symbolNode*);
 void parser_printAST(struct astNode*, int);
 char* parser_astToString(enum astType);
 

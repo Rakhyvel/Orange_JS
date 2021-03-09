@@ -51,7 +51,8 @@ int main(int argn, char** argv) {
         NORMAL, TARGET, OUTPUT
     };
     enum argState state = NORMAL;
-    program = parser_initProgram();
+    program = parser_createSymbolNode(SYMBOL_PROGRAM, NULL, NULL, -1);
+    fileMap = map_create();
 
     for(int i = 1; i < argn; i++) {
         switch(state) {
@@ -65,11 +66,11 @@ int main(int argn, char** argv) {
             }
             break;
         case TARGET:
-            strncpy(program->target, argv[i], 255);
+            strncpy(program->type, argv[i], 255);
             state = NORMAL;
             break;
         case OUTPUT:
-            strncpy(program->output, argv[i], 255);
+            strncpy(program->name, argv[i], 255);
             state = NORMAL;
             break;
         }
@@ -80,14 +81,14 @@ int main(int argn, char** argv) {
     LOG("\nEnd Validating.\n");
 
     LOG("\nBegin Generation.");
-    FILE* out = fopen(program->output, "w");
+    FILE* out = fopen(program->name, "w");
     if(out == NULL) {
-        perror(program->output);
+        perror(program->name);
         exit(1);
     }
     generator_generate(out);
     if(fclose(out) == EOF) {
-        perror(program->output);
+        perror(program->name);
         exit(1);
     }
     LOG("\nEnd Generation.");
@@ -113,7 +114,7 @@ static void readInputFile(char* filename) {
     struct file* fileStruct = malloc(sizeof(struct file));
     fileStruct->lines = lines;
     fileStruct->nLines = numLines;
-    map_put(program->fileMap, filename, fileStruct);
+    map_put(fileMap, filename, fileStruct);
     LOG("End file reading");
 
     LOG("\n\nBegin Tokenization.");
@@ -122,6 +123,7 @@ static void readInputFile(char* filename) {
 
     LOG("\n\nBegin Parsing.");
     parser_removeComments(tokenQueue);
+    parser_condenseArrayIdentifiers(tokenQueue);
     parser_addModules(program, tokenQueue);
     LOG("\nEnd Parsing.\n");
 }
@@ -161,7 +163,7 @@ void error(const char* filename, int line, const char *message, ...) {
     vfprintf (stderr, message, args);
     if(filename != NULL) {
         fprintf (stderr, "\n%d |\t", (line + 1));
-        println(((struct file*)map_get(program->fileMap, filename))->lines[line]);
+        println(((struct file*)map_get(fileMap, filename))->lines[line]);
     }
     va_end(args);
   

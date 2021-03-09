@@ -1,11 +1,25 @@
-static module Main {
+Main {
+    struct ListElem(ListElem next, ListElem prev, Any data)
+    struct List(ListElem head, ListElem tail)
+    private void loop(int) = null;
+
     void start(int i) {
-        int func(int) = f;
+        int(int) func = f;
 
         func(4);
     }
 
     int f(int x) {
         return x * x;
+    }
+    
+    void requestAnimation(void loop(int)) {
+        Main:loop = loop;
+    }
+
+    void addKeyListner(void keyl(char)) {
+        Main:keyl = keyl;
+
+        keyl('4');
     }
 }
