@@ -26,6 +26,7 @@ struct symbolNode {
     char type[255];
     char name[255];
     char path[255];
+    int id;
     struct astNode* code;
 
     // Parse tree

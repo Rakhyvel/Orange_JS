@@ -9,9 +9,11 @@ Main {
             i = 6;
         }
         hmm();
+        Test t = new Test(i, 4);
 
         void hmm() {
             int i = 4;
         }
+        struct Test(int i, int j)
     }
 }

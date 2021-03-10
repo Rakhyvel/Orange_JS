@@ -59,6 +59,7 @@ struct symbolNode* parser_createSymbolNode(enum symbolType symbolType, struct sy
     retval->children = map_create();
     retval->filename = filename;
     retval->line = line;
+    retval->id = num_ids++;
 
     return retval;
 }

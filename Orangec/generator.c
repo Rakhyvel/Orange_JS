@@ -57,19 +57,19 @@ static void constructLists(struct symbolNode* node, struct list* structList, str
 
         if(child->symbolType == SYMBOL_STRUCT) {
             queue_push(structList, child);
-            LOG("%s", child->path);
+            LOG("_%d", child->id);
         } else if(child->symbolType == SYMBOL_VARIABLE && node->symbolType == SYMBOL_MODULE) {
             queue_push(globalList, child);
         } else if(child->symbolType == SYMBOL_FUNCTION) {
             queue_push(functionList, child);
-            LOG("%s", child->path);
+            LOG("_%d", child->id);
         }
         constructLists(child, structList, globalList, functionList);
     }
 }
 
 static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
-    fprintf(out, "class %s {\n\tconstructor(", dataStruct->path);
+    fprintf(out, "class _%d {\n\tconstructor(", dataStruct->id);
     struct list* fields = dataStruct->children->keyList;
     struct listElem* fieldElem;
     for(fieldElem = list_begin(fields); fieldElem != list_end(fields); fieldElem = list_next(fieldElem)) {
@@ -88,16 +88,16 @@ static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
 
 static void generateGlobal(FILE* out, struct symbolNode* variable) {
     if(variable->code != NULL) {
-        fprintf(out, "let %s=", variable->path);
+        fprintf(out, "let _%d=", variable->id);
         generateExpression(out, variable->code, 0);
         fprintf(out, ";\n");
     } else {
-        fprintf(out, "let %s;", variable->path);
+        fprintf(out, "let _%d;", variable->id);
     }
 }
 
 static void generateFunction(FILE* out, struct symbolNode* function) {
-    fprintf(out, "function %s(", function->path);
+    fprintf(out, "function _%d(", function->id);
     struct list* params = function->children->keyList;
     struct listElem* paramElem;
     for(paramElem = list_begin(params); paramElem != list_end(params); paramElem = list_next(paramElem)) {
@@ -196,7 +196,7 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
         break;
     case AST_VAR: {
         struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
-        fprintf(out, "%s", symbol->path);
+        fprintf(out, "_%d", symbol->id);
     } break;
     case AST_ADD:
     case AST_SUBTRACT:
@@ -224,10 +224,9 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
     case AST_CALL: {
         if(strstr(node->data, " array")) {
             fprintf(out, "Array(");
-        } else if(!external) {
-            fprintf(out, "%s_%s(", (char*)node->data);
         } else {
-            fprintf(out, "%s(", (char*)node->data);
+            struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
+            fprintf(out, "_%d(", symbol->id);
         }
         struct listElem* elem;
         for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
