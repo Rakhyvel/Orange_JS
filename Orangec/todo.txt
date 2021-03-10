@@ -69,3 +69,51 @@ x mouseX, mouseY
 - add image drawing
 - enums
 - throw/catch (which just sets errno, but predictably)
+
+
+    // Each struct should be a class with only a constructor
+    fprintf(out, "/*** BEGIN STRUCTS ****/\n");
+    struct list* dataStructs = map_getKeyList(program->dataStructsMap);   
+    struct listElem* dataStructElem;
+    for(dataStructElem = list_begin(dataStructs); dataStructElem != list_end(dataStructs); dataStructElem = list_next(dataStructElem)) {
+        struct dataStruct* dataStruct = map_get(program->dataStructsMap, (char*)dataStructElem->data);
+        generateStruct(out, dataStruct);
+    }
+    fprintf(out, "\n/*** BEGIN SYSTEM/CANVAS ****/\n");
+    fprintf(out, "%s", systemDef);
+    fprintf(out, "%s", canvasDef);
+    fprintf(out, "\n/*** BEGIN GLOBALS ****/\n");
+    struct list* modules = map_getKeyList(program->modulesMap);   
+    struct listElem* moduleElem;
+    // Globals
+    for(moduleElem = list_begin(modules); moduleElem != list_end(modules); moduleElem = list_next(moduleElem)) {
+        struct module* module = map_get(program->modulesMap, (char*)moduleElem->data);
+        if(!strcmp(module->name, "System") || !strcmp(module->name, "Canvas")) {
+            continue;
+        }
+        struct list* globals = map_getKeyList(module->block->varMap);
+        struct listElem* globalElem;
+        for(globalElem = list_begin(globals); globalElem != list_end(globals); globalElem = list_next(globalElem)) {
+            struct variable* global = map_get(module->block->varMap, (char*)globalElem->data);
+            generateGlobal(out, module->name, global);
+        }
+    }
+    fprintf(out, "\n/*** BEGIN FUNCTIONS ****/\n");
+    // Functions
+    for(moduleElem = list_begin(modules); moduleElem != list_end(modules); moduleElem = list_next(moduleElem)) {
+        struct module* module = map_get(program->modulesMap, (char*)moduleElem->data);
+        if(!strcmp(module->name, "System") || !strcmp(module->name, "Canvas")) {
+            continue;
+        }
+        struct list* functions = map_getKeyList(module->functionsMap);
+        struct listElem* functionElem;
+        for(functionElem = list_begin(functions); functionElem != list_end(functions); functionElem = list_next(functionElem)) {
+            struct function* function = map_get(module->functionsMap, (char*)functionElem->data);
+            if(!strcmp(function->self.name, "start")) {
+                startMod=module->name;
+                startFunc=function->self.name;
+            }
+            generateFunction(out, module->name, function);
+        }
+    }
+    fprintf(out, "%s_%s();", startMod, startFunc);

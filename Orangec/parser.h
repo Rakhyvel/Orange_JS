@@ -50,6 +50,7 @@ struct astNode {
     enum astType type;
     struct list* children; // list of OTHER AST's ONLY!
     void* data;
+    struct symbolNode* scope;
 
 	const char* filename;
 	int line;

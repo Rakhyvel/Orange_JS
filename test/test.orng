@@ -1,10 +1,10 @@
 Main {
     struct ListElem(ListElem next, ListElem prev, Any data)
     struct List(ListElem head, ListElem tail)
-    private void loop(int) = null;
+    private void loop(int i) = null;
 
     void start(int i) {
-        int(int) func = f;
+        int func = f;
 
         func(4);
     }

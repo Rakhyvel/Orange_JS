@@ -124,7 +124,10 @@ static void readInputFile(char* filename) {
     LOG("\n\nBegin Parsing.");
     parser_removeComments(tokenQueue);
     parser_condenseArrayIdentifiers(tokenQueue);
-    parser_addModules(program, tokenQueue);
+    while(!list_isEmpty(tokenQueue)) {
+        struct symbolNode* node = parser_parseTokens(tokenQueue, program);
+        map_put(program->children, node->name, node);
+    }
     LOG("\nEnd Parsing.\n");
 }
 
