@@ -24,6 +24,7 @@ static const char* systemDef = "function System_println(msg){\n\tconsole.log(msg
 static const char* canvasDef = "let canvas;let context;let mousePos = new Point(0, 0);canvas.addEventListener('mousemove', function(e) {var cRect = canvas.getBoundingClientRect();mousePos.x = Math.round(e.clientX - cRect.left); mousePos.y = Math.round(e.clientY - cRect.top);});function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}function Canvas_width(){return canvas.width;}function Canvas_height(){return canvas.height;}function Canvas_mouseX(){return mousePos.x;}function Canvas_mouseY(){return mousePos.y;}";
 
 static void constructLists(struct symbolNode*, struct list*, struct list*, struct list*);
+static void fprintb(FILE*, int);
 static void generateStruct(FILE*, struct symbolNode*);
 static void generateGlobal(FILE*, struct symbolNode*);
 static void generateFunction(FILE*, struct symbolNode*);
@@ -68,8 +69,16 @@ static void constructLists(struct symbolNode* node, struct list* structList, str
     }
 }
 
+static void fprintb(FILE* out, int num) {
+    char* buf = itoa(num);
+    fprintf(out, "_%s", buf);
+    // free(buf);
+}
+
 static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
-    fprintf(out, "class _%d {\n\tconstructor(", dataStruct->id);
+    fprintf(out, "class ");
+    fprintb(out, dataStruct->id);
+    fprintf(out, " {\n\tconstructor(");
     struct list* fields = dataStruct->children->keyList;
     struct listElem* fieldElem;
     for(fieldElem = list_begin(fields); fieldElem != list_end(fields); fieldElem = list_next(fieldElem)) {
@@ -88,16 +97,22 @@ static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
 
 static void generateGlobal(FILE* out, struct symbolNode* variable) {
     if(variable->code != NULL) {
-        fprintf(out, "let _%d=", variable->id);
+        fprintf(out, "let ", variable->id);
+        fprintb(out, variable->id);
+        fprintf(out, "=", variable->id);
         generateExpression(out, variable->code, 0);
         fprintf(out, ";\n");
     } else {
-        fprintf(out, "let _%d;", variable->id);
+        fprintf(out, "let ", variable->id);
+        fprintb(out, variable->id);
+        fprintf(out, ";\n");
     }
 }
 
 static void generateFunction(FILE* out, struct symbolNode* function) {
-    fprintf(out, "function _%d(", function->id);
+    fprintf(out, "function ");
+    fprintb(out, function->id);
+    fprintf(out, "(");
     struct list* params = function->children->keyList;
     struct listElem* paramElem;
     for(paramElem = list_begin(params); paramElem != list_end(params); paramElem = list_next(paramElem)) {
@@ -196,7 +211,7 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
         break;
     case AST_VAR: {
         struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
-        fprintf(out, "_%d", symbol->id);
+        fprintb(out, symbol->id);
     } break;
     case AST_ADD:
     case AST_SUBTRACT:
@@ -226,7 +241,8 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
             fprintf(out, "Array(");
         } else {
             struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
-            fprintf(out, "_%d(", symbol->id);
+            fprintb(out, symbol->id);
+            fprintf(out, "(");
         }
         struct listElem* elem;
         for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {

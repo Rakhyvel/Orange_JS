@@ -1,4 +1,4 @@
-class _17 {
+class _h {
 	constructor(i, j) {
 		this.i=i;
 		this.j=j;
@@ -15,9 +15,9 @@ function _2(){
 	else{
 		_5=6;
 	}
-	_13();
-	let _12=new _17(_5, 4);
+	_d();
+	let _c=new _h(_5, 4);
 }
-function _13(){
-	let _16=4;
+function _d(){
+	let _g=4;
 }

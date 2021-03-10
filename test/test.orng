@@ -1,19 +1,10 @@
 Main {
     void start() {
-        int i = 4;
-        if i < 4 {
-            i = 4;
-        } else if i > 4 {
-            i = 5;
-        } else {
-            i = 6;
-        }
-        hmm();
-        Test t = new Test(i, 4);
-
-        void hmm() {
-            int i = 4;
-        }
-        struct Test(int i, int j)
+        
     }
+}
+
+List {
+    struct ListElem(ListElem next, ListElem prev, Any data)
+    struct List()
 }

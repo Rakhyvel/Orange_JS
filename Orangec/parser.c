@@ -37,7 +37,6 @@ static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
-char* itoa(int val);
 static void initSymbolPath(char*, struct symbolNode*);
 static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
@@ -434,7 +433,7 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
 /*
     Implementation from http://www.strudel.org.uk/itoa/ */
 char* itoa(int val) {
-	char* buf = (char*)malloc(32);
+	char* buf = (char*)calloc(1, 32);
 	int i = 30;
 	for(; val && i ; --i, val /= 36)
 		buf[i] = "0123456789abcdefghijklmnopqrstuvwxyz"[val % 36];

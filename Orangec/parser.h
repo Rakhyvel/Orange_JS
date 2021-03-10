@@ -62,6 +62,6 @@ struct symbolNode* parser_parseTokens(struct list*, struct symbolNode*);
 // AST functions
 struct astNode* parser_createAST(struct list*, struct symbolNode*);
 void parser_printAST(struct astNode*, int);
-char* parser_astToString(enum astType);
+char* parser_astToString(enum astType);char* itoa(int );
 
 #endif
