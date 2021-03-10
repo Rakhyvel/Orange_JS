@@ -30,18 +30,18 @@ static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, 
 static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static int num_ids = 0;
 
 // Private functions
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
-
-// static struct variable* createVar(struct list*, struct block*);
-static struct astNode* createAST(enum astType, const char*, int);
-static struct astNode* createExpressionAST(struct list*);
+char* itoa(int val);
+static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
+static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
-static struct list* simplifyTokens(struct list*);
+static struct list* simplifyTokens(struct list*, struct symbolNode*);
 static struct list* infixToPostfix(struct list*);
 static enum astType tokenToAST(enum tokenType);
 static void assertPeek(struct list*, enum tokenType);
@@ -141,6 +141,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             map_put(symbolNode->children, child->name, child);
         }
         assertRemove(tokenQueue, TOKEN_RBRACE);
+        LOG("Module %s created %d", symbolNode->name, symbolNode->symbolType);
     }
     // STRUCT
     else if(matchTokens(tokenQueue, STRUCT, 3)) {
@@ -150,6 +151,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         assertRemove(tokenQueue, TOKEN_STRUCT);
         copyNextTokenString(tokenQueue, symbolNode->name);
         parseParams(tokenQueue, symbolNode);
+        LOG("Struct %s created", symbolNode->name);
     }
     // VARIABLE DEFINITION
     else if(matchTokens(tokenQueue, VARDEFINE, 3)) {
@@ -162,6 +164,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         assertRemove(tokenQueue, TOKEN_EQUALS);
         symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3)) {
         symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
@@ -171,6 +174,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         copyNextTokenString(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        LOG("Variable %s created", symbolNode->name);
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3)) {
         symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, topToken->filename, topToken->line);
@@ -184,14 +188,16 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             assertRemove(tokenQueue, TOKEN_EQUALS);
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
-        } else if(topMatches(tokenQueue, TOKEN_LPAREN)) {
-            parseParams(tokenQueue, symbolNode);
+        } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         } else {
             // error
         }
+        LOG("Function %s created", symbolNode->name);
+    } else if(topMatches(tokenQueue, TOKEN_EOF)){
+        return NULL;
     } else {
-        // error
+        printf("%s\n", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
     }
     return symbolNode;
 }
@@ -207,11 +213,12 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
 
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-        retval = createAST(AST_BLOCK, topToken->filename, topToken->line);
+        retval = createAST(AST_BLOCK, topToken->filename, topToken->line, scope);
         retval->data = parser_createSymbolNode(SYMBOL_BLOCK, scope, topToken->filename, topToken->line);
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
+        strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
         strcpy(((struct symbolNode*)retval->data)->type, scope->type);
-        map_put(retval->data, ((struct symbolNode*)retval->data)->name, retval->data);
+        map_put(scope->children, ((struct symbolNode*)retval->data)->name, retval->data);
         assertRemove(tokenQueue, TOKEN_LBRACE);
         while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
             queue_push(retval->children, parser_createAST(tokenQueue, retval->data));
@@ -220,14 +227,16 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // SYMBOL DEFINITION/DECLARATION
     else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
-             matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, FUNCTION, 3)) {
-        retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line);
+             matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, FUNCTION, 3)
+            || matchTokens(tokenQueue, STRUCT, 3)) {
+        retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line, scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
+        map_put(scope->children, symbolNode->name, symbolNode);
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
-        retval = createAST(AST_IF, topToken->filename, topToken->line);
+        retval = createAST(AST_IF, topToken->filename, topToken->line, scope);
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -248,7 +257,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // WHILE
     else if (topMatches(tokenQueue, TOKEN_WHILE)) {
-        retval = createAST(AST_WHILE, topToken->filename, topToken->line);
+        retval = createAST(AST_WHILE, topToken->filename, topToken->line, scope);
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -260,9 +269,9 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // RETURN
     else if (topMatches(tokenQueue, TOKEN_RETURN)) {
-        retval = createAST(AST_RETURN, topToken->filename, topToken->line);
+        retval = createAST(AST_RETURN, topToken->filename, topToken->line, scope);
         assertRemove(tokenQueue, TOKEN_RETURN);
-        struct astNode* expression = createExpressionAST(tokenQueue);
+        struct astNode* expression = createExpressionAST(tokenQueue, scope);
         queue_push(retval->children, expression);
     }
     else if (topMatches(tokenQueue, TOKEN_SEMICOLON)) {
@@ -270,9 +279,8 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // EXPRESSION
     else {
-        retval = createExpressionAST(tokenQueue);
+        retval = createExpressionAST(tokenQueue, scope);
     }
-    retval->scope = scope;
     return retval;
 }
 
@@ -420,13 +428,22 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
 }
 
 /*
+    Implementation from http://www.strudel.org.uk/itoa/ */
+char* itoa(int val) {
+	char* buf = (char*)malloc(32);
+	int i = 30;
+	for(; val && i ; --i, val /= 36)
+		buf[i] = "0123456789abcdefghijklmnopqrstuvwxyz"[val % 36];
+	return &buf[i+1];
+}
+
+/*
     Takes in a token queue, reads in the parameters and adds both the types and
     names to lists. The lists are ordered and pairs are in the same indices.
     
     Parenthesis are removed in this function as well.*/
 static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
-
     // Parse parameters of function
     while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
         struct symbolNode* param = parser_createSymbolNode(SYMBOL_VARIABLE, parent, parent->filename, parent->line);
@@ -435,6 +452,7 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
             copyNextTokenString(tokenQueue, param->name);
         } else {
             strcpy(param->name, "_undef");
+            strcat(param->name, itoa(num_ids++));
             free(queue_pop(tokenQueue));
         }
         struct token* topToken = queue_peek(tokenQueue);
@@ -469,19 +487,20 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
 
 /*
     Allocates and initializes an Abstract Syntax Tree node, with the proper type */
-static struct astNode* createAST(enum astType type, const char* filename, int line) {
+static struct astNode* createAST(enum astType type, const char* filename, int line, struct symbolNode* scope) {
     struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
     retval->filename = filename;
     retval->line = line;
+    retval->scope = scope;
     return retval;
 }
 
 /*
     Given a token queue, extracts the front expression, parses it into an
     Abstract Syntax Tree. */
-static struct astNode* createExpressionAST(struct list* tokenQueue) {
+static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbolNode* scope) {
     LOG("Create Expression AST");
     ASSERT(tokenQueue != NULL);
     struct astNode* astNode = NULL;
@@ -491,13 +510,13 @@ static struct astNode* createExpressionAST(struct list* tokenQueue) {
         return NULL;
     }
 
-    struct list* expression = infixToPostfix(simplifyTokens(rawExpression));
+    struct list* expression = infixToPostfix(simplifyTokens(rawExpression, scope));
     struct list* argStack = list_create();
     
     while (!list_isEmpty(expression)) {
         struct listElem* elem = NULL;
         token = (struct token*)queue_pop(expression);
-        astNode = createAST(AST_NOP, token->filename, token->line);
+        astNode = createAST(AST_NOP, token->filename, token->line, scope);
         int* intData;
         float* realData;
         char* charData;
@@ -599,7 +618,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
 /*
     Takes in a queue representing an expression, and if it can, transforms 
     function calls/index token structures into proper call/index tokens */
-static struct list* simplifyTokens(struct list* tokenQueue) {
+static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* scope) {
     LOG("Simplify Tokens");
     struct list* retval = list_create();
 
@@ -617,7 +636,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             
             // Go through each argument, create AST representing it
             while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
-                struct astNode* argAST = createExpressionAST(tokenQueue);
+                struct astNode* argAST = createExpressionAST(tokenQueue, scope);
                 queue_push(call->list, argAST);
 
                 if(topMatches(tokenQueue, TOKEN_COMMA)) {
@@ -636,7 +655,7 @@ static struct list* simplifyTokens(struct list* tokenQueue) {
             assertRemove(tokenQueue, TOKEN_LSQUARE);
 
             // extract expression for index, add to retval list, between anonymous parens
-            struct list* innerExpression = infixToPostfix(simplifyTokens(nextExpression(tokenQueue)));
+            struct list* innerExpression = infixToPostfix(simplifyTokens(nextExpression(tokenQueue), scope));
             struct listElem* elem;
             for(elem = list_begin(innerExpression); elem != list_end(innerExpression); elem=list_next(elem)) {
                 queue_push(retval, elem->data);

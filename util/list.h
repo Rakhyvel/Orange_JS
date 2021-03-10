@@ -10,6 +10,7 @@ struct listElem {
 struct list {
     struct listElem head;
     struct listElem tail;
+    int size;
 };
 
 // List create/destroy

@@ -23,6 +23,7 @@
 static const char* systemDef = "function System_println(msg){\n\tconsole.log(msg);\n}\nfunction System_input(msg){\n\treturn window.prompt(msg);\n}";
 static const char* canvasDef = "let canvas;let context;let mousePos = new Point(0, 0);canvas.addEventListener('mousemove', function(e) {var cRect = canvas.getBoundingClientRect();mousePos.x = Math.round(e.clientX - cRect.left); mousePos.y = Math.round(e.clientY - cRect.top);});function Canvas_init(id){canvas=document.getElementById(id);context=canvas.getContext('2d');}function Canvas_setColor(color){context.fillStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setStroke(w, color){context.width=w;context.strokeStyle='rgb('+color.r+','+color.g+','+color.b+')';}function Canvas_setFont(font){context.font=font;}function Canvas_drawLine(x1, y1, x2, y2){context.beginPath();context.moveTo(x1, y1);context.lineTo(x2, y2);context.stroke();}function Canvas_drawRect(x,y,w,h){context.beginPath();context.rect(x,y,w,h);context.stroke();}function Canvas_fillRect(x,y,w,h){context.fillRect(x,y,w,h);}function Canvas_drawString(text, x, y){context.fillText(text, x, y);}function Canvas_width(){return canvas.width;}function Canvas_height(){return canvas.height;}function Canvas_mouseX(){return mousePos.x;}function Canvas_mouseY(){return mousePos.y;}";
 
+static void constructLists(struct symbolNode*, struct list*, struct list*, struct list*);
 static void generateStruct(FILE*, struct symbolNode*);
 static void generateGlobal(FILE*, char*, struct symbolNode*);
 static void generateFunction(FILE*, char*, struct symbolNode*);
@@ -31,7 +32,28 @@ static void generateAST(FILE*, int, char*, struct astNode*);
 static void generateExpression(FILE*, char*, struct astNode*, int);
 
 void generator_generate(FILE* out) {
-    
+    struct list* structList = list_create();
+    struct list* globalList = list_create();
+    struct list* functionList = list_create();
+    constructLists(program, structList, globalList, functionList);
+
+}
+
+static void constructLists(struct symbolNode* node, struct list* structList, struct list* globalList, struct list* functionList) {
+    struct listElem* elem = list_begin(node->children->keyList);
+    for(;elem != list_end(node->children->keyList); elem = list_next(elem)) {
+        LOG("%s", elem->data);
+        struct symbolNode* child = (struct symbolNode*)map_get(node->children, (char*)elem->data);
+
+        if(child->symbolType == SYMBOL_STRUCT) {
+            queue_push(structList, child);
+        } else if(child->symbolType == SYMBOL_VARIABLE && node->type == SYMBOL_MODULE) {
+            queue_push(globalList, child);
+        } else if(child->symbolType == SYMBOL_FUNCTION) {
+            queue_push(functionList, child);
+        }
+        constructLists(child, structList, globalList, functionList);
+    }
 }
 
 static void generateStruct(FILE* out, struct symbolNode* dataStruct) {

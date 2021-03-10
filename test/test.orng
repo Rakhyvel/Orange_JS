@@ -1,25 +1,12 @@
 Main {
-    struct ListElem(ListElem next, ListElem prev, Any data)
-    struct List(ListElem head, ListElem tail)
-    private void loop(int i) = null;
+    struct dataStruct(int i, int k)
+    int i = 4;
 
-    void start(int i) {
-        int func = f;
-
-        func(4);
+    void start() {
+        otherFunc('d');
     }
 
-    int f(int x) {
-        return x * x;
-    }
-    
-    void requestAnimation(void loop(int)) {
-        Main:loop = loop;
-    }
+    int otherFunc(int i) {
 
-    void addKeyListner(void keyl(char)) {
-        Main:keyl = keyl;
-
-        keyl('4');
     }
 }

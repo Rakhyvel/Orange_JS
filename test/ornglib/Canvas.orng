@@ -1,9 +1,9 @@
-static module Canvas {
-    struct Canvas();
-    struct Image();
-    struct Rect(int x, int y, int w, int h);
-    struct Point(int x, int y);
-    struct Color(int a, int r, int g, int b);
+static Canvas {
+    struct Canvas()
+    struct Image()
+    struct Rect(int x, int y, int w, int h)
+    struct Point(int x, int y)
+    struct Color(int a, int r, int g, int b)
 
     void init(char[] id){}
     void destroy(){}

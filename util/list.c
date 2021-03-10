@@ -26,6 +26,7 @@ struct list* list_create() {
     list->head.next = &list->tail;
     list->tail.prev = &list->head;
     list->tail.next = NULL;
+    list->size = 0;
     
     return list;
 }
@@ -68,6 +69,7 @@ void list_insert(struct list* list, struct listElem* before, void* data) {
     elem->next = before;
     before->prev->next = elem;
     before->prev = elem;
+    list->size++;
 }
 
 /*
@@ -87,6 +89,7 @@ void* list_remove(struct list* list, struct listElem* elem) {
     prev->next = next;
     next->prev = prev;
     free(elem);
+    list->size--;
 
     return retval;
 }

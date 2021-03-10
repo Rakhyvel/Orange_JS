@@ -1,4 +1,4 @@
-static module System {
+static System {
     void println(char[] msg){
     }
 

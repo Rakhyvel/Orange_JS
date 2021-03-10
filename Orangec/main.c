@@ -126,6 +126,8 @@ static void readInputFile(char* filename) {
     parser_condenseArrayIdentifiers(tokenQueue);
     while(!list_isEmpty(tokenQueue)) {
         struct symbolNode* node = parser_parseTokens(tokenQueue, program);
+        if(node == NULL) break;
+        LOG("%s", node->name);
         map_put(program->children, node->name, node);
     }
     LOG("\nEnd Parsing.\n");

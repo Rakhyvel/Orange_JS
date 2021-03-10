@@ -26,12 +26,12 @@ static struct symbolNode* findSymbol(const char*, const struct symbolNode*, cons
 static int validateType(const char*, const struct symbolNode*, const char*, int);
 static void validateBinaryOp(struct list*, char*, char*);
 static struct symbolNode* findExplicitSymbol(char*, char*, const struct symbolNode*, const char*, int);
-static int validateArrayType(struct list*, char*, const char*, int);
-static int validateParamType(struct list*, struct map*, const char*, int);
+static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
+static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
 static char* validateExpressionAST(struct astNode* node);
 static void removeArray(char*);
-static int typesMatch(const char*, const char*, const char*, int);
+static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
 static void validateAST(struct astNode*);
 
 /*
@@ -43,18 +43,18 @@ void validator_validate(struct symbolNode* symbolNode) {
     switch(symbolNode->symbolType) {
     case SYMBOL_PROGRAM: {
         for(;elem != list_end(children); elem = list_next(elem)) {
-            struct symbolNode* child = (struct symbolNode*)elem->data;
+            struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
             if(child->symbolType != SYMBOL_MODULE) {
-                error(child->filename, child->line, "Must be defined inside a module");
+                error(child->filename, child->line, "Must be defined inside a module\n");
             }
-            validator_validate((struct symbolNode*)elem->data);
+            validator_validate(child);
         }
     } break;
     case SYMBOL_MODULE: {
         for(;elem != list_end(children); elem = list_next(elem)) {
-            struct symbolNode* child = (struct symbolNode*)elem->data;
+            struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
             if(child->symbolType == SYMBOL_BLOCK) {
-                error(child->filename, child->line, "Module members must be structs, variables, or functions");
+                error(child->filename, child->line, "Module members must be structs, variables, or functions\n");
             }
             validator_validate(child);
         }
@@ -67,14 +67,14 @@ void validator_validate(struct symbolNode* symbolNode) {
         validateAST(symbolNode->code);
         // All children must be valid
         for(;elem != list_end(children); elem = list_next(elem)) {
-            validator_validate((struct symbolNode*)elem->data);
+            validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
         }
     } break;
     case SYMBOL_STRUCT:
     case SYMBOL_BLOCK: {
         // All children must be valid
         for(;elem != list_end(children); elem = list_next(elem)) {
-            validator_validate((struct symbolNode*)elem->data);
+            validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
         }
     } break;
     default:
@@ -134,7 +134,7 @@ static int validateType(const char* type, const struct symbolNode* scope, const 
     
     USE THIS FUNCTION for comapring two unknown types. Use strcmp ONLY if the 
     expected type is fixed and known. */
-static int typesMatch(const char* expected, const char* actual, const char* filename, int line) {
+static int typesMatch(const char* expected, const char* actual, const struct symbolNode* scope, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
         return !strcmp(expected, actual);
     } else if (!isPrimitive(expected) && !strcmp(actual, "None")) {
@@ -151,10 +151,11 @@ static int typesMatch(const char* expected, const char* actual, const char* file
         strcpy(actualBase, actual);
         removeArray(expectedBase);
         removeArray(actualBase);
-        return typesMatch(expectedBase, actualBase, filename, line);
+        return typesMatch(expectedBase, actualBase, scope, filename, line);
     } else {
         // here type must be struct
-        if(map_get(program->children, actual) == NULL) {
+        struct symbolNode* dataStruct = findSymbol(actual, scope, filename, line);
+        if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
             return !strcmp(expected, actual);
@@ -186,9 +187,10 @@ static void validateAST(struct astNode* node) {
     case AST_VARDEFINE: {
         var = (struct symbolNode*) node->data;
         var->isDeclared = 1;
+        LOG("%p", node->scope);
         validateType(var->type, node->scope, var->filename, var->line);
         char *initType = validateExpressionAST(var->code);
-        if(!typesMatch(var->type, initType, var->filename, var->line)) {
+        if(!typesMatch(var->type, initType, node->scope, var->filename, var->line)) {
             error(var->filename, var->line, "Value type mismatch when assigning to variable \"%s\". Expected \"%s\" type, actual type was \"%s\" ", var->name, var->type, initType);
         }
         break;
@@ -235,7 +237,7 @@ static void validateAST(struct astNode* node) {
             }
         } else {
             char *returnType = validateExpressionAST(retval);
-            if(!typesMatch(node->scope->type, returnType, node->filename, node->line)) {
+            if(!typesMatch(node->scope->type, returnType, node->scope, node->filename, node->line)) {
                 error(retval->filename, retval->line,"Return values do not match, expected \"%s\" , actual was \"%s\" ", node->scope->type, returnType);
             }
         }
@@ -321,7 +323,7 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // Left/right type matching
         validateBinaryOp(node->children, left, right);
-        if(!typesMatch(left, right, node->filename, node->line)) {
+        if(!typesMatch(left, right, node->scope, node->filename, node->line)) {
             error(node->filename, node->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", left, right);
         }
         strcpy(retval, left);
@@ -357,18 +359,21 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     case AST_CALL: {
         struct symbolNode* symbol = findSymbol(node->data, node->scope, node->filename, node->line);
+        ASSERT(symbol != NULL);
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
+            LOG("Array literal call");
             char base[255];
             strcpy(base, node->data);
             removeArray(base);
-            validateArrayType(node->children, base, node->filename, node->line);
+            validateArrayType(node->children, base, node->scope, node->filename, node->line);
             strcpy(retval, node->data);
             return retval;
         }
         // STRUCT INIT
         else if(symbol->symbolType == SYMBOL_STRUCT) {
-            int err = validateParamType(node->children, symbol->children, node->filename, node->line);
+            LOG("Struct init call");
+            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
             
             if(!err || list_isEmpty(node->children)) {
                 strcpy(retval, node->data);
@@ -381,10 +386,11 @@ char* validateExpressionAST(struct astNode* node) {
         } 
         // FUNCTION CALL
         else if(symbol->symbolType == SYMBOL_FUNCTION) {
-            if(!node->scope->isStatic) {
+            LOG("Function call");
+            if(!node->scope->isStatic && symbol->isStatic) {
                 error(node->filename, node->line, "Cannot call a static function from global scope");
             }
-            int err = validateParamType(node->children, symbol->children, node->filename, node->line);
+            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
             
             if(!err) {
                 strcpy(retval, symbol->type);
@@ -536,15 +542,13 @@ static void removeArray(char* str) {
     Will return NULL if no symbol with the name is found in any direct ancestor
     scopes. */
 static struct symbolNode* findSymbol(const char* symbolName, const struct symbolNode* scope, const char* filename, int line) {
-    if(scope == NULL) {
-        error(filename, line, "Unknown variable \"%s\"", symbolName);
+    struct symbolNode* symbol = map_get(scope->children, symbolName);
+    if(symbol != NULL) {
+        return symbol;
+    } else if(scope->parent == NULL) {
+        error(filename, line, "Unknown symbol \"%s\"", symbolName);
     } else {
-        struct symbolNode* symbol = map_get(scope->children, symbolName);
-        if(symbol != NULL) {
-            return symbol;
-        } else {
-            return findSymbol(symbolName, scope->parent, filename, line);
-        }
+        return findSymbol(symbolName, scope->parent, filename, line);
     }
     return NULL;
 }
@@ -556,38 +560,33 @@ static struct symbolNode* findSymbol(const char* symbolName, const struct symbol
     Returns: 1 when too many args, 
             -1 when too few args,
              0 when okay args. */
-static int validateParamType(struct list* args, struct map* paramMap, const char* filename, int line) {
+static int validateParamType(struct list* args, struct map* paramMap, struct symbolNode* scope, const char* filename, int line) {
     struct list* params = map_getKeyList(paramMap);
     struct listElem* paramElem;
     struct listElem* argElem;
     for(paramElem = list_begin(params), argElem = list_begin(args); 
         paramElem != list_end(params) && argElem != list_end(args); 
         paramElem = list_next(paramElem), argElem = list_next(argElem)) {
-        if(!strcmp(paramElem->data, "_block")) { // functions store blocks along with parameters, this excludes checking that
+        if(strstr(paramElem->data, "_block")) { // functions store blocks along with parameters, this excludes checking that
             continue;
         }
         char* paramType = ((struct symbolNode*)map_get(paramMap, ((char*)paramElem->data)))->type;
         char* argType = validateExpressionAST((struct astNode*)argElem->data);
-        if(!typesMatch(paramType, argType, filename, line)) {
+        if(!typesMatch(paramType, argType, scope, filename, line)) {
             error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
         }
     }
-    if(argElem != list_end(args)) {
-        return 1;
-    } else if(paramElem != list_end(params)){
-        return -1;
-    } else {
-        return 0;
-    }
+    // todo- actually count the parameters, and add a length to a list for arguments. Check that
+    return args->size - paramMap->size + 1;
 }
 
 /*
     Validates that all types in an array literal are the expected type */
-static int validateArrayType(struct list* args, char* expected, const char* filename, int line) {
+static int validateArrayType(struct list* args, char* expected, struct symbolNode* scope, const char* filename, int line) {
     struct listElem* argElem;
     for(argElem = list_begin(args); argElem != list_end(args); argElem = list_next(argElem)) {
         char* argType = validateExpressionAST((struct astNode*)argElem->data);
-        if(typesMatch(expected, argType, filename, line)) {
+        if(typesMatch(expected, argType, scope, filename, line)) {
             error(filename, line, "Value type mismatch when creating array. Expected \"%s\" type, actual type was \"%s\" ", argType, expected);
         }
     }
