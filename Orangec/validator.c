@@ -15,6 +15,7 @@
 #include "./main.h"
 #include "./validator.h"
 #include "./parser.h"
+#include "./symbol.h"
 
 #include "../util/map.h"
 #include "../util/list.h"
@@ -22,10 +23,8 @@
 
 // Private functions
 static int findTypeEnd(const char*);
-static struct symbolNode* findSymbol(const char*, const struct symbolNode*, const char*, int);
 static int validateType(const char*, const struct symbolNode*, const char*, int);
 static void validateBinaryOp(struct list*, char*, char*);
-static struct symbolNode* findExplicitSymbol(char*, char*, const struct symbolNode*, const char*, int);
 static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
@@ -40,6 +39,7 @@ static void validateAST(struct astNode*);
 void validator_validate(struct symbolNode* symbolNode) {
     struct list* children = symbolNode->children->keyList;
     struct listElem* elem = list_begin(children);
+    LOG("Validating %s", symbolNode->name);
     switch(symbolNode->symbolType) {
     case SYMBOL_PROGRAM: {
         for(;elem != list_end(children); elem = list_next(elem)) {
@@ -59,7 +59,21 @@ void validator_validate(struct symbolNode* symbolNode) {
             validator_validate(child);
         }
     } break;
-    case SYMBOL_VARIABLE:
+    case SYMBOL_VARIABLE: {
+        // Valid type
+        validateType(symbolNode->type, symbolNode->parent, symbolNode->filename, symbolNode->line);
+        // Valid AST
+        if(symbolNode->code != NULL) {
+            char* actual = validateExpressionAST(symbolNode->code);
+            if(!typesMatch(symbolNode->type, actual, symbolNode->parent, symbolNode->filename, symbolNode->line)) {
+                error(symbolNode->filename, symbolNode->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", symbolNode->type, actual);
+            }
+        }
+        // All children must be valid
+        for(;elem != list_end(children); elem = list_next(elem)) {
+            validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
+        }
+    } break;
     case SYMBOL_FUNCTION: {
         // Valid type
         validateType(symbolNode->type, symbolNode->parent, symbolNode->filename, symbolNode->line);
@@ -78,7 +92,7 @@ void validator_validate(struct symbolNode* symbolNode) {
         }
     } break;
     default:
-        error("", 1, "Bad");
+        error("", 1, "Bad symbol\n");
     }
 }
 
@@ -120,7 +134,7 @@ static int validateType(const char* type, const struct symbolNode* scope, const 
     strncpy(temp, type, end);
     // If the type isn't private, check to see if there is a struct defined with the name
     if(!isPrimitive(temp)) {
-        struct symbolNode* dataStruct = findSymbol(type, scope, filename, line);
+        struct symbolNode* dataStruct = symbol_findSymbol(type, scope, filename, line);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown type %s", type);
         }
@@ -154,7 +168,7 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         return typesMatch(expectedBase, actualBase, scope, filename, line);
     } else {
         // here type must be struct
-        struct symbolNode* dataStruct = findSymbol(actual, scope, filename, line);
+        struct symbolNode* dataStruct = symbol_findSymbol(actual, scope, filename, line);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
@@ -179,22 +193,13 @@ static void validateAST(struct astNode* node) {
             validateAST((struct astNode*)elem->data);
         }
         break;
-    case AST_VARDECLARE:
-        var = (struct symbolNode*) node->data;
-        var->isDeclared = 1;
-        validateType(var->type, node->scope, var->filename, var->line);
-        break;
-    case AST_VARDEFINE: {
+    case AST_SYMBOLDEFINE: {
         var = (struct symbolNode*) node->data;
         var->isDeclared = 1;
         LOG("%p", node->scope);
         validateType(var->type, node->scope, var->filename, var->line);
-        char *initType = validateExpressionAST(var->code);
-        if(!typesMatch(var->type, initType, node->scope, var->filename, var->line)) {
-            error(var->filename, var->line, "Value type mismatch when assigning to variable \"%s\". Expected \"%s\" type, actual type was \"%s\" ", var->name, var->type, initType);
-        }
-        break;
-    }
+        validator_validate(var);
+    } break;
     case AST_IF: {
         struct astNode* condition = node->children->head.next->data;
         struct astNode* block = node->children->head.next->next->data;
@@ -244,7 +249,7 @@ static void validateAST(struct astNode* node) {
         break;
     }
     default:
-        LOG("%p", validateExpressionAST(node));
+        validateExpressionAST(node);
     }
 }
 
@@ -278,7 +283,7 @@ char* validateExpressionAST(struct astNode* node) {
         strcpy(retval, "None");
         return retval;
     case AST_VAR: {
-        struct symbolNode* var = findSymbol(node->data, node->scope, node->filename, node->line);
+        struct symbolNode* var = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
         strcpy(retval, var->type);
         return retval;
     }
@@ -308,14 +313,14 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // Constant assignment validation- find variable associated with assignment
         if(leftAST->type == AST_VAR) {
-            var = findSymbol(leftAST->data, leftAST->scope, node->filename, node->line);
+            var = symbol_findSymbol(leftAST->data, leftAST->scope, node->filename, node->line);
         } else if(leftAST->type == AST_MODULEACCESS) {
             struct astNode* moduleIdent = leftAST->children->head.next->next->data;
             struct astNode* nameIdent = leftAST->children->head.next->data;
             if(nameIdent->type != AST_VAR) {
                 error(node->filename, node->line, "Left side of assignment must be a location");
             }
-            var = findExplicitSymbol(moduleIdent->data, nameIdent->data, leftAST->scope, leftAST->filename, leftAST->line);
+            var = symbol_findExplicitSymbol(moduleIdent->data, nameIdent->data, leftAST->scope, leftAST->filename, leftAST->line);
         }
         // Indexing is not checked, you can change the contents of an array if it is constant
         if(var != NULL && var->isConstant) {
@@ -358,7 +363,7 @@ char* validateExpressionAST(struct astNode* node) {
         strcpy(retval, "boolean");
         return retval;
     case AST_CALL: {
-        struct symbolNode* symbol = findSymbol(node->data, node->scope, node->filename, node->line);
+        struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
         ASSERT(symbol != NULL);
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
@@ -392,12 +397,12 @@ char* validateExpressionAST(struct astNode* node) {
             }
             int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
             
-            if(!err) {
+            if(err == -1) {
                 strcpy(retval, symbol->type);
                 return retval;
-            } else if(err > 0){
+            } else if(err > -1){
                 error(node->filename, node->line, "Too many arguments for function call");
-            } else if(err < 0){
+            } else if(err < -1){
                 error(node->filename, node->line, "Too few arguments for function call");
             }
         }
@@ -451,7 +456,7 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Right side of module access operator must be varibale or function name");
         }
 
-        struct symbolNode* symbol = findExplicitSymbol(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
+        struct symbolNode* symbol = symbol_findExplicitSymbol(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
         if(symbol != NULL) {
             if (rightAST->type == AST_CALL) { // Validate that the call is well formed
                 validateExpressionAST(rightAST);
@@ -508,21 +513,6 @@ static void validateBinaryOp(struct list* children, char* leftType, char* rightT
     strcpy(leftType, validateExpressionAST(children->head.next->next->data));
 }
 
-static struct symbolNode* findExplicitSymbol(char* moduleName, char* memberName, const struct symbolNode* scope, const char* filename, int line) {
-    struct symbolNode* module = map_get(program->children, moduleName);
-    if(module == NULL) {
-        error(filename, line, "Unknown module %s", moduleName);
-    }
-    if(module->isStatic && !scope->isStatic) {
-        error(filename, line, "Cannot access static module from non static module");
-    }
-    struct symbolNode* member = map_get(module->children, memberName);
-    if(member == NULL || member->isPrivate) {
-        error(filename, line, "Unknown member %s in %s", memberName, moduleName);
-    }
-    return member;
-}
-
 /*
     Takes in an array type, returns the lower level type (the type without the "array" modifier) */
 static void removeArray(char* str) {
@@ -534,23 +524,6 @@ static void removeArray(char* str) {
             return;
         }
     }
-}
-
-/*
-    Returns the symbol with the given name relative to a given starting scope.
-    
-    Will return NULL if no symbol with the name is found in any direct ancestor
-    scopes. */
-static struct symbolNode* findSymbol(const char* symbolName, const struct symbolNode* scope, const char* filename, int line) {
-    struct symbolNode* symbol = map_get(scope->children, symbolName);
-    if(symbol != NULL) {
-        return symbol;
-    } else if(scope->parent == NULL) {
-        error(filename, line, "Unknown symbol \"%s\"", symbolName);
-    } else {
-        return findSymbol(symbolName, scope->parent, filename, line);
-    }
-    return NULL;
 }
 
 /*
@@ -576,8 +549,8 @@ static int validateParamType(struct list* args, struct map* paramMap, struct sym
             error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
         }
     }
-    // todo- actually count the parameters, and add a length to a list for arguments. Check that
-    return args->size - paramMap->size + 1;
+    // count the parameters, arguments. Check that sizes match excluding function's block
+    return args->size - paramMap->size;
 }
 
 /*

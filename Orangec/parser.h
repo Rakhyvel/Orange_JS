@@ -8,14 +8,17 @@
 #define PARSER_H
 
 #include <stdbool.h>
+
 #include "./main.h"
+#include "./symbol.h"
+
 #include "../util/list.h"
 
 /*
     AST nodes have types that tell them apart */
 enum astType {
     // StatementNode types
-	AST_BLOCK, AST_VARDECLARE, AST_VARDEFINE, AST_IF, AST_IFELSE, AST_WHILE, AST_RETURN,
+	AST_BLOCK, AST_SYMBOLDEFINE, AST_IF, AST_IFELSE, AST_WHILE, AST_RETURN,
 	// Values
     AST_INTLITERAL, AST_REALLITERAL, AST_CALL, AST_VAR, AST_STRINGLITERAL, 
     AST_CHARLITERAL, AST_ARRAYLITERAL, AST_TRUE, AST_FALSE, AST_NULL,
@@ -33,16 +36,6 @@ enum astType {
     AST_NOP
 };
 
-enum symbolType {
-    SYMBOL_UNSURE,
-    SYMBOL_PROGRAM,
-    SYMBOL_MODULE,
-    SYMBOL_STRUCT,
-    SYMBOL_VARIABLE, 
-    SYMBOL_FUNCTION,
-    SYMBOL_BLOCK
-};
-
 /*
     Abstract Syntax Trees describe the actual code of a language in a more
     efficient way. */
@@ -54,37 +47,6 @@ struct astNode {
 
 	const char* filename;
 	int line;
-};
-
-/*
-    The Symbol Tree describes symbols and their relationship to other symbols.
-    
-    Symbols include:
-    - Modules
-    - Structs
-    - Variables
-    - Functions
-    - The program as a whole */
-struct symbolNode {
-    // Data
-    enum symbolType symbolType;
-    char type[255];
-    char name[255];
-    struct astNode* code;
-
-    // Parse tree
-    struct symbolNode* parent;
-    struct map* children; // name -> other symbolNodes
-
-    // Flags
-    int isPrivate;  // only accessed by direct descendants (ie not root access operator ":")
-    int isStatic;   // can access other static symbols
-    int isConstant; // value cannot change
-    int isDeclared; // has value been set or not
-
-    // Metadata
-    const char* filename;
-    int line;
 };
 
 // Init functions

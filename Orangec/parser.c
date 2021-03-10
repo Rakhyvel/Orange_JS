@@ -38,6 +38,7 @@ static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
 char* itoa(int val);
+static void initSymbolPath(char*, struct symbolNode*);
 static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
@@ -150,6 +151,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         symbolNode->isStatic = 1;
         assertRemove(tokenQueue, TOKEN_STRUCT);
         copyNextTokenString(tokenQueue, symbolNode->name);
+        strcpy(symbolNode->type, symbolNode->name);
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }
@@ -199,6 +201,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     } else {
         printf("%s\n", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
     }
+    initSymbolPath(symbolNode->path, symbolNode);
     return symbolNode;
 }
 
@@ -227,9 +230,11 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // SYMBOL DEFINITION/DECLARATION
     else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
-             matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, FUNCTION, 3)
-            || matchTokens(tokenQueue, STRUCT, 3)) {
-        retval = createAST(AST_VARDEFINE, topToken->filename, topToken->line, scope);
+             matchTokens(tokenQueue, VARDEFINE, 3) || 
+             matchTokens(tokenQueue, FUNCTION, 3) || 
+             matchTokens(tokenQueue, STRUCT, 3)) {
+        LOG("HELLO");
+        retval = createAST(AST_SYMBOLDEFINE, topToken->filename, topToken->line, scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
         map_put(scope->children, symbolNode->name, symbolNode);
@@ -292,7 +297,7 @@ void parser_printAST(struct astNode* node, int n) {
     #else
     for(int i = 0; i < n; i++) printf("  "); // print spaces
     LOG("%s", parser_astToString(node->type));
-    if(node->type == AST_VARDEFINE) {
+    if(node->type == AST_SYMBOLDEFINE) {
         for(int i = 0; i < n; i++) printf("  ");
         LOG("%s %s =", ((struct symbolNode*)node->data)->type, (((struct symbolNode*)node->data)->name));
         parser_printAST(((struct symbolNode*)node->data)->code, n+1);
@@ -335,10 +340,8 @@ char* parser_astToString(enum astType type) {
     switch(type) {
     case AST_BLOCK: 
         return "astType:BLOCK";
-    case AST_VARDEFINE: 
-        return "astType.VARDEFINE";
-    case AST_VARDECLARE: 
-        return "astType.VARDECLARE";
+    case AST_SYMBOLDEFINE: 
+        return "astType.SYMBOLDEFINE";
     case AST_IF: 
         return "astType.IF";
     case AST_IFELSE: 
@@ -483,6 +486,18 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
         }
     }
     return i == nTokens;
+}
+
+static void initSymbolPath(char* path, struct symbolNode* node) {
+    switch (node->symbolType) {
+    case SYMBOL_PROGRAM:
+        break;
+    default:
+        initSymbolPath(path, node->parent);
+        strcat(path, "_");
+        strcat(path, node->name);
+        break;
+    }
 }
 
 /*
