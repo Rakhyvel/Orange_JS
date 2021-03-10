@@ -33,9 +33,7 @@ struct symbolNode* symbol_findSymbol(const char* symbolName, const struct symbol
     struct symbolNode* symbol = map_get(scope->children, symbolName);
     if(symbol != NULL) {
         return symbol;
-    } else if(scope->parent == NULL) {
-        error(filename, line, "Unknown symbol \"%s\"", symbolName);
-    } else {
+    } else if(scope->parent != NULL) {
         return symbol_findSymbol(symbolName, scope->parent, filename, line);
     }
     return NULL;

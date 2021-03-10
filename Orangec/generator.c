@@ -58,12 +58,12 @@ static void constructLists(struct symbolNode* node, struct list* structList, str
 
         if(child->symbolType == SYMBOL_STRUCT) {
             queue_push(structList, child);
-            LOG("_%d", child->id);
+            LOG("%s", child->name);
         } else if(child->symbolType == SYMBOL_VARIABLE && node->symbolType == SYMBOL_MODULE) {
             queue_push(globalList, child);
         } else if(child->symbolType == SYMBOL_FUNCTION) {
             queue_push(functionList, child);
-            LOG("_%d", child->id);
+            LOG("%s", child->name);
         }
         constructLists(child, structList, globalList, functionList);
     }
@@ -211,7 +211,11 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
         break;
     case AST_VAR: {
         struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
-        fprintb(out, symbol->id);
+        if(symbol == NULL) {
+            fprintf(out, "%s", (char*)node->data);
+        } else {
+            fprintb(out, symbol->id);
+        }
     } break;
     case AST_ADD:
     case AST_SUBTRACT:

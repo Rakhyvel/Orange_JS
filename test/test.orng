@@ -5,6 +5,14 @@ Main {
 }
 
 List {
-    struct ListElem(ListElem next, ListElem prev, Any data)
-    struct List()
+    struct ListElem(ListElem next, ListElem prev, int data)
+    struct List(ListElem head, ListElem tail, int size)
+
+    List create() {
+        ListElem head = new ListElem();
+        ListElem tail = new ListElem();
+        head.next = tail;
+        tail.prev = head;
+        return new List(head, tail, 0);
+    }
 }

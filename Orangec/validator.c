@@ -27,7 +27,7 @@ static int validateType(const char*, const struct symbolNode*, const char*, int)
 static void validateBinaryOp(struct list*, char*, char*);
 static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
-static char* validateStructField(char*, char*, const char*, int);
+static char* validateStructField(char*, char*, struct symbolNode*, const char*, int);
 static char* validateExpressionAST(struct astNode* node);
 static void removeArray(char*);
 static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
@@ -284,6 +284,9 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     case AST_VAR: {
         struct symbolNode* var = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
+        if(var == NULL) {
+            error(node->filename, node->line, "Unknown symbol %s", node->data);
+        }
         strcpy(retval, var->type);
         return retval;
     }
@@ -314,6 +317,9 @@ char* validateExpressionAST(struct astNode* node) {
         // Constant assignment validation- find variable associated with assignment
         if(leftAST->type == AST_VAR) {
             var = symbol_findSymbol(leftAST->data, leftAST->scope, node->filename, node->line);
+            if(var == NULL) {
+                error(node->filename, node->line, "Unknown symbol %s", node->data);
+            }
         } else if(leftAST->type == AST_MODULEACCESS) {
             struct astNode* moduleIdent = leftAST->children->head.next->next->data;
             struct astNode* nameIdent = leftAST->children->head.next->data;
@@ -364,7 +370,9 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     case AST_CALL: {
         struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
-        ASSERT(symbol != NULL);
+        if(symbol == NULL) {
+            error(node->filename, node->line, "Unknown symbol %s", node->data);
+        }
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
             LOG("Array literal call");
@@ -415,7 +423,7 @@ char* validateExpressionAST(struct astNode* node) {
         if(strstr(type, " array") && !strcmp(rightAST->data, "length")) {
             strcpy(retval, "int");
         } else {
-            strcpy(retval, validateStructField(type, rightAST->data, node->filename, node->line));
+            strcpy(retval, validateStructField(type, rightAST->data, node->scope, node->filename, node->line));
         }
         return retval;
     }
@@ -568,8 +576,8 @@ static int validateArrayType(struct list* args, char* expected, struct symbolNod
 
 /*
     Checks to see if a struct contains a field, or if a super struct contains the field. */
-static char* validateStructField(char* structName, char* fieldName, const char* filename, int line) {
-    struct symbolNode* dataStruct = map_get(program->children, structName);
+static char* validateStructField(char* structName, char* fieldName, struct symbolNode* scope, const char* filename, int line) {
+    struct symbolNode* dataStruct = symbol_findSymbol(structName, scope, filename, line);
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
     }
@@ -577,5 +585,5 @@ static char* validateStructField(char* structName, char* fieldName, const char* 
         error(filename, line, "Unknown field \"%s\" for struct \"%s\" ", fieldName, structName);
     }
 
-    return ((struct symbolNode*)map_get(dataStruct->children, fieldName))->type;
+    return ((struct symbolNode*) map_get(dataStruct->children, fieldName))->type;
 }
