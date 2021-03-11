@@ -28,7 +28,6 @@ static void validateBinaryOp(struct list*, char*, char*);
 static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
-static struct symbolNode* getStructFromAST(struct astNode*);
 static char* validateExpressionAST(struct astNode* node);
 static void removeArray(char*);
 static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
@@ -429,6 +428,7 @@ char* validateExpressionAST(struct astNode* node) {
     }
     case AST_IS:
     case AST_ISNT:
+        validateBinaryOp(node->children, left, right);
         strcpy(retval, "boolean");
         return retval;
     case AST_CALL: {
@@ -567,7 +567,6 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     }
     case AST_FREE: {
-        struct astNode* rightAST = node->children->head.next->data;
         strcpy(retval, "None");
         return retval;
     }

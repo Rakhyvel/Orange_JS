@@ -3,6 +3,10 @@ Mod1 {
 
     void start() {
         List:Linked tokenQueue = List:create();
+        List:Node node = List:begin(tokenQueue);
+        while node != List:end(tokenQueue) {
+            node = List:next(node);
+        }
     }
 }
 

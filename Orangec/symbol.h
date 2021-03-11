@@ -1,3 +1,8 @@
+/*
+    Author: Joseph Shimel
+    Date: 3/10/21
+*/
+
 #ifndef SYMBOL_H
 #define SYMBOL_H
 

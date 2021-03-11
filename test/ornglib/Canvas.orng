@@ -5,7 +5,11 @@ static Canvas {
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
 
-    void init(char[] id){}
+    void init(char[] id){
+        verbatim(id) {
+            
+        }
+    }
     void destroy(){}
     void setColor(Color color){}
     void setStroke(int w, Color color){}

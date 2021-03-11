@@ -22,7 +22,8 @@ struct file {
 
 struct symbolNode* program;
 struct map* fileMap;
-struct map* structMap;      // maps: struct#id -> symbolNode* struct
+struct map* structMap;      // maps: struct#id -> symbolNode* struct    // @fix maybe this isn't holistic. 
+                                                                        //      Was done for struct_type->struct_symbol
 
 void error(const char* filename, int line, const char* msg, ...);
 

@@ -39,7 +39,7 @@ static int num_ids = 0;
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
-static char* expectType(struct list*, char*);
+static void expectType(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
 static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
@@ -447,7 +447,7 @@ char* itoa(int val) {
 	return &buf[i+1];
 }
 
-static char* expectType(struct list* tokenQueue, char* dst) {
+static void expectType(struct list* tokenQueue, char* dst) {
     copyNextTokenString(tokenQueue, dst);
     if(topMatches(tokenQueue, TOKEN_COLON)) {
         assertRemove(tokenQueue, TOKEN_COLON);
