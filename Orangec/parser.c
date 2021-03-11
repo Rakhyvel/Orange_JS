@@ -28,6 +28,9 @@ static const enum tokenType MODULE[] = {TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
 static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
+static const enum tokenType EXTERN_VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
+static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
+static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static int num_ids = 0;
@@ -36,8 +39,8 @@ static int num_ids = 0;
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
+static char* expectType(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
-static void initSymbolPath(char*, struct symbolNode*);
 static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
@@ -152,38 +155,41 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         assertRemove(tokenQueue, TOKEN_STRUCT);
         copyNextTokenString(tokenQueue, symbolNode->name);
         strcpy(symbolNode->type, symbolNode->name);
+        char* buf = itoa(symbolNode->id);
+        strcat(symbolNode->type, "#");
+        strcat(symbolNode->type, buf);
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }
     // VARIABLE DEFINITION
-    else if(matchTokens(tokenQueue, VARDEFINE, 3)) {
+    else if(matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
         symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
-        copyNextTokenString(tokenQueue, symbolNode->type);
+        expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_EQUALS);
         symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
-    } else if(matchTokens(tokenQueue, VARDECLARE, 3)) {
+    } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
         symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
-        copyNextTokenString(tokenQueue, symbolNode->type);
+        expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable %s created", symbolNode->name);
     // FUNCTION DECLARATION
-    } else if(matchTokens(tokenQueue, FUNCTION, 3)) {
+    } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
         symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, topToken->filename, topToken->line);
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
-        copyNextTokenString(tokenQueue, symbolNode->type);
+        expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         parseParams(tokenQueue, symbolNode);
         if(topMatches(tokenQueue, TOKEN_EQUALS)) {
@@ -201,7 +207,6 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     } else {
         printf("%s\n", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
     }
-    initSymbolPath(symbolNode->path, symbolNode);
     return symbolNode;
 }
 
@@ -232,8 +237,9 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
              matchTokens(tokenQueue, VARDEFINE, 3) || 
              matchTokens(tokenQueue, FUNCTION, 3) || 
-             matchTokens(tokenQueue, STRUCT, 3)) {
-        LOG("HELLO");
+             matchTokens(tokenQueue, STRUCT, 3) || 
+             matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
+             matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
         retval = createAST(AST_SYMBOLDEFINE, topToken->filename, topToken->line, scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
@@ -426,7 +432,7 @@ static int topMatches(struct list* tokenQueue, enum tokenType type) {
 static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     assertPeek(tokenQueue, TOKEN_IDENTIFIER);
     struct token* nextToken = (struct token*) queue_pop(tokenQueue);
-    strncpy(dest, nextToken->data, 254);
+    strncat(dest, nextToken->data, 254);
     free(nextToken);
 }
 
@@ -438,6 +444,16 @@ char* itoa(int val) {
 	for(; val && i ; --i, val /= 36)
 		buf[i] = "0123456789abcdefghijklmnopqrstuvwxyz"[val % 36];
 	return &buf[i+1];
+}
+
+static char* expectType(struct list* tokenQueue, char* dst) {
+    copyNextTokenString(tokenQueue, dst);
+    if(topMatches(tokenQueue, TOKEN_COLON)) {
+        assertRemove(tokenQueue, TOKEN_COLON);
+        strcat(dst, "$");    // The dollar sign is a special char
+                                // signifies that the type is a composite, and should be updated later
+        copyNextTokenString(tokenQueue, dst);
+    }
 }
 
 /*
@@ -486,18 +502,6 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
         }
     }
     return i == nTokens;
-}
-
-static void initSymbolPath(char* path, struct symbolNode* node) {
-    switch (node->symbolType) {
-    case SYMBOL_PROGRAM:
-        break;
-    default:
-        initSymbolPath(path, node->parent);
-        strcat(path, "_");
-        strcat(path, node->name);
-        break;
-    }
 }
 
 /*

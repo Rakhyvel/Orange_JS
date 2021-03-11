@@ -9,6 +9,7 @@
 
 #include "./parser.h"
 
+void validator_updateStructType(struct symbolNode*);
 void validator_validate(struct symbolNode*);
 
 #endif

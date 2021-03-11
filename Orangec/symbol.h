@@ -7,6 +7,7 @@ enum symbolType {
     SYMBOL_MODULE,
     SYMBOL_STRUCT,
     SYMBOL_VARIABLE, 
+    SYMBOL_EXTERN_VARIABLE, 
     SYMBOL_FUNCTION,
     SYMBOL_BLOCK
 };
@@ -23,9 +24,9 @@ enum symbolType {
 struct symbolNode {
     // Data
     enum symbolType symbolType;
+    char path[255];
     char type[255];
     char name[255];
-    char path[255];
     int id;
     struct astNode* code;
 

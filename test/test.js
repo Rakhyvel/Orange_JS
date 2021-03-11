@@ -1,23 +1,15 @@
-class _6 {
-	constructor(next, prev, data) {
-		this.next=next;
-		this.prev=prev;
-		this.data=data;
+class _2 {
+	constructor(d) {
+		this.d=d;
 	}
 }
-class _a {
-	constructor(head, tail, size) {
-		this.head=head;
-		this.tail=tail;
-		this.size=size;
+class _c {
+	constructor(i) {
+		this.i=i;
 	}
 }
-function _2(){
+function _4(){
+	let _7=new _2();
 }
-function _e(){
-	let _h=new _6();
-	let _i=new _6();
-	_h.next=_i;
-	_i.prev=_h;
-	return new _a(_h, _i, 0);
+function _8(){
 }

@@ -77,6 +77,7 @@ int main(int argn, char** argv) {
     }
 
     LOG("\nBegin Validating.");
+    validator_updateStructType(program);
     validator_validate(program);
     LOG("\nEnd Validating.\n");
 

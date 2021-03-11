@@ -32,6 +32,31 @@ static char* validateExpressionAST(struct astNode* node);
 static void removeArray(char*);
 static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
 static void validateAST(struct astNode*);
+static void updateStruct(struct symbolNode*);
+static void updateType(char*, struct symbolNode*);
+
+void validator_updateStructType(struct symbolNode* symbolNode) {
+    struct list* children = symbolNode->children->keyList;
+    struct listElem* elem = list_begin(children);
+    // Correct struct type, if exists
+    switch(symbolNode->symbolType) {
+    case SYMBOL_VARIABLE:
+    case SYMBOL_FUNCTION:
+    case SYMBOL_BLOCK:
+        if(strstr(symbolNode->type, "$")) {
+            updateType(symbolNode->type, symbolNode);
+            break;
+        } else {
+            updateStruct(symbolNode);
+        }
+    default: {
+        for(;elem != list_end(children); elem = list_next(elem)) {
+            struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
+            validator_updateStructType(child);
+        }
+    } break;
+    }
+}
 
 /*
     Takes in a program, looks through structures, modules, globals, and 
@@ -40,6 +65,7 @@ void validator_validate(struct symbolNode* symbolNode) {
     struct list* children = symbolNode->children->keyList;
     struct listElem* elem = list_begin(children);
     LOG("Validating %s", symbolNode->name);
+    // Correct struct type, if exists
     switch(symbolNode->symbolType) {
     case SYMBOL_PROGRAM: {
         for(;elem != list_end(children); elem = list_next(elem)) {
@@ -74,15 +100,31 @@ void validator_validate(struct symbolNode* symbolNode) {
             validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
         }
     } break;
-    case SYMBOL_FUNCTION: {
+    case SYMBOL_EXTERN_VARIABLE: {
+        struct symbolNode* module = symbol_findSymbol(symbolNode->path, program, symbolNode->filename, symbolNode->line);
         // Valid type
-        validateType(symbolNode->type, symbolNode->parent, symbolNode->filename, symbolNode->line);
+        validateType(symbolNode->type, module, symbolNode->filename, symbolNode->line);
         // Valid AST
-        validateAST(symbolNode->code);
+        if(symbolNode->code != NULL) {
+            char* actual = validateExpressionAST(symbolNode->code);
+            if(!typesMatch(symbolNode->type, actual, module, symbolNode->filename, symbolNode->line)) {
+                error(symbolNode->filename, symbolNode->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", symbolNode->type, actual);
+            }
+        }
         // All children must be valid
         for(;elem != list_end(children); elem = list_next(elem)) {
             validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
         }
+    } break;
+    case SYMBOL_FUNCTION: {
+        // Valid type
+        validateType(symbolNode->type, symbolNode->parent, symbolNode->filename, symbolNode->line);
+        // All children must be valid- done before AST validation so as to allow SYMBOL_BLOCK's to update their struct type
+        for(;elem != list_end(children); elem = list_next(elem)) {
+            validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
+        }
+        // Valid AST
+        validateAST(symbolNode->code);
     } break;
     case SYMBOL_STRUCT:
     case SYMBOL_BLOCK: {
@@ -93,6 +135,27 @@ void validator_validate(struct symbolNode* symbolNode) {
     } break;
     default:
         error("", 1, "Bad symbol\n");
+    }
+}
+
+static void updateType(char* type, struct symbolNode* scope) {
+    char mod[255];
+    char member[255];
+    int end = findTypeEnd(type);
+    memset(mod, 0, 254);
+    memset(member, 0, 254);
+    strncpy(mod, type, end);
+    strcpy(member, type + end + 1);
+    struct symbolNode* symbol = symbol_findExplicitSymbol(mod, member, scope->parent, scope->filename, scope->line);
+    if(symbol != NULL && symbol->symbolType == SYMBOL_STRUCT) {
+        strcpy(scope->type, symbol->type);
+    }
+}
+
+static void updateStruct(struct symbolNode* symbolNode) {
+    struct symbolNode* symbol = symbol_findSymbol(symbolNode->type, symbolNode->parent, symbolNode->filename, symbolNode->line);
+    if(symbol != NULL && symbol->symbolType == SYMBOL_STRUCT) {
+        strcpy(symbolNode->type, symbol->type);
     }
 }
 
@@ -107,7 +170,7 @@ void validator_validate(struct symbolNode* symbolNode) {
 */
 static int findTypeEnd(const char* type) {
     int i = 0;
-    while (type[i] != '\0' && type[i] != ' ') i++;
+    while (type[i] != '\0' && type[i] != ' ' && type[i] != '#' && type[i] != '$') i++;
     return i;
 }
 
@@ -134,7 +197,7 @@ static int validateType(const char* type, const struct symbolNode* scope, const 
     strncpy(temp, type, end);
     // If the type isn't private, check to see if there is a struct defined with the name
     if(!isPrimitive(temp)) {
-        struct symbolNode* dataStruct = symbol_findSymbol(type, scope, filename, line);
+        struct symbolNode* dataStruct = symbol_findSymbol(temp, scope, filename, line);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown type %s", type);
         }
@@ -168,7 +231,11 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         return typesMatch(expectedBase, actualBase, scope, filename, line);
     } else {
         // here type must be struct
-        struct symbolNode* dataStruct = symbol_findSymbol(actual, scope, filename, line);
+        int end = findTypeEnd(actual);
+        char temp[255];
+        memset(temp, 0, 254);
+        strncpy(temp, actual, end);
+        struct symbolNode* dataStruct = symbol_findSymbol(temp, scope, filename, line);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
@@ -197,7 +264,6 @@ static void validateAST(struct astNode* node) {
         var = (struct symbolNode*) node->data;
         var->isDeclared = 1;
         LOG("%p", node->scope);
-        validateType(var->type, node->scope, var->filename, var->line);
         validator_validate(var);
     } break;
     case AST_IF: {
@@ -389,7 +455,7 @@ char* validateExpressionAST(struct astNode* node) {
             int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
             
             if(!err || list_isEmpty(node->children)) {
-                strcpy(retval, node->data);
+                strcpy(retval, symbol->type);
                 return retval;
             } else if(err > 0){
                 error(node->filename, node->line, "Too many arguments for struct \"%s\" initialization", symbol->name);
@@ -413,6 +479,8 @@ char* validateExpressionAST(struct astNode* node) {
             } else if(err < -1){
                 error(node->filename, node->line, "Too few arguments for function call");
             }
+        } else {
+            LOG("HELLO");
         }
     }
     case AST_DOT: {
@@ -467,6 +535,7 @@ char* validateExpressionAST(struct astNode* node) {
         struct symbolNode* symbol = symbol_findExplicitSymbol(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
         if(symbol != NULL) {
             if (rightAST->type == AST_CALL) { // Validate that the call is well formed
+                rightAST->scope = map_get(program->children, leftAST->data);
                 validateExpressionAST(rightAST);
             }
             return symbol->type;
@@ -493,7 +562,7 @@ char* validateExpressionAST(struct astNode* node) {
     }
     case AST_NEW: {
         struct astNode* rightAST = node->children->head.next->data;
-        if(rightAST->type != AST_CALL && rightAST->type != AST_INDEX) {
+        if(rightAST->type != AST_CALL && rightAST->type != AST_INDEX && rightAST->type != AST_MODULEACCESS) {
             error(node->filename, node->line, "New operand must be a struct call");
         }
         char* oldType = validateExpressionAST(rightAST);
@@ -502,9 +571,6 @@ char* validateExpressionAST(struct astNode* node) {
     }
     case AST_FREE: {
         struct astNode* rightAST = node->children->head.next->data;
-        if(rightAST->type != AST_VAR && rightAST->type != AST_INDEX) {
-            error(node->filename, node->line, "Free operand must be a variable");
-        }
         strcpy(retval, "None");
         return retval;
     }

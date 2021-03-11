@@ -42,7 +42,7 @@ struct symbolNode* symbol_findSymbol(const char* symbolName, const struct symbol
 struct symbolNode* symbol_findExplicitSymbol(char* moduleName, char* memberName, const struct symbolNode* scope, const char* filename, int line) {
     struct symbolNode* module = map_get(program->children, moduleName);
     if(module == NULL) {
-        error(filename, line, "Unknown module %s", moduleName);
+        error(filename, line, "Unknown module \"%s\"", moduleName);
     }
     if(module->isStatic && !scope->isStatic) {
         error(filename, line, "Cannot access static module from non static module");
