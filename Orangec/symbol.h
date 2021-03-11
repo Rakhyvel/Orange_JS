@@ -13,6 +13,7 @@ enum symbolType {
     SYMBOL_STRUCT,
     SYMBOL_VARIABLE, 
     SYMBOL_EXTERN_VARIABLE, 
+    SYMBOL_FUNCTIONPTR, 
     SYMBOL_FUNCTION,
     SYMBOL_BLOCK
 };
@@ -51,6 +52,6 @@ struct symbolNode {
 };
 
 struct symbolNode* symbol_findExplicitSymbol(char*, char*, const struct symbolNode*, const char*, int);
-struct symbolNode* symbol_findSymbol(const char*, const struct symbolNode*, const char*, int);
+struct symbolNode* symbol_findSymbol(const char*, const struct symbolNode*);
 
 #endif

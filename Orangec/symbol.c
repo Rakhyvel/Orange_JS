@@ -29,12 +29,12 @@
     
     Will return NULL if no symbol with the name is found in any direct ancestor
     scopes. */
-struct symbolNode* symbol_findSymbol(const char* symbolName, const struct symbolNode* scope, const char* filename, int line) {
+struct symbolNode* symbol_findSymbol(const char* symbolName, const struct symbolNode* scope) {
     struct symbolNode* symbol = map_get(scope->children, symbolName);
     if(symbol != NULL) {
         return symbol;
     } else if(scope->parent != NULL) {
-        return symbol_findSymbol(symbolName, scope->parent, filename, line);
+        return symbol_findSymbol(symbolName, scope->parent);
     }
     return NULL;
 }

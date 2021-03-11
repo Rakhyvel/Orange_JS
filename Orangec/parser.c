@@ -27,8 +27,12 @@
 static const enum tokenType MODULE[] = {TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
+static const enum tokenType PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
+static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
 static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 static const enum tokenType EXTERN_VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
+static const enum tokenType EXTERN_PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
+static const enum tokenType EXTERN_ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
 static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
@@ -134,6 +138,10 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     if(topMatches(tokenQueue, TOKEN_RBRACE)) {
         return NULL;
     }
+    // END OF PARAM LIST, RETURN
+    if(topMatches(tokenQueue, TOKEN_RPAREN)) {
+        return NULL;
+    }
     // MODULE
     else if(matchTokens(tokenQueue, MODULE, 2)) {
         symbolNode = parser_createSymbolNode(SYMBOL_MODULE, parent, topToken->filename, topToken->line);
@@ -184,6 +192,16 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable %s created", symbolNode->name);
+    // PARAM DECLARATION
+    } else if(matchTokens(tokenQueue, PARAM_DECLARE, 3) || matchTokens(tokenQueue, ENDPARAM_DECLARE, 3) ||
+            matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 3) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
+        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
+        symbolNode->isPrivate = isPrivate;
+        symbolNode->isConstant = isConstant;
+        symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
+        expectType(tokenQueue, symbolNode->type);
+        copyNextTokenString(tokenQueue, symbolNode->name);
+        LOG("Variable %s created", symbolNode->name);    
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
         symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, topToken->filename, topToken->line);
@@ -200,7 +218,10 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         } else {
-            // error
+            symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
+            struct symbolNode* anon = parser_createSymbolNode(SYMBOL_BLOCK, parent, topToken->filename, topToken->line);
+            strcpy(anon->name, "_block_anon");
+            map_put(symbolNode->children, anon->name, anon);
         }
         LOG("Function %s created", symbolNode->name);
     } else if(topMatches(tokenQueue, TOKEN_EOF)){
@@ -466,15 +487,7 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
     // Parse parameters of function
     while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
-        struct symbolNode* param = parser_createSymbolNode(SYMBOL_VARIABLE, parent, parent->filename, parent->line);
-        copyNextTokenString(tokenQueue, param->type);
-        if(!topMatches(tokenQueue, TOKEN_COMMA)) {
-            copyNextTokenString(tokenQueue, param->name);
-        } else {
-            strcpy(param->name, "_undef");
-            strcat(param->name, itoa(num_ids++));
-            free(queue_pop(tokenQueue));
-        }
+        struct symbolNode* param = parser_parseTokens(tokenQueue, parent);
         struct token* topToken = queue_peek(tokenQueue);
         if(map_put(parent->children, param->name, param)) {
             error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place", param->name);
