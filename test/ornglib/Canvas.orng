@@ -1,27 +1,63 @@
 static Canvas {
-    struct Canvas()
+    struct Canvas(int width, int height, Canvas next)
+    struct Context()
     struct Image()
     struct Rect(int x, int y, int w, int h)
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
-    Canvas c;
+    struct MouseEvent(int offsetX, int offsetY)
+
+    Canvas canvas;
+    Context ctx;
 
     void init(char[] id){
-        Canvas:c = cast(Canvas)verbatim("document.getElementByID(", id, ")");
+        canvas = cast(Canvas)verbatim("document.getElementByID(", id, ")");
+        ctx = cast(Context)verbatim(canvas, ".getContext('2d')");
     }
     void destroy(){}
-    void setColor(Color color){}
-    void setStroke(int w, Color color){}
-    void setFont(char[] font){}
-    void drawLine(int x1, int y1, int x2, int y2){}
-    void drawRect(int x, int y, int w, int h){}
-    void fillRect(int x, int y, int w, int h){}
-    void drawImage(Image image, int x, int y){}
-    void drawString(char[] text, int x, int y){}
-    void drawPolygon(int[] xPoints, int[] yPoints){}
-    void fillPolygon(int[] xPoints, int[] yPoints){}
-    int mouseX(){}
-    int mouseY(){}
-    int width(){}
-    int height(){}
+    void setColor(int a, int r, int g, int b){
+        verbatim(   ctx, ".fillStyle=rgba(", r, ",", g, ",", b, ",", a ")");
+        verbatim(   ctx, ".strokeStyle=rgba(", r, ",", g, ",", b, ",", a ")");
+    }
+    void setStroke(int w){
+        verbatim(   ctx, ".lineWidth=", w);
+    }
+    void setFont(char[] font){
+        verbatim(   ctx, ".font=", font);
+    }
+    void drawLine(int x1, int y1, int x2, int y2){
+        verbatim(   ctx, ".beginPath();", 
+                    ctx, ".moveTo(", x1, ",", y1, ");", 
+                    ctx, ".lineTo(", x2, ",", y2, ");", 
+                    ctx, ".stroke()");
+    }
+    void drawRect(int x, int y, int w, int h){
+        verbatim(   ctx, ".beginPath();", 
+                    ctx, ".rect(", x, ",", y, ",", w, ",", h, ");",
+                    ctx, ".stroke()");
+    }
+    void fillRect(int x, int y, int w, int h){
+        verbatim(   ctx, ".fillRect(", x, ",", y, ",", w, ",", h, ")");
+    }
+    void drawImage(Image image, int x, int y){
+        // @todo
+    }
+    void drawString(char[] text, int x, int y){
+        verbatim(   ctx, ".fillText(", text, ",", x, ",", y, ")");
+    }
+    void drawPolygon(int[] xPoints, int[] yPoints){
+
+    }
+    void fillPolygon(int[] xPoints, int[] yPoints){
+
+    }
+    int addMouseListener(char[] event, void handler(MouseEvent e)){
+        verbatim(   ctx, ".addEventListener(", event, ",", handler, ")");
+    }
+    int width(){
+        return canvas.width;
+    }
+    int height(){
+        return canvas.height;
+    }
 }

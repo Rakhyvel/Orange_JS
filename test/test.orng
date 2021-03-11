@@ -1,11 +1,5 @@
-Mod1 {
-    int[] start(int i, int k) {
-        test(4, start);
-        return new int[](i, k);
-    }
-
-    void test(int i, int[] k(int i, int j)) {
-        int[] arr = k(4, 5);
-        arr[4] = 5;
+static Main {
+    void start() {
+        System:println("Hello, world!");
     }
 }

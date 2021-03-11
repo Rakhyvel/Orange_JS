@@ -1,5 +1,6 @@
 static System {
     void println(char[] msg){
+        verbatim("console.log(", msg, ")");
     }
 
     char[] input(char[] msg){

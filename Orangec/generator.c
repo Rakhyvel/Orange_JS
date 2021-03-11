@@ -29,10 +29,13 @@ static void generateAST(FILE*, int, struct astNode*);
 static void generateExpression(FILE*, struct astNode*);
 
 void generator_generate(FILE* out) {
+    fprintf(out, "/*\n\tGenerated with Orange compiler\n\tWritten and developed by Joseph Shimel\n\thttps://github.com/rakhyvel/Orange\n*/\n");
     struct list* structList = list_create();
     struct list* globalList = list_create();
     struct list* functionList = list_create();
+    struct symbolNode* start = NULL;
     constructLists(program, structList, globalList, functionList);
+
     struct listElem* elem = list_begin(structList);
     for(;elem != list_end(structList); elem = list_next(elem)) {
         generateStruct(out, elem->data);
@@ -46,7 +49,15 @@ void generator_generate(FILE* out) {
     elem = list_begin(functionList);
     for(;elem != list_end(functionList); elem = list_next(elem)) {
         generateFunction(out, elem->data);
+        if(!strcmp(((struct symbolNode*)elem->data)->name, "start")) {
+            start = elem->data;
+        }
         fprintf(out, "\n");
+    }
+
+    if(start != NULL) {
+        fprintb(out, start->id);
+        fprintf(out, "()\n");
     }
 }
 
@@ -196,7 +207,11 @@ static void generateExpression(FILE* out, struct astNode* node) {
         fprintf(out, "%f", *(float*)node->data);
         break;
     case AST_CHARLITERAL:
+        fprintf(out, "'%s'", (char*)node->data);
+        break;
     case AST_STRINGLITERAL:
+        fprintf(out, "\"%s\"", (char*)node->data);
+        break;
     case AST_TRUE:
     case AST_FALSE:
     case AST_NULL:
@@ -223,10 +238,14 @@ static void generateExpression(FILE* out, struct astNode* node) {
     case AST_LESSEREQUAL:
     case AST_IS:
     case AST_ISNT:
-    case AST_DOT:
         generateExpression(out, node->children->head.next->next->data);
         fprintf(out, "%s", (char*)node->data);
         generateExpression(out, node->children->head.next->data);
+        break;
+    case AST_DOT:
+        generateExpression(out, node->children->head.next->next->data);
+        fprintf(out, ".");
+        fprintf(out, "%s", (char*)((struct astNode*)node->children->head.next->data)->data);
         break;
     case AST_MODULEACCESS:
         generateExpression(out, node->children->head.next->data);
@@ -279,7 +298,7 @@ static void generateExpression(FILE* out, struct astNode* node) {
         for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
             struct astNode* child = (struct astNode*)elem->data;
             if(child->type == AST_STRINGLITERAL) {
-                fprintf(out, child->data);
+                fprintf(out, "%s", (char*)child->data);
             } else {
                 generateExpression(out, child);
             }

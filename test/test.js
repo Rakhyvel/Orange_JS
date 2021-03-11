@@ -1,36 +1,47 @@
-class _h {
+/*
+	Generated with Orange compiler
+	Written and developed by Joseph Shimel
+	https://github.com/rakhyvel/Orange
+*/
+class _6 {
+	constructor(width, height, next) {this.width=width;this.height=height;this.next=next;}
+}
+class _a {
 	constructor() {}
 }
-class _i {
+class _b {
 	constructor() {}
 }
-class _j {
+class _c {
 	constructor(x, y, w, h) {this.x=x;this.y=y;this.w=w;this.h=h;}
 }
-class _o {
+class _h {
 	constructor(x, y) {this.x=x;this.y=y;}
 }
-class _r {
+class _k {
 	constructor(a, r, g, b) {this.a=a;this.r=r;this.g=g;this.b=b;}
 }
-let _w;
-function _2(_3, _4){_7(4, _2);return new Array(_3, _4);}
-function _7(_8, _9){let _f=_9(4, 5);_f[4]=5;}
-function _x(_y){_w=document.getElementByID(_y);}
-function _11(){}
-function _14(_15){}
-function _18(_19, _1a){}
-function _1d(_1e){}
-function _1h(_1i, _1j, _1k, _1l){}
-function _1o(_1p, _1q, _1r, _1s){}
-function _1v(_1w, _1x, _1y, _1z){}
-function _22(_23, _24, _25){}
-function _28(_29, _2a, _2b){}
-function _2e(_2f, _2g){}
-function _2j(_2k, _2l){}
-function _2o(){}
-function _2r(){}
-function _2u(){}
-function _2x(){}
-function _31(_32){}
+class _p {
+	constructor(offsetX, offsetY) {this.offsetX=offsetX;this.offsetY=offsetY;}
+}
+let _s;
+let _t;
+function _2(){_31("Hello, world!");}
+function _u(_v){_s=document.getElementByID(_v);_t=_s.getContext('2d');}
+function _y(){}
+function _11(_12, _13, _14, _15){_t.fillStyle=rgba(_13,_14,_15,);_t.strokeStyle=rgba(_13,_14,_15,);}
+function _18(_19){_t.lineWidth=_19;}
+function _1c(_1d){_t.font=_1d;}
+function _1g(_1h, _1i, _1j, _1k){_t.beginPath();_t.moveTo(_1h,_1i);_t.lineTo(_1j,_1k);_t.stroke();}
+function _1n(_1o, _1p, _1q, _1r){_t.beginPath();_t.rect(_1o,_1p,_1q,_1r);_t.stroke();}
+function _1u(_1v, _1w, _1x, _1y){_t.fillRect(_1v,_1w,_1x,_1y);}
+function _21(_22, _23, _24){}
+function _27(_28, _29, _2a){_t.fillText(_28,_29,_2a);}
+function _2d(_2e, _2f){}
+function _2i(_2j, _2k){}
+function _2n(_2o, _2p){_t.addEventListener(_2o,_2p);}
+function _2u(){return _s.width;}
+function _2x(){return _s.height;}
+function _31(_32){console.log(_32);}
 function _35(_36){}
+_2()
