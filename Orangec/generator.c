@@ -236,8 +236,6 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
         generateExpression(out, node->children->head.next->data, external);
         break;
     case AST_MODULEACCESS:
-        generateExpression(out, node->children->head.next->next->data, 1);
-        fprintf(out, "_");
         generateExpression(out, node->children->head.next->data, 1);
         break;
     case AST_CALL: {
@@ -245,6 +243,7 @@ static void generateExpression(FILE* out, struct astNode* node, int external) {
             fprintf(out, "Array(");
         } else {
             struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope, node->filename, node->line);
+            fprintb(stdout, symbol->id);
             fprintb(out, symbol->id);
             fprintf(out, "(");
         }

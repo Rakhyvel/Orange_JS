@@ -158,6 +158,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         char* buf = itoa(symbolNode->id);
         strcat(symbolNode->type, "#");
         strcat(symbolNode->type, buf);
+        map_put(structMap, symbolNode->type, symbolNode);
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }

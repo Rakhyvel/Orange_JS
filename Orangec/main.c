@@ -53,6 +53,7 @@ int main(int argn, char** argv) {
     enum argState state = NORMAL;
     program = parser_createSymbolNode(SYMBOL_PROGRAM, NULL, NULL, -1);
     fileMap = map_create();
+    structMap = map_create();
 
     for(int i = 1; i < argn; i++) {
         switch(state) {

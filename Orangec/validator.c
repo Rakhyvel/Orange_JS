@@ -27,7 +27,8 @@ static int validateType(const char*, const struct symbolNode*, const char*, int)
 static void validateBinaryOp(struct list*, char*, char*);
 static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
-static char* validateStructField(char*, char*, struct symbolNode*, const char*, int);
+static char* validateStructField(char*, char*, const char*, int);
+static struct symbolNode* getStructFromAST(struct astNode*);
 static char* validateExpressionAST(struct astNode* node);
 static void removeArray(char*);
 static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
@@ -170,7 +171,7 @@ static void updateStruct(struct symbolNode* symbolNode) {
 */
 static int findTypeEnd(const char* type) {
     int i = 0;
-    while (type[i] != '\0' && type[i] != ' ' && type[i] != '#' && type[i] != '$') i++;
+    while (type[i] != '\0' && type[i] != ' ' && type[i] != '$') i++;
     return i;
 }
 
@@ -197,7 +198,7 @@ static int validateType(const char* type, const struct symbolNode* scope, const 
     strncpy(temp, type, end);
     // If the type isn't private, check to see if there is a struct defined with the name
     if(!isPrimitive(temp)) {
-        struct symbolNode* dataStruct = symbol_findSymbol(temp, scope, filename, line);
+        struct symbolNode* dataStruct = map_get(structMap, temp);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown type %s", type);
         }
@@ -231,11 +232,7 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         return typesMatch(expectedBase, actualBase, scope, filename, line);
     } else {
         // here type must be struct
-        int end = findTypeEnd(actual);
-        char temp[255];
-        memset(temp, 0, 254);
-        strncpy(temp, actual, end);
-        struct symbolNode* dataStruct = symbol_findSymbol(temp, scope, filename, line);
+        struct symbolNode* dataStruct = map_get(structMap, actual);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
@@ -491,7 +488,7 @@ char* validateExpressionAST(struct astNode* node) {
         if(strstr(type, " array") && !strcmp(rightAST->data, "length")) {
             strcpy(retval, "int");
         } else {
-            strcpy(retval, validateStructField(type, rightAST->data, node->scope, node->filename, node->line));
+            strcpy(retval, validateStructField(type, rightAST->data, node->filename, node->line));
         }
         return retval;
     }
@@ -642,8 +639,8 @@ static int validateArrayType(struct list* args, char* expected, struct symbolNod
 
 /*
     Checks to see if a struct contains a field, or if a super struct contains the field. */
-static char* validateStructField(char* structName, char* fieldName, struct symbolNode* scope, const char* filename, int line) {
-    struct symbolNode* dataStruct = symbol_findSymbol(structName, scope, filename, line);
+static char* validateStructField(char* structName, char* fieldName, const char* filename, int line) {
+    struct symbolNode* dataStruct = map_get(structMap, structName);
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
     }

@@ -2,13 +2,31 @@ Mod1 {
     struct Test(char d)
 
     void start() {
-        Mod1:Test t2 = new Test();
-    }
-
-    Mod2:Test lol() {
+        List:Linked tokenQueue = List:create();
     }
 }
 
-Mod2 {
-    struct Test(int i)
+List {
+    struct Node(Node next, Node prev)
+    struct Linked(Node head, Node tail)
+
+    Linked create() {
+        Node head = new Node();
+        Node tail = new Node();
+        head.next = tail;
+        tail.prev = head;
+        return new Linked(head, tail);
+    }
+
+    Node begin(Linked list) {
+        return list.head.next;
+    }
+
+    Node end(Linked list) {
+        return list.tail;
+    }
+
+    Node next(Node node) {
+        return node.next;
+    }
 }

@@ -22,6 +22,7 @@ struct file {
 
 struct symbolNode* program;
 struct map* fileMap;
+struct map* structMap;      // maps: struct#id -> symbolNode* struct
 
 void error(const char* filename, int line, const char* msg, ...);
 
