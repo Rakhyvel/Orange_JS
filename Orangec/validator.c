@@ -241,10 +241,13 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
     } else {
         // here type must be struct
         struct symbolNode* dataStruct = map_get(structMap, actual);
+        if(dataStruct == NULL) {
+            dataStruct = symbol_findSymbol(actual, scope);
+        }
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
-            return !strcmp(expected, actual);
+            return !strcmp(expected, dataStruct->type);
         }
     }
     return 1;
@@ -405,6 +408,7 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // Left/right type matching
         validateBinaryOp(node->children, left, right);
+        LOG("%s == %s", left, right);
         if(!typesMatch(left, right, node->scope, node->filename, node->line)) {
             error(node->filename, node->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", left, right);
         }
@@ -575,6 +579,10 @@ char* validateExpressionAST(struct astNode* node) {
     }
     case AST_FREE: {
         strcpy(retval, "None");
+        return retval;
+    }
+    case AST_VERBATIM: {
+        strcpy(retval, "Any");
         return retval;
     }
     default:

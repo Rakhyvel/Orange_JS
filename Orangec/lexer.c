@@ -36,6 +36,7 @@ static int nextToken(const char*, int);
 static int numIsFloat(const char*);
 static int nextNonWhitespace(const char*, int);
 static void copyToken(const char* src, char* dst, int start, int end);
+static void removeQuotes(char* str);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -158,6 +159,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_NEW;
         } else if(strcmp("free", tokenBuffer) == 0) {
             tempType = TOKEN_FREE;
+        } else if(strcmp("verbatim", tokenBuffer) == 0) {
+            tempType = TOKEN_VERBATIM;
         } else if(strcmp("true", tokenBuffer) == 0) {
             tempType = TOKEN_TRUE;
         } else if(strcmp("false", tokenBuffer) == 0) {
@@ -192,8 +195,10 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             }
         } else if(tokenBuffer[0] == '\''){
             tempType = TOKEN_CHARLITERAL;
+            removeQuotes(tokenBuffer);
         } else if(tokenBuffer[0] == '"'){
             tempType = TOKEN_STRINGLITERAL;
+            removeQuotes(tokenBuffer);
         } else {
             tempType = TOKEN_IDENTIFIER;
         }
@@ -331,6 +336,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:NEW";
     case TOKEN_FREE:
         return "token:FREE";
+    case TOKEN_VERBATIM:
+        return "token:VERBATIM";
     case TOKEN_MODULE:
         return "token:MODULE";
     case TOKEN_STRUCT:
@@ -499,4 +506,23 @@ static void copyToken(const char* src, char* dst, int start, int end) {
         dst[i] = src[i + start];
     }
     dst[i] = '\0';
+}
+
+static void removeQuotes(char* str) {
+    char temp[255];
+    memset(temp, 0, 255);
+    int i = 1;
+    int string = str[0] == '"';
+    if(string) {
+        while (str[i] != '"') {
+            temp[i - 1] = str[i];
+            i++;
+        }
+    } else {
+        while (str[i] != '\'') {
+            temp[i - 1] = str[i];
+            i++;
+        }
+    }
+    strcpy(str, temp);
 }

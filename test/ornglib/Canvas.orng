@@ -4,11 +4,10 @@ static Canvas {
     struct Rect(int x, int y, int w, int h)
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
+    Canvas c;
 
     void init(char[] id){
-        verbatim(id) {
-            
-        }
+        Canvas:c = cast(Canvas)verbatim("document.getElementByID(", id, ")");
     }
     void destroy(){}
     void setColor(Color color){}

@@ -267,7 +267,24 @@ static void generateExpression(FILE* out, struct astNode* node) {
         } else if(rightAST->type == AST_INDEX) {
             fprintf(out, "Array(%d)", *(int*)(((struct astNode*)rightAST->children->head.next->data)->data));
         }
-    }
+    }break;
+    case AST_CAST: {
+        struct listElem* elem;
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            generateExpression(out, (struct astNode*)elem->data);
+        }
+    } break;
+    case AST_VERBATIM: {
+        struct listElem* elem;
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            struct astNode* child = (struct astNode*)elem->data;
+            if(child->type == AST_STRINGLITERAL) {
+                fprintf(out, child->data);
+            } else {
+                generateExpression(out, child);
+            }
+        }
+    } break;
     case AST_FREE:
     default:
         break;

@@ -62,12 +62,16 @@ x add canvas module
 x width(), height()
 x mouseX, mouseY
 x symbols
+x add function pointer to blocks as well, replace (function, module) parameters in validator with blocks
+- verbatim
 - prerequisite: function references
     - keyboard input
     - requestAnimationFrame()
 - remove parser_symbolCreate from parser.c and put it into symbol.c
 - remove AST code from parser, add to new ast.c file
-x add function pointer to blocks as well, replace (function, module) parameters in validator with blocks
+- escape characters
 - add image drawing
 - enums
 - throw/catch (which just sets errno, but predictably)
+- clean up function order
+- clean up enum order

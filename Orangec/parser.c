@@ -37,6 +37,7 @@ static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON,
 static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType VERBATIM[] = {TOKEN_VERBATIM, TOKEN_LPAREN};
 static int num_ids = 0;
 
 // Private functions
@@ -245,6 +246,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
         retval = createAST(AST_BLOCK, topToken->filename, topToken->line, scope);
         retval->data = parser_createSymbolNode(SYMBOL_BLOCK, scope, topToken->filename, topToken->line);
+        ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
         strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
         strcpy(((struct symbolNode*)retval->data)->type, scope->type);
@@ -426,6 +428,8 @@ char* parser_astToString(enum astType type) {
         return "astType:NULL";
     case AST_CALL:
         return "astType.CALL";
+    case AST_VERBATIM:
+        return "astType.VERBATIM";
     case AST_VAR: 
         return "astType.VAR";
     case AST_STRINGLITERAL: 
@@ -569,6 +573,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbo
             stack_push(argStack, astNode);
             break;
         case TOKEN_CALL:
+        case TOKEN_VERBATIM:
             // Add args of call token (which are already ASTs) to new AST node's children
             for(elem = list_begin(token->list); elem != list_end(token->list); elem = list_next(elem)) {
                 queue_push(astNode->children, (struct astNode*)elem->data);
@@ -589,6 +594,7 @@ static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbo
             strncpy(charData, token->data, 254);
             astNode->data = charData;
             assertOperator(astNode->type, token->filename, token->line);
+            ASSERT(!list_isEmpty(argStack)); // if fails, can indicate token was not put onto argstack
             queue_push(astNode->children, stack_pop(argStack)); // Right
             if(astNode->type != AST_CAST && astNode->type != AST_NEW && astNode->type != AST_FREE) { // Don't do left side for unary operators
                 queue_push(astNode->children, stack_pop(argStack)); // Left
@@ -657,11 +663,32 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
 
     // Go through each token in given expression token queue, add/reject/parse to retval
     while(!list_isEmpty(tokenQueue)) {
+        // @fix unify call arg parsing and verbatim arg parsing
         // CALL
         if(matchTokens(tokenQueue, CALL, 2)) {
-            assertPeek(tokenQueue, TOKEN_IDENTIFIER);
             struct token* callName = ((struct token*)queue_pop(tokenQueue));
             struct token* call = lexer_createToken(TOKEN_CALL, callName->data, callName->filename, callName->line);
+            call->line = callName->line;
+            free(callName);
+
+            assertRemove(tokenQueue, TOKEN_LPAREN);
+            
+            // Go through each argument, create AST representing it
+            while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
+                struct astNode* argAST = createExpressionAST(tokenQueue, scope);
+                queue_push(call->list, argAST);
+
+                if(topMatches(tokenQueue, TOKEN_COMMA)) {
+                    free(queue_pop(tokenQueue));
+                }
+            }
+            assertRemove(tokenQueue, TOKEN_RPAREN);
+
+            queue_push(retval, call);
+        // VERBATIM
+        } else if(matchTokens(tokenQueue, VERBATIM, 2)) {
+            struct token* callName = ((struct token*)queue_pop(tokenQueue));
+            struct token* call = lexer_createToken(TOKEN_VERBATIM, callName->data, callName->filename, callName->line);
             call->line = callName->line;
             free(callName);
 
@@ -729,9 +756,11 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
     while(!list_isEmpty(tokenQueue)) {
         token = ((struct token*) queue_pop(tokenQueue));
         // VALUE
-        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_INTLITERAL  || token->type == TOKEN_REALLITERAL 
-            || token->type == TOKEN_CALL || token->type == TOKEN_CHARLITERAL
-            || token->type == TOKEN_STRINGLITERAL || token->type == TOKEN_FALSE || token->type == TOKEN_TRUE) {
+        if(token->type == TOKEN_IDENTIFIER || token->type == TOKEN_INTLITERAL  
+            || token->type == TOKEN_REALLITERAL || token->type == TOKEN_CALL 
+            || token->type == TOKEN_CHARLITERAL 
+            || token->type == TOKEN_STRINGLITERAL || token->type == TOKEN_FALSE
+            || token->type == TOKEN_TRUE || token->type == TOKEN_VERBATIM) {
             queue_push(retval, token);
         } 
         // OPEN PARENTHESIS
@@ -810,6 +839,8 @@ static enum astType tokenToAST(enum tokenType type) {
         return AST_VAR;
     case TOKEN_CALL:
         return AST_CALL;
+    case TOKEN_VERBATIM:
+        return AST_VERBATIM;
     case TOKEN_DOT:
         return AST_DOT;
     case TOKEN_INDEX:
