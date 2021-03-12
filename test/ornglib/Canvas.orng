@@ -1,7 +1,6 @@
 static Canvas {
     struct Canvas(int width, int height, Canvas next)
     struct Context()
-    struct Image()
     struct Rect(int x, int y, int w, int h)
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
@@ -39,8 +38,8 @@ static Canvas {
     void fillRect(int x, int y, int w, int h){
         verbatim(   ctx, ".fillRect(", x, ",", y, ",", w, ",", h, ")");
     }
-    void drawImage(Image image, int x, int y){
-        // @todo
+    void drawImage(Image:Image image, int x, int y){
+        verbatim(   ctx, ".drawImage(", image, ",", x, ",", y, ")");
     }
     void drawString(char[] text, int x, int y){
         verbatim(   ctx, ".fillText(", text, ",", x, ",", y, ")");
@@ -62,5 +61,16 @@ static Canvas {
     }
     void requestAnimationFrame(void callback(real timestep)) {
         verbatim(   "window.requestAnimationFrame(", callback, ")");
+    }
+}
+
+static Image {
+    struct Image(char[] src)
+
+    Image create(char[] src) {
+        Image retval = cast(Image)verbatim("new Image()");
+        verbatim(retval, ".onload=function(){}");
+        retval.src = src;
+        return retval;
     }
 }

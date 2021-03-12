@@ -67,10 +67,11 @@ x verbatim
 x prerequisite: function references
     x keyboard input
     x requestAnimationFrame()
-- escape characters
-- add image drawing
+x escape characters
+x add image drawing
 - enums
 - throw/catch (which just sets errno, but predictably)
+- add any and none type
 - remove parser_symbolCreate from parser.c and put it into symbol.c
 - remove AST code from parser, add to new ast.c file
 - clean up function order

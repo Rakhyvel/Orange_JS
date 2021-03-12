@@ -205,7 +205,7 @@ static int validateType(const char* type, const struct symbolNode* scope) {
     memset(temp, 0, 254);
     strncpy(temp, type, end);
     // If the type isn't private, check to see if there is a struct defined with the name
-    if(!isPrimitive(temp)) {
+    if(!isPrimitive(temp) && strcmp(temp, "Any")) {
         struct symbolNode* dataStruct = map_get(structMap, temp);
         if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
             return 0;
@@ -582,6 +582,10 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     }
     case AST_VERBATIM: {
+        struct listElem* elem;
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            validateAST((struct astNode*)elem->data);
+        }
         strcpy(retval, "Any");
         return retval;
     }

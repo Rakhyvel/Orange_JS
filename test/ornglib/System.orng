@@ -1,5 +1,5 @@
 static System {
-    void println(char[] msg){
+    void println(Any msg){
         verbatim("console.log(", msg, ")");
     }
 
