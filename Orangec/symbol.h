@@ -51,8 +51,8 @@ struct symbolNode {
     int line;
 };
 
-struct symbolNode* symbol_createSymbolNode(enum symbolType, struct symbolNode*, const char*, int);
-struct symbolNode* symbol_findExplicitSymbol(char*, char*, const struct symbolNode*, const char*, int);
-struct symbolNode* symbol_findSymbol(const char*, const struct symbolNode*);
+struct symbolNode* symbol_create(enum symbolType, struct symbolNode*, const char*, int);
+struct symbolNode* symbol_findExplicit(char*, char*, const struct symbolNode*, const char*, int);
+struct symbolNode* symbol_find(const char*, const struct symbolNode*);
 
 #endif

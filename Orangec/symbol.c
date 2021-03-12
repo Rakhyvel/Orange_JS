@@ -28,7 +28,7 @@ static int num_ids = 0;
 
 /*
     Allocates and initializes the program struct */
-struct symbolNode* symbol_createSymbolNode(enum symbolType symbolType, struct symbolNode* parent, const char* filename, int line) {
+struct symbolNode* symbol_create(enum symbolType symbolType, struct symbolNode* parent, const char* filename, int line) {
     struct symbolNode* retval = (struct symbolNode*)calloc(1, sizeof(struct symbolNode));
 
     retval->symbolType = symbolType;
@@ -46,17 +46,17 @@ struct symbolNode* symbol_createSymbolNode(enum symbolType symbolType, struct sy
     
     Will return NULL if no symbol with the name is found in any direct ancestor
     scopes. */
-struct symbolNode* symbol_findSymbol(const char* symbolName, const struct symbolNode* scope) {
+struct symbolNode* symbol_find(const char* symbolName, const struct symbolNode* scope) {
     struct symbolNode* symbol = map_get(scope->children, symbolName);
     if(symbol != NULL) {
         return symbol;
     } else if(scope->parent != NULL) {
-        return symbol_findSymbol(symbolName, scope->parent);
+        return symbol_find(symbolName, scope->parent);
     }
     return NULL;
 }
 
-struct symbolNode* symbol_findExplicitSymbol(char* moduleName, char* memberName, const struct symbolNode* scope, const char* filename, int line) {
+struct symbolNode* symbol_findExplicit(char* moduleName, char* memberName, const struct symbolNode* scope, const char* filename, int line) {
     struct symbolNode* module = map_get(program->children, moduleName);
     if(module == NULL) {
         error(filename, line, "Unknown module \"%s\"", moduleName);

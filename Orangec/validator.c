@@ -12,10 +12,10 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "./ast.h"
 #include "./main.h"
-#include "./validator.h"
-#include "./parser.h"
 #include "./symbol.h"
+#include "./validator.h"
 
 #include "../util/map.h"
 #include "../util/list.h"
@@ -106,7 +106,7 @@ void validator_validate(struct symbolNode* symbolNode) {
         }
     } break;
     case SYMBOL_EXTERN_VARIABLE: {
-        struct symbolNode* module = symbol_findSymbol(symbolNode->path, program);
+        struct symbolNode* module = symbol_find(symbolNode->path, program);
         // Valid type
         if(!validateType(symbolNode->type, symbolNode->parent)) {
             error(symbolNode->filename, symbolNode->line, "Unknown type %s", symbolNode->type);
@@ -156,14 +156,14 @@ static void updateType(char* type, struct symbolNode* scope) {
     memset(member, 0, 254);
     strncpy(mod, type, end);
     strcpy(member, type + end + 1);
-    struct symbolNode* symbol = symbol_findExplicitSymbol(mod, member, scope->parent, scope->filename, scope->line);
+    struct symbolNode* symbol = symbol_findExplicit(mod, member, scope->parent, scope->filename, scope->line);
     if(symbol != NULL && symbol->symbolType == SYMBOL_STRUCT) {
         strcpy(scope->type, symbol->type);
     }
 }
 
 static void updateStruct(struct symbolNode* symbolNode) {
-    struct symbolNode* symbol = symbol_findSymbol(symbolNode->type, symbolNode->parent);
+    struct symbolNode* symbol = symbol_find(symbolNode->type, symbolNode->parent);
     if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
         strcpy(symbolNode->type, symbol->type);
     }
@@ -243,7 +243,7 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         // here type must be struct
         struct symbolNode* dataStruct = map_get(structMap, actual);
         if(dataStruct == NULL) {
-            dataStruct = symbol_findSymbol(actual, scope);
+            dataStruct = symbol_find(actual, scope);
         }
         if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
@@ -261,7 +261,7 @@ static void validateAST(struct astNode* node) {
 
     struct listElem* elem;
     struct symbolNode* var;
-    LOG("Validating AST \"%s\" ", parser_astToString(node->type));
+    LOG("Validating AST \"%s\" ", ast_toString(node->type));
 
     switch(node->type) {
     case AST_BLOCK:
@@ -335,7 +335,7 @@ char* validateExpressionAST(struct astNode* node) {
     char left[255], right[255];
     char* retval = (char*)malloc(sizeof(char) * 255);
 
-    LOG("Validating expression \"%s\" ", parser_astToString(node->type));
+    LOG("Validating expression \"%s\" ", ast_toString(node->type));
     switch(node->type){
     // BASE CASES
     case AST_INTLITERAL:
@@ -358,7 +358,7 @@ char* validateExpressionAST(struct astNode* node) {
         strcpy(retval, "None");
         return retval;
     case AST_VAR: {
-        struct symbolNode* var = symbol_findSymbol(node->data, node->scope);
+        struct symbolNode* var = symbol_find(node->data, node->scope);
         if(var == NULL) {
             error(node->filename, node->line, "Unknown symbol %s", node->data);
         }
@@ -391,7 +391,7 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // Constant assignment validation- find variable associated with assignment
         if(leftAST->type == AST_VAR) {
-            var = symbol_findSymbol(leftAST->data, leftAST->scope);
+            var = symbol_find(leftAST->data, leftAST->scope);
             if(var == NULL) {
                 error(node->filename, node->line, "Unknown symbol %s", node->data);
             }
@@ -401,7 +401,7 @@ char* validateExpressionAST(struct astNode* node) {
             if(nameIdent->type != AST_VAR) {
                 error(node->filename, node->line, "Left side of assignment must be a location");
             }
-            var = symbol_findExplicitSymbol(moduleIdent->data, nameIdent->data, leftAST->scope, leftAST->filename, leftAST->line);
+            var = symbol_findExplicit(moduleIdent->data, nameIdent->data, leftAST->scope, leftAST->filename, leftAST->line);
         }
         // Indexing is not checked, you can change the contents of an array if it is constant
         if(var != NULL && var->isConstant) {
@@ -457,7 +457,7 @@ char* validateExpressionAST(struct astNode* node) {
             return retval;
         }
 
-        struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope);
+        struct symbolNode* symbol = symbol_find(node->data, node->scope);
         if(symbol == NULL) {
             error(node->filename, node->line, "Unknown symbol %s", node->data);
         // STRUCT INIT
@@ -541,7 +541,7 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Right side of module access operator must be varibale or function name");
         }
 
-        struct symbolNode* symbol = symbol_findExplicitSymbol(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
+        struct symbolNode* symbol = symbol_findExplicit(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
         if(symbol != NULL) {
             rightAST->scope = map_get(program->children, leftAST->data);
             if (rightAST->type == AST_CALL) { // Validate that the call is well formed
@@ -592,7 +592,7 @@ char* validateExpressionAST(struct astNode* node) {
         return retval;
     }
     default:
-        PANIC("AST \"%s\" validation is not implemented yet", parser_astToString(node->type));
+        PANIC("AST \"%s\" validation is not implemented yet", ast_toString(node->type));
     }
     return NULL;
 }
@@ -642,7 +642,7 @@ static int validateParamType(struct list* args, struct map* paramMap, struct sym
         }
         if(symbol->symbolType == SYMBOL_FUNCTIONPTR) {
             struct astNode* node = (struct astNode*)argElem->data;
-            struct symbolNode* fnptr = symbol_findSymbol(node->data, node->scope);
+            struct symbolNode* fnptr = symbol_find(node->data, node->scope);
             if(fnptr == NULL) {
                 LOG("Here");
             }

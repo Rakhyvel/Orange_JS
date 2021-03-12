@@ -13,8 +13,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "./ast.h"
 #include "./main.h"
-#include "./parser.h"
+#include "./symbol.h"
 
 #include "../util/debug.h"
 #include "../util/list.h"
@@ -175,7 +176,7 @@ static void generateFunction(FILE* out, struct symbolNode* function) {
 }
 
 static void generateAST(FILE* out, int tabs, struct astNode* node) {
-    LOG("Generate AST %s", parser_astToString(node->type));
+    LOG("Generate AST %s", ast_toString(node->type));
     if(node == NULL) return;
 
     switch(node->type) {
@@ -228,7 +229,7 @@ static void generateAST(FILE* out, int tabs, struct astNode* node) {
 }
 
 static void generateExpression(FILE* out, struct astNode* node) {
-    LOG("Generate expression %s", parser_astToString(node->type));
+    LOG("Generate expression %s", ast_toString(node->type));
 
     if(node == NULL) return;
     switch(node->type){
@@ -250,7 +251,7 @@ static void generateExpression(FILE* out, struct astNode* node) {
         fprintf(out, "%s", (char*)node->data);
         break;
     case AST_VAR: {
-        struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope);
+        struct symbolNode* symbol = symbol_find(node->data, node->scope);
         if(symbol == NULL) {
             fprintf(out, "%s", (char*)node->data);
         } else {
@@ -287,7 +288,7 @@ static void generateExpression(FILE* out, struct astNode* node) {
             fprintf(out, "Array(");
         } else {
             LOG("%s", (char*)node->data);
-            struct symbolNode* symbol = symbol_findSymbol(node->data, node->scope);
+            struct symbolNode* symbol = symbol_find(node->data, node->scope);
             if(symbol == NULL) {
                 symbol = map_get(structMap, node->data);
             }

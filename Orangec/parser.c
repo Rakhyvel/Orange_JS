@@ -16,6 +16,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "./ast.h"
 #include "./main.h"
 #include "./parser.h"
 #include "./lexer.h"
@@ -50,12 +51,10 @@ static int getTopLine(struct list*);
 static void expectType(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
 static void parseEnums(struct list*, struct symbolNode*);
-static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
 static struct list* simplifyTokens(struct list*, struct symbolNode*);
 static struct list* infixToPostfix(struct list*);
-static enum astType tokenToAST(enum tokenType);
 static void assertPeek(struct list*, enum tokenType);
 static void assertRemove(struct list*, enum tokenType);
 static void assertOperator(enum astType, const char*, int);
@@ -133,7 +132,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // MODULE
     else if(matchTokens(tokenQueue, MODULE, 2)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_MODULE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_MODULE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isStatic = isStatic;
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_LBRACE);
@@ -146,7 +145,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // STRUCT
     else if(matchTokens(tokenQueue, STRUCT, 3)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_STRUCT, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_STRUCT, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isStatic = 1;
         assertRemove(tokenQueue, TOKEN_STRUCT);
@@ -161,7 +160,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // ENUM
     else if(matchTokens(tokenQueue, ENUM, 3)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_ENUM, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_ENUM, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isStatic = 1;
         symbolNode->isConstant = 1;
@@ -177,7 +176,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // VARIABLE DEFINITION
     else if(matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -189,7 +188,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -200,7 +199,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     // PARAM DECLARATION
     } else if(matchTokens(tokenQueue, PARAM_DECLARE, 3) || matchTokens(tokenQueue, ENDPARAM_DECLARE, 3) ||
             matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 3) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -209,7 +208,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);    
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
-        symbolNode = symbol_createSymbolNode(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_create(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -224,7 +223,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
-            struct symbolNode* anon = symbol_createSymbolNode(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+            struct symbolNode* anon = symbol_create(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
             strcpy(anon->name, "_block_anon"); // put here so that parameter length cmp is easy
             map_put(symbolNode->children, anon->name, anon);
         }
@@ -247,8 +246,8 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
 
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-        retval = createAST(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        retval->data = symbol_createSymbolNode(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval->data = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
         strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
@@ -268,14 +267,14 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
              matchTokens(tokenQueue, ENUM, 3) || 
              matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
              matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        retval = createAST(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
         map_put(scope->children, symbolNode->name, symbolNode);
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
-        retval = createAST(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -296,7 +295,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // WHILE
     else if (topMatches(tokenQueue, TOKEN_WHILE)) {
-        retval = createAST(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -308,7 +307,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // RETURN
     else if (topMatches(tokenQueue, TOKEN_RETURN)) {
-        retval = createAST(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_RETURN);
         struct astNode* expression = createExpressionAST(tokenQueue, scope);
         queue_push(retval->children, expression);
@@ -321,135 +320,6 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
         retval = createExpressionAST(tokenQueue, scope);
     }
     return retval;
-}
-
-/*
-    If VERBOSE is defined, prints out a given Abstract Syntax Tree */
-void parser_printAST(struct astNode* node, int n) {
-    #ifndef VERBOSE
-    return;
-    #else
-    for(int i = 0; i < n; i++) printf("  "); // print spaces
-    LOG("%s", parser_astToString(node->type));
-    if(node->type == AST_SYMBOLDEFINE) {
-        for(int i = 0; i < n; i++) printf("  ");
-        LOG("%s %s =", ((struct symbolNode*)node->data)->type, (((struct symbolNode*)node->data)->name));
-        parser_printAST(((struct symbolNode*)node->data)->code, n+1);
-    } else if(node->type == AST_INTLITERAL) {
-        for(int i = 0; i < n; i++) printf("  "); 
-        printf("^-: "); // print spaces
-        int* data = (int*)(node->data);
-        LOG("%d", *data);
-    } else if(node->type == AST_REALLITERAL) {
-        for(int i = 0; i < n; i++) printf("  "); 
-        printf("^-: "); // print spaces
-        float* data = (float*)(node->data);
-        LOG("%f", *data);
-    } else if(node->type == AST_CHARLITERAL || node->type == AST_STRINGLITERAL) {
-        for(int i = 0; i < n; i++) printf("  "); 
-        printf("^-: "); // print spaces
-        LOG("%s", (char*)(node->data));
-    } else if(node->type == AST_VAR) {
-        for(int i = 0; i < n; i++) printf("  "); 
-        printf("^-: "); // print spaces
-        LOG("%s", (char*)node->data);
-    }
-
-    // Go through children of passed in AST node
-    struct listElem* elem = NULL;
-    for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-        if(elem->data == NULL) {
-            continue;
-        } else {
-            parser_printAST(((struct astNode*)elem->data), n+1);
-        }
-    }
-    #endif
-}
-
-
-/*
-    Converts an AST type to a string */
-char* parser_astToString(enum astType type) {
-    switch(type) {
-    case AST_BLOCK: 
-        return "astType:BLOCK";
-    case AST_SYMBOLDEFINE: 
-        return "astType.SYMBOLDEFINE";
-    case AST_IF: 
-        return "astType.IF";
-    case AST_IFELSE: 
-        return "astType.IFELSE";
-    case AST_WHILE: 
-        return "astType.WHILE";
-    case AST_RETURN: 
-        return "astType.RETURN";
-    case AST_ADD: 
-        return "astType:PLUS";
-    case AST_SUBTRACT: 
-        return "astType:MINUS";
-    case AST_MULTIPLY: 
-        return "astType:MULTIPLY";
-    case AST_DIVIDE: 
-        return "astType:DIVIDE";
-    case AST_AND: 
-        return "astType.AND";
-    case AST_OR: 
-        return "astType.OR";
-    case AST_CAST: 
-        return "astType.CAST";
-    case AST_NEW: 
-        return "astType.NEW";
-    case AST_FREE: 
-        return "astType.FREE";
-    case AST_GREATER: 
-        return "astType.GREATER";
-    case AST_LESSER: 
-        return "astType.LESSER";
-    case AST_GREATEREQUAL: 
-        return "astType.GREATEREQUAL";
-    case AST_LESSEREQUAL: 
-        return "astType.LESSEREQUAL";
-    case AST_IS:
-        return "astType.IS";
-    case AST_ISNT: 
-        return "astType.ISNT";
-    case AST_ASSIGN: 
-        return "astType:ASSIGN";
-    case AST_INDEX: 
-        return "astType.INDEX";
-    case AST_INTLITERAL: 
-        return "astType:INTLITERAL";
-    case AST_REALLITERAL: 
-        return "astType:REALLITERAL";
-    case AST_ARRAYLITERAL: 
-        return "astType:ARRAYLITERAL";
-    case AST_TRUE: 
-        return "astType:TRUE";
-    case AST_FALSE: 
-        return "astType:FALSE";
-    case AST_NULL: 
-        return "astType:NULL";
-    case AST_CALL:
-        return "astType.CALL";
-    case AST_VERBATIM:
-        return "astType.VERBATIM";
-    case AST_VAR: 
-        return "astType.VAR";
-    case AST_STRINGLITERAL: 
-        return "astType.STRINGLITERAL";
-    case AST_CHARLITERAL: 
-        return "astType.CHARLITERAL";
-    case AST_DOT: 
-        return "astType.DOT";
-    case AST_MODULEACCESS: 
-        return "astType.MODULEACCESS";
-    case AST_NOP:
-        return "astType:NOP";
-    }
-    printf("Unknown astType: %d\n", type);
-    NOT_REACHED();
-    return "";
 }
 
 static int topMatches(struct list* tokenQueue, enum tokenType type) {
@@ -522,7 +392,7 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
     // Parse enum names for enums
     while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
-        struct symbolNode* num = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        struct symbolNode* num = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         num->isConstant = 1;
         copyNextTokenString(tokenQueue, num->name);
         strcpy(num->type, parent->type);
@@ -555,18 +425,6 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
 }
 
 /*
-    Allocates and initializes an Abstract Syntax Tree node, with the proper type */
-static struct astNode* createAST(enum astType type, const char* filename, int line, struct symbolNode* scope) {
-    struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
-    retval->type = type;
-    retval->children = list_create();
-    retval->filename = filename;
-    retval->line = line;
-    retval->scope = scope;
-    return retval;
-}
-
-/*
     Given a token queue, extracts the front expression, parses it into an
     Abstract Syntax Tree. */
 static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbolNode* scope) {
@@ -585,11 +443,11 @@ static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbo
     while (!list_isEmpty(expression)) {
         struct listElem* elem = NULL;
         token = (struct token*)queue_pop(expression);
-        astNode = createAST(AST_NOP, token->filename, token->line, scope);
+        astNode = ast_create(AST_NOP, token->filename, token->line, scope);
         int* intData;
         float* realData;
         char* charData;
-        astNode->type = tokenToAST(token->type);
+        astNode->type = ast_tokenToAST(token->type);
 
         switch(token->type) {
         case TOKEN_INTLITERAL:
@@ -827,78 +685,6 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
 }
 
 /*
-    Used to convert between token types for operators, and ast types for 
-    operators. Must have a one-to-one mapping. TOKEN_LPAREN for example, 
-    does not have a one-to-one mapping with any AST type.
-    
-    Called by createExpression to convert operator tokens into ASTs */
-static enum astType tokenToAST(enum tokenType type) {
-    switch(type) {
-    case TOKEN_PLUS:
-        return AST_ADD;
-    case TOKEN_MINUS: 
-        return AST_SUBTRACT;
-    case TOKEN_STAR: 
-        return AST_MULTIPLY;
-    case TOKEN_SLASH: 
-        return AST_DIVIDE;
-    case TOKEN_EQUALS:
-        return AST_ASSIGN;
-	case TOKEN_IS: 
-        return AST_IS;
-    case TOKEN_ISNT: 
-        return AST_ISNT;
-    case TOKEN_GREATER: 
-        return AST_GREATER;
-    case TOKEN_LESSER:
-        return AST_LESSER;
-    case TOKEN_GREATEREQUAL: 
-        return AST_GREATEREQUAL;
-    case TOKEN_LESSEREQUAL:
-        return AST_LESSEREQUAL;
-	case TOKEN_AND: 
-        return AST_AND;
-    case TOKEN_OR:
-        return AST_OR;
-    case TOKEN_CAST:
-        return AST_CAST;
-    case TOKEN_NEW:
-        return AST_NEW;
-    case TOKEN_FREE:
-        return AST_FREE;
-    case TOKEN_IDENTIFIER:
-        return AST_VAR;
-    case TOKEN_CALL:
-        return AST_CALL;
-    case TOKEN_VERBATIM:
-        return AST_VERBATIM;
-    case TOKEN_DOT:
-        return AST_DOT;
-    case TOKEN_INDEX:
-        return AST_INDEX;
-    case TOKEN_COLON:
-        return AST_MODULEACCESS;
-    case TOKEN_INTLITERAL:
-        return AST_INTLITERAL;
-    case TOKEN_REALLITERAL:
-        return AST_REALLITERAL;
-    case TOKEN_CHARLITERAL:
-        return AST_CHARLITERAL;
-    case TOKEN_STRINGLITERAL:
-        return AST_STRINGLITERAL;
-    case TOKEN_TRUE:
-        return AST_FALSE;
-    case TOKEN_FALSE:
-        return AST_FALSE;
-    case TOKEN_NULL:
-        return AST_NULL;
-    default:
-        printf("Cannot directly convert %s to AST\n", lexer_tokenToString(type));
-        NOT_REACHED();
-    }
-}
-
-/*
     Verifies that the next token is what is expected. Errors otherwise */
 static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
@@ -946,6 +732,6 @@ static void assertOperator(enum astType type, const char* filename, int line) {
     case AST_MODULEACCESS:
         return;
     default:
-        error(filename, line, "Operator stack corrupted, %s was assumed to be operator", parser_astToString(type));
+        error(filename, line, "Operator stack corrupted, %s was assumed to be operator", ast_toString(type));
     }
 }
