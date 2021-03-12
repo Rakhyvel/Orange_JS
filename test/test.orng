@@ -1,5 +1,3 @@
 static Main {
-    void start() {
-        System:println("Hello, world!");
-    }
+    char[] test = "\"";
 }

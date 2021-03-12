@@ -11,13 +11,13 @@ static Canvas {
     Context ctx;
 
     void init(char[] id){
-        canvas = cast(Canvas)verbatim("document.getElementByID(", id, ")");
+        canvas = cast(Canvas)verbatim("document.getElementById(", id, ")");
         ctx = cast(Context)verbatim(canvas, ".getContext('2d')");
     }
     void destroy(){}
     void setColor(int a, int r, int g, int b){
-        verbatim(   ctx, ".fillStyle=rgba(", r, ",", g, ",", b, ",", a ")");
-        verbatim(   ctx, ".strokeStyle=rgba(", r, ",", g, ",", b, ",", a ")");
+        verbatim(   ctx, ".fillStyle='rgba('+", r, "+','+", g, "+','+", b, "+','+", a, "+')'");
+        verbatim(   ctx, ".strokeStyle='rgba('+", r, "+','+", g, "+','+", b, "+','+", a, "+')'");
     }
     void setStroke(int w){
         verbatim(   ctx, ".lineWidth=", w);
@@ -51,13 +51,16 @@ static Canvas {
     void fillPolygon(int[] xPoints, int[] yPoints){
 
     }
-    int addMouseListener(char[] event, void handler(MouseEvent e)){
-        verbatim(   ctx, ".addEventListener(", event, ",", handler, ")");
+    int addMouseListener(char[] event, void callback(MouseEvent e)){
+        verbatim(   ctx, ".addEventListener(", event, ",", callback, ")");
     }
     int width(){
         return canvas.width;
     }
     int height(){
         return canvas.height;
+    }
+    void requestAnimationFrame(void callback(real timestep)) {
+        verbatim(   "window.requestAnimationFrame(", callback, ")");
     }
 }

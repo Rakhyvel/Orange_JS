@@ -37,6 +37,7 @@ static int numIsFloat(const char*);
 static int nextNonWhitespace(const char*, int);
 static void copyToken(const char* src, char* dst, int start, int end);
 static void removeQuotes(char* str);
+static char getEscapedChar(char c);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -418,7 +419,7 @@ static int nextNonWhitespace(const char* file, int start) {
     Returns the index of the begining of the next token */
 static int nextToken(const char* file, int start) {
     enum tokenState {
-        BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING, PUNCTUATION
+        BEGIN, TEXT, INTEGER, FLOAT, CHAR, STRING, PUNCTUATION, ESC_CHAR, ESC_STR
     };
 
     enum tokenState state = BEGIN;
@@ -469,13 +470,23 @@ static int nextToken(const char* file, int start) {
                 return start;
             }
         } else if (state == CHAR) {
+            if(nextChar == '\\') {
+                state = ESC_CHAR;
+            }
             if(nextChar == '\''){
                 return start + 1;
             }
+        } else if (state == ESC_CHAR) {
+            state = CHAR;
         } else if (state == STRING) {
             if(nextChar == '"'){
                 return start + 1;
             }
+            if(nextChar == '\\') {
+                state = ESC_STR;
+            }
+        } else if (state == ESC_STR) {
+            state = STRING;
         } else if (state == PUNCTUATION) {
             if(nextChar == ']'){
                 return start + 1;
@@ -512,17 +523,16 @@ static void removeQuotes(char* str) {
     char temp[255];
     memset(temp, 0, 255);
     int i = 1;
-    int string = str[0] == '"';
-    if(string) {
-        while (str[i] != '"') {
+    char first = str[0];
+    int escaped = 0;
+
+    while (str[i] != first) {
+        if(str[i] == '\\') {
             temp[i - 1] = str[i];
             i++;
         }
-    } else {
-        while (str[i] != '\'') {
-            temp[i - 1] = str[i];
-            i++;
-        }
+        temp[i - 1] = str[i];
+        i++;
     }
     strcpy(str, temp);
 }

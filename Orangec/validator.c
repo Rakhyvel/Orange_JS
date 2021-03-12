@@ -635,7 +635,11 @@ static int validateParamType(struct list* args, struct map* paramMap, struct sym
             error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
         }
         if(symbol->symbolType == SYMBOL_FUNCTIONPTR) {
-            struct symbolNode* fnptr = symbol_findSymbol(((struct astNode*)argElem->data)->data, scope);
+            struct astNode* node = (struct astNode*)argElem->data;
+            struct symbolNode* fnptr = symbol_findSymbol(node->data, node->scope);
+            if(fnptr == NULL) {
+                LOG("Here");
+            }
             int err = validateFunctionTypesMatch(fnptr->children, symbol->children, scope, filename, line);
             if(err > 0){
                 error(filename, line, "Passed pointer to function with more arguments than expected");

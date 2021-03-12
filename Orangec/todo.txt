@@ -63,15 +63,16 @@ x width(), height()
 x mouseX, mouseY
 x symbols
 x add function pointer to blocks as well, replace (function, module) parameters in validator with blocks
-- verbatim
-- prerequisite: function references
-    - keyboard input
-    - requestAnimationFrame()
-- remove parser_symbolCreate from parser.c and put it into symbol.c
-- remove AST code from parser, add to new ast.c file
+x verbatim
+x prerequisite: function references
+    x keyboard input
+    x requestAnimationFrame()
 - escape characters
 - add image drawing
 - enums
 - throw/catch (which just sets errno, but predictably)
+- remove parser_symbolCreate from parser.c and put it into symbol.c
+- remove AST code from parser, add to new ast.c file
 - clean up function order
 - clean up enum order
+- vs code .orng file ext icon
