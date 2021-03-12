@@ -74,7 +74,7 @@ x enums
 x throw/catch (which just sets errno, but predictably)
 x remove parser_symbolCreate from parser.c and put it into symbol.c
 x remove AST code from parser, add to new ast.c file
-- remove Token code from lexer, add to new token.c file
+x remove Token code from lexer, add to new token.c file
 - clean up function order
 - clean up enum order
 - clean up includes

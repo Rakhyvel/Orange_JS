@@ -1,3 +1,12 @@
+/*  ast.c
+
+    An Abstract Syntax Tree is a way to represent the syntax and higher level
+    relationships in code.
+
+    Author: Joseph Shimel
+    Date: 3/12/21
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -169,7 +178,7 @@ enum astType ast_tokenToAST(enum tokenType type) {
     case TOKEN_NULL:
         return AST_NULL;
     default:
-        printf("Cannot directly convert %s to AST\n", lexer_tokenToString(type));
+        printf("Cannot directly convert %s to AST\n", token_toString(type));
         NOT_REACHED();
     }
 }

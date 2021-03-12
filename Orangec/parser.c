@@ -231,7 +231,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     } else if(topMatches(tokenQueue, TOKEN_EOF)){
         return NULL;
     } else {
-        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
+        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s", token_toString(((struct token*) queue_peek(tokenQueue))->type));
     }
     return symbolNode;
 }
@@ -537,7 +537,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
         if(depth < 0) {
             break;
         }
-        LOG("%s %s", lexer_tokenToString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
+        LOG("%s %s", token_toString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
         queue_push(retval, queue_pop(tokenQueue));
     }
     LOG("end Next Expression");
@@ -557,7 +557,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
         // CALL
         if(matchTokens(tokenQueue, CALL, 2)) {
             struct token* callName = ((struct token*)queue_pop(tokenQueue));
-            struct token* call = lexer_createToken(TOKEN_CALL, callName->data, callName->filename, callName->line);
+            struct token* call = token_create(TOKEN_CALL, callName->data, callName->filename, callName->line);
             call->line = callName->line;
             free(callName);
 
@@ -578,7 +578,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
         // VERBATIM
         } else if(matchTokens(tokenQueue, VERBATIM, 2)) {
             struct token* callName = ((struct token*)queue_pop(tokenQueue));
-            struct token* call = lexer_createToken(TOKEN_VERBATIM, callName->data, callName->filename, callName->line);
+            struct token* call = token_create(TOKEN_VERBATIM, callName->data, callName->filename, callName->line);
             call->line = callName->line;
             free(callName);
 
@@ -599,8 +599,8 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
         } 
         // INDEX
         else if(topMatches(tokenQueue, TOKEN_LSQUARE)) {
-            queue_push(retval, lexer_createToken(TOKEN_INDEX, "", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
-            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "(", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
+            queue_push(retval, token_create(TOKEN_INDEX, "", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
+            queue_push(retval, token_create(TOKEN_LPAREN, "(", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
             assertRemove(tokenQueue, TOKEN_LSQUARE);
 
             // extract expression for index, add to retval list, between anonymous parens
@@ -611,7 +611,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             }
 
             assertRemove(tokenQueue, TOKEN_RSQUARE);
-            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
+            queue_push(retval, token_create(TOKEN_RPAREN, ")", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
         }
         // CAST
         else if(topMatches(tokenQueue, TOKEN_CAST)) {
@@ -669,7 +669,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
         else {
             // Pop all operations from opstack until an operation of lower precedence is found
             while(!list_isEmpty(opStack) && 
-            lexer_getTokenPrecedence(token->type) <= lexer_getTokenPrecedence(((struct token*)stack_peek(opStack))->type)) {
+            token_precedence(token->type) <= token_precedence(((struct token*)stack_peek(opStack))->type)) {
                 queue_push(retval, stack_pop(opStack));
             }
             stack_push(opStack, token);
@@ -690,7 +690,7 @@ static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
     enum tokenType actual = topToken->type;
     if(actual != expected) {
-        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", lexer_tokenToString(actual), lexer_tokenToString(expected));
+        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", token_toString(actual), token_toString(expected));
     }
 }
 
@@ -703,7 +703,7 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
     if(actual == expected) {
         free(queue_pop(tokenQueue));
     } else {
-        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", lexer_tokenToString(actual), lexer_tokenToString(expected));
+        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", token_toString(actual), token_toString(expected));
     }
 }
 

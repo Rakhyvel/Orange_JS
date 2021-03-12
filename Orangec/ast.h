@@ -1,8 +1,13 @@
+/*
+    Author: Joseph Shimel
+    Date: 3/12/21
+*/
+
 #ifndef AST_H
 #define AST_H
 
-#include "./lexer.h"
 #include "./symbol.h"
+#include "./token.h"
 
 #include "../util/list.h"
 
