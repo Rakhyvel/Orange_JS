@@ -26,6 +26,7 @@
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType ENUM[] = {TOKEN_ENUM, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
 static const enum tokenType PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
 static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
@@ -44,8 +45,11 @@ static int num_ids = 0;
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static void copyNextTokenString(struct list*, char*);
+static const char* getTopFilename(struct list*);
+static int getTopLine(struct list*);
 static void expectType(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
+static void parseEnums(struct list*, struct symbolNode*);
 static struct astNode* createAST(enum astType, const char*, int, struct symbolNode*);
 static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
@@ -134,7 +138,6 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     int isConstant = topMatches(tokenQueue, TOKEN_CONST);
     if(isConstant) free(queue_pop(tokenQueue));
 
-    struct token* topToken = queue_peek(tokenQueue);
     // END OF MODULE, RETURN
     if(topMatches(tokenQueue, TOKEN_RBRACE)) {
         return NULL;
@@ -145,7 +148,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // MODULE
     else if(matchTokens(tokenQueue, MODULE, 2)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_MODULE, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_MODULE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isStatic = isStatic;
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_LBRACE);
@@ -158,7 +161,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // STRUCT
     else if(matchTokens(tokenQueue, STRUCT, 3)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_STRUCT, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_STRUCT, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isStatic = 1;
         assertRemove(tokenQueue, TOKEN_STRUCT);
@@ -171,9 +174,25 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }
+    // ENUM
+    else if(matchTokens(tokenQueue, ENUM, 3)) {
+        symbolNode = parser_createSymbolNode(SYMBOL_ENUM, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode->isPrivate = isPrivate;
+        symbolNode->isStatic = 1;
+        symbolNode->isConstant = 1;
+        assertRemove(tokenQueue, TOKEN_ENUM);
+        copyNextTokenString(tokenQueue, symbolNode->name);
+        strcpy(symbolNode->type, symbolNode->name);
+        char* buf = itoa(symbolNode->id);
+        strcat(symbolNode->type, "#");
+        strcat(symbolNode->type, buf);
+        map_put(structMap, symbolNode->type, symbolNode);
+        parseEnums(tokenQueue, symbolNode);
+        LOG("Enum %s created", symbolNode->name);
+    }
     // VARIABLE DEFINITION
     else if(matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -185,7 +204,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -196,7 +215,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     // PARAM DECLARATION
     } else if(matchTokens(tokenQueue, PARAM_DECLARE, 3) || matchTokens(tokenQueue, ENDPARAM_DECLARE, 3) ||
             matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 3) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -205,7 +224,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);    
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, topToken->filename, topToken->line);
+        symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -220,15 +239,15 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
-            struct symbolNode* anon = parser_createSymbolNode(SYMBOL_BLOCK, parent, topToken->filename, topToken->line);
-            strcpy(anon->name, "_block_anon");
+            struct symbolNode* anon = parser_createSymbolNode(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+            strcpy(anon->name, "_block_anon"); // put here so that parameter length cmp is easy
             map_put(symbolNode->children, anon->name, anon);
         }
         LOG("Function %s created", symbolNode->name);
     } else if(topMatches(tokenQueue, TOKEN_EOF)){
         return NULL;
     } else {
-        printf("%s\n", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
+        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s", lexer_tokenToString(((struct token*) queue_peek(tokenQueue))->type));
     }
     return symbolNode;
 }
@@ -240,12 +259,11 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     ASSERT(tokenQueue != NULL);
     ASSERT(scope != NULL);
     struct astNode* retval = NULL;
-    struct token* topToken = queue_peek(tokenQueue);
 
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-        retval = createAST(AST_BLOCK, topToken->filename, topToken->line, scope);
-        retval->data = parser_createSymbolNode(SYMBOL_BLOCK, scope, topToken->filename, topToken->line);
+        retval = createAST(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval->data = parser_createSymbolNode(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
         strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
@@ -262,16 +280,17 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
              matchTokens(tokenQueue, VARDEFINE, 3) || 
              matchTokens(tokenQueue, FUNCTION, 3) || 
              matchTokens(tokenQueue, STRUCT, 3) || 
+             matchTokens(tokenQueue, ENUM, 3) || 
              matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
              matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        retval = createAST(AST_SYMBOLDEFINE, topToken->filename, topToken->line, scope);
+        retval = createAST(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
         map_put(scope->children, symbolNode->name, symbolNode);
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
-        retval = createAST(AST_IF, topToken->filename, topToken->line, scope);
+        retval = createAST(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_IF);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -292,7 +311,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // WHILE
     else if (topMatches(tokenQueue, TOKEN_WHILE)) {
-        retval = createAST(AST_WHILE, topToken->filename, topToken->line, scope);
+        retval = createAST(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_WHILE);
         struct astNode* expression = parser_createAST(tokenQueue, scope);
         struct astNode* body = parser_createAST(tokenQueue, scope);
@@ -304,7 +323,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     }
     // RETURN
     else if (topMatches(tokenQueue, TOKEN_RETURN)) {
-        retval = createAST(AST_RETURN, topToken->filename, topToken->line, scope);
+        retval = createAST(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         assertRemove(tokenQueue, TOKEN_RETURN);
         struct astNode* expression = createExpressionAST(tokenQueue, scope);
         queue_push(retval->children, expression);
@@ -462,6 +481,14 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     free(nextToken);
 }
 
+static const char* getTopFilename(struct list* tokenQueue) {
+    return ((struct token*)queue_peek(tokenQueue))->filename;
+}
+
+static int getTopLine(struct list* tokenQueue) {
+    return ((struct token*)queue_peek(tokenQueue))->line;
+}
+
 /*
     Implementation from http://www.strudel.org.uk/itoa/ */
 char* itoa(int val) {
@@ -492,15 +519,35 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
     // Parse parameters of function
     while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
         struct symbolNode* param = parser_parseTokens(tokenQueue, parent);
-        struct token* topToken = queue_peek(tokenQueue);
         if(map_put(parent->children, param->name, param)) {
-            error(topToken->filename, topToken->line, "Parameter \"%s\" defined in more than one place", param->name);
+            error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Parameter \"%s\" defined in more than one place", param->name);
+        }
+    
+        if(topMatches(tokenQueue, TOKEN_COMMA)) {
+            free(queue_pop(tokenQueue));
+        } else if(!topMatches(tokenQueue, TOKEN_RPAREN)){
+            error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Bad syntax in parameters");
+        }
+        LOG("New arg: %s %s", param->type, param->name);
+    }
+    assertRemove(tokenQueue, TOKEN_RPAREN);
+}
+
+static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
+    assertRemove(tokenQueue, TOKEN_LPAREN);
+    // Parse enum names for enums
+    while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
+        struct symbolNode* num = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        num->isConstant = 1;
+        copyNextTokenString(tokenQueue, num->name);
+        strcpy(num->type, parent->type);
+        if(map_put(parent->children, num->name, num)) {
+            error(num->filename, num->line, "Enum \"%s\" defined in more than one place", num->name);
         }
     
         if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
         }
-        LOG("New arg: %s %s", param->type, param->name);
     }
     assertRemove(tokenQueue, TOKEN_RPAREN);
 }
@@ -709,9 +756,8 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
         } 
         // INDEX
         else if(topMatches(tokenQueue, TOKEN_LSQUARE)) {
-            struct token* topToken = queue_peek(tokenQueue);
-            queue_push(retval, lexer_createToken(TOKEN_INDEX, "", topToken->filename, topToken->line));
-            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "(", topToken->filename, topToken->line));
+            queue_push(retval, lexer_createToken(TOKEN_INDEX, "", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
+            queue_push(retval, lexer_createToken(TOKEN_LPAREN, "(", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
             assertRemove(tokenQueue, TOKEN_LSQUARE);
 
             // extract expression for index, add to retval list, between anonymous parens
@@ -722,7 +768,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             }
 
             assertRemove(tokenQueue, TOKEN_RSQUARE);
-            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")", topToken->filename, topToken->line));
+            queue_push(retval, lexer_createToken(TOKEN_RPAREN, ")", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
         }
         // CAST
         else if(topMatches(tokenQueue, TOKEN_CAST)) {

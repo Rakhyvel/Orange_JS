@@ -69,11 +69,12 @@ x prerequisite: function references
     x requestAnimationFrame()
 x escape characters
 x add image drawing
+x add any and none type
 - enums
 - throw/catch (which just sets errno, but predictably)
-- add any and none type
 - remove parser_symbolCreate from parser.c and put it into symbol.c
 - remove AST code from parser, add to new ast.c file
+- remove Token code from lexer, add to new token.c file
 - clean up function order
 - clean up enum order
 - vs code .orng file ext icon

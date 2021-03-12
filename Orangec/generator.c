@@ -20,8 +20,9 @@
 #include "../util/list.h"
 #include "../util/map.h"
 
-static void constructLists(struct symbolNode*, struct list*, struct list*, struct list*);
+static void constructLists(struct symbolNode*, struct list*, struct list*, struct list*, struct list*);
 static void fprintb(FILE*, int);
+static void generateEnum(FILE*, struct symbolNode*);
 static void generateStruct(FILE*, struct symbolNode*);
 static void generateGlobal(FILE*, struct symbolNode*);
 static void generateFunction(FILE*, struct symbolNode*);
@@ -30,13 +31,19 @@ static void generateExpression(FILE*, struct astNode*);
 
 void generator_generate(FILE* out) {
     fprintf(out, "/*\n\tGenerated with Orange compiler\n\tWritten and developed by Joseph Shimel\n\thttps://github.com/rakhyvel/Orange\n*/\n");
+    struct list* enumList = list_create();
     struct list* structList = list_create();
     struct list* globalList = list_create();
     struct list* functionList = list_create();
     struct symbolNode* start = NULL;
-    constructLists(program, structList, globalList, functionList);
+    constructLists(program, enumList, structList, globalList, functionList);
 
-    struct listElem* elem = list_begin(structList);
+    struct listElem* elem = list_begin(enumList);
+    for(;elem != list_end(enumList); elem = list_next(elem)) {
+        generateEnum(out, elem->data);
+        fprintf(out, "\n");
+    }
+    elem = list_begin(structList);
     for(;elem != list_end(structList); elem = list_next(elem)) {
         generateStruct(out, elem->data);
         fprintf(out, "\n");
@@ -61,7 +68,7 @@ void generator_generate(FILE* out) {
     }
 }
 
-static void constructLists(struct symbolNode* node, struct list* structList, struct list* globalList, struct list* functionList) {
+static void constructLists(struct symbolNode* node, struct list* enumList, struct list* structList, struct list* globalList, struct list* functionList) {
     struct listElem* elem = list_begin(node->children->keyList);
     for(;elem != list_end(node->children->keyList); elem = list_next(elem)) {
         struct symbolNode* child = (struct symbolNode*)map_get(node->children, (char*)elem->data);
@@ -69,13 +76,16 @@ static void constructLists(struct symbolNode* node, struct list* structList, str
         if(child->symbolType == SYMBOL_STRUCT) {
             queue_push(structList, child);
             LOG("%s", child->name);
+        } else if(child->symbolType == SYMBOL_ENUM) {
+            queue_push(enumList, child);
+            LOG("%s", child->name);
         } else if(child->symbolType == SYMBOL_VARIABLE && node->symbolType == SYMBOL_MODULE) {
             queue_push(globalList, child);
         } else if(child->symbolType == SYMBOL_FUNCTION && child->code != NULL) {
             queue_push(functionList, child);
             LOG("%s", child->name);
         }
-        constructLists(child, structList, globalList, functionList);
+        constructLists(child, enumList, structList, globalList, functionList);
     }
 }
 
@@ -83,6 +93,28 @@ static void fprintb(FILE* out, int num) {
     char* buf = itoa(num);
     fprintf(out, "_%s", buf);
     // free(buf);
+}
+
+/*
+_6 = {
+    WINTER: 0,
+    SPRING: 1,
+}
+*/
+static void generateEnum(FILE* out, struct symbolNode* num) {
+    LOG("Generate enum");
+    fprintb(out, num->id);
+    fprintf(out, "={");
+    int val = 0;
+    struct list* nums = num->children->keyList;
+    struct listElem* numElem;
+    for(numElem = list_begin(nums); numElem != list_end(nums); numElem = list_next(numElem)) {
+        fprintf(out, "%s:%d", (char*)numElem->data, val++);
+        if(numElem->next != list_end(nums)){
+            fprintf(out, ", ");
+        }
+    }
+    fprintf(out, "};");
 }
 
 static void generateStruct(FILE* out, struct symbolNode* dataStruct) {

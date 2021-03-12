@@ -37,7 +37,6 @@ static int numIsFloat(const char*);
 static int nextNonWhitespace(const char*, int);
 static void copyToken(const char* src, char* dst, int start, int end);
 static void removeQuotes(char* str);
-static char getEscapedChar(char c);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -172,6 +171,8 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_MODULE;
         } else if(strcmp("struct", tokenBuffer) == 0) {
             tempType = TOKEN_STRUCT;
+        } else if(strcmp("enum", tokenBuffer) == 0) {
+            tempType = TOKEN_ENUM;
         } else if(strcmp("return", tokenBuffer) == 0) {
             tempType = TOKEN_RETURN;
         } else if(strcmp("[]", tokenBuffer) == 0) {
@@ -343,6 +344,8 @@ char* lexer_tokenToString(enum tokenType type) {
         return "token:MODULE";
     case TOKEN_STRUCT:
         return "token:STRUCT";
+    case TOKEN_ENUM:
+        return "token:ENUM";
     case TOKEN_ARRAY:
         return "token:ARRAY";
     case TOKEN_STATIC:
@@ -524,7 +527,6 @@ static void removeQuotes(char* str) {
     memset(temp, 0, 255);
     int i = 1;
     char first = str[0];
-    int escaped = 0;
 
     while (str[i] != first) {
         if(str[i] == '\\') {

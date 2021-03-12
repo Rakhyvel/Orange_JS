@@ -4,14 +4,14 @@ static Main {
     int x = 0;
     int y = 0;
 
+
     void start() {
         orange = Image:create("http://josephs-projects.com/src/image1.jpeg");
         Canvas:init("canvas");
         Canvas:requestAnimationFrame(loop);
     }
 
-    void loop(real timestep) {
-        verbatim("", System:println("Hello, world!"),"");
+    void loop(real timestep) {        
         Canvas:drawImage(orange, x, y);
         Canvas:requestAnimationFrame(loop);
     }

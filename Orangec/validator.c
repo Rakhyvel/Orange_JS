@@ -135,6 +135,7 @@ void validator_validate(struct symbolNode* symbolNode) {
         // Valid AST
         validateAST(symbolNode->code);
     } break;
+    case SYMBOL_ENUM:
     case SYMBOL_STRUCT:
     case SYMBOL_BLOCK: {
         // All children must be valid
@@ -163,7 +164,7 @@ static void updateType(char* type, struct symbolNode* scope) {
 
 static void updateStruct(struct symbolNode* symbolNode) {
     struct symbolNode* symbol = symbol_findSymbol(symbolNode->type, symbolNode->parent);
-    if(symbol != NULL && symbol->symbolType == SYMBOL_STRUCT) {
+    if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
         strcpy(symbolNode->type, symbol->type);
     }
 }
@@ -207,7 +208,7 @@ static int validateType(const char* type, const struct symbolNode* scope) {
     // If the type isn't private, check to see if there is a struct defined with the name
     if(!isPrimitive(temp) && strcmp(temp, "Any")) {
         struct symbolNode* dataStruct = map_get(structMap, temp);
-        if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
+        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
             return 0;
         }
     }
@@ -244,7 +245,7 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         if(dataStruct == NULL) {
             dataStruct = symbol_findSymbol(actual, scope);
         }
-        if(dataStruct == NULL || dataStruct->symbolType != SYMBOL_STRUCT) {
+        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
             error(filename, line, "Unknown struct \"%s\" ", actual);
         } else {
             return !strcmp(expected, dataStruct->type);
@@ -561,7 +562,8 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Cannot cast %s to None", oldType);
         }
         if(strcmp(oldType, newType)) {
-            if(strcmp(oldType, "Any") && strcmp(newType, "Any")) {
+            struct symbolNode* symbol = map_get(structMap, oldType);
+            if((symbol == NULL && !strcmp(newType, "int")) && (strcmp(oldType, "Any") && strcmp(newType, "Any"))) {
                 error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
             }
         }
