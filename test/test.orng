@@ -4,14 +4,19 @@ static Main {
     int x = 0;
     int y = 0;
 
-
     void start() {
         orange = Image:create("http://josephs-projects.com/src/image1.jpeg");
         Canvas:init("canvas");
+        Canvas:addMouseListener("mousemove", mouseListener);
         Canvas:requestAnimationFrame(loop);
     }
 
-    void loop(real timestep) {        
+    void mouseListener(Canvas:MouseEvent e) {
+        x = e.offsetX;
+        y = e.offsetY;
+    }
+
+    void loop(real timestep) {      
         Canvas:drawImage(orange, x, y);
         Canvas:requestAnimationFrame(loop);
     }

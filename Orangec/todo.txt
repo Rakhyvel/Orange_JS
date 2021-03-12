@@ -70,11 +70,13 @@ x prerequisite: function references
 x escape characters
 x add image drawing
 x add any and none type
-- enums
-- throw/catch (which just sets errno, but predictably)
-- remove parser_symbolCreate from parser.c and put it into symbol.c
+x enums
+x throw/catch (which just sets errno, but predictably)
+x remove parser_symbolCreate from parser.c and put it into symbol.c
 - remove AST code from parser, add to new ast.c file
 - remove Token code from lexer, add to new token.c file
 - clean up function order
 - clean up enum order
+- comment! You're done!
+- port to Windows
 - vs code .orng file ext icon

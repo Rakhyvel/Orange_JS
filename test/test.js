@@ -3,56 +3,61 @@
 	Written and developed by Joseph Shimel
 	https://github.com/rakhyvel/Orange
 */
-_9={SPRING:0, WINTER:1, FALL:2, SUMMER:3};
-class _e {
-	constructor(season) {this.season=season;}
-}
-class _l {
+_36={NULL_POINTER:0};
+class _f {
 	constructor(width, height, next) {this.width=width;this.height=height;this.next=next;}
 }
-class _p {
+class _j {
 	constructor() {}
 }
-class _q {
+class _k {
 	constructor(x, y, w, h) {this.x=x;this.y=y;this.w=w;this.h=h;}
 }
-class _v {
+class _p {
 	constructor(x, y) {this.x=x;this.y=y;}
 }
-class _y {
+class _s {
 	constructor(a, r, g, b) {this.a=a;this.r=r;this.g=g;this.b=b;}
 }
-class _13 {
+class _x {
 	constructor(offsetX, offsetY) {this.offsetX=offsetX;this.offsetY=offsetY;}
 }
-class _3l {
+class _2z {
 	constructor(src) {this.src=src;}
+}
+class _39 {
+	constructor(next, prev, data) {this.next=next;this.prev=prev;this.data=data;}
+}
+class _3d {
+	constructor(head, tail, size) {this.head=head;this.tail=tail;this.size=size;}
 }
 let _2="Hello, world!";
 let _3;
 let _4=0;
 let _5=0;
-let _16;
-let _17;
-function _6(){_3=_3n("http://josephs-projects.com/src/image1.jpeg");_18("canvas");_3e(_g);}
-function _g(_h){_2f(_3, _4, _5);_3e(_g);}
-function _18(_19){_16=document.getElementById(_19);_17=_16.getContext('2d');}
-function _1c(){}
-function _1f(_1g, _1h, _1i, _1j){_17.fillStyle='rgba('+_1h+','+_1i+','+_1j+','+_1g+')';_17.strokeStyle='rgba('+_1h+','+_1i+','+_1j+','+_1g+')';}
-function _1m(_1n){_17.lineWidth=_1n;}
-function _1q(_1r){_17.font=_1r;}
-function _1u(_1v, _1w, _1x, _1y){_17.beginPath();_17.moveTo(_1v,_1w);_17.lineTo(_1x,_1y);_17.stroke();}
-function _21(_22, _23, _24, _25){_17.beginPath();_17.rect(_22,_23,_24,_25);_17.stroke();}
-function _28(_29, _2a, _2b, _2c){_17.fillRect(_29,_2a,_2b,_2c);}
-function _2f(_2g, _2h, _2i){_17.drawImage(_2g,_2h,_2i);}
-function _2l(_2m, _2n, _2o){_17.fillText(_2m,_2n,_2o);}
-function _2r(_2s, _2t){}
-function _2w(_2x, _2y){}
-function _31(_32, _33){_17.addEventListener(_32,_33);}
-function _38(){return _16.width;}
-function _3b(){return _16.height;}
-function _3e(_3f){window.requestAnimationFrame(_3f);}
-function _3n(_3o){let _3r=new Image();_3r.onload=function(){};_3r.src=_3o;return _3r;}
-function _3t(_3u){console.log(_3u);}
-function _3x(_3y){}
+let _10;
+let _11;
+function _6(){_3=_31("http://josephs-projects.com/src/image1.jpeg");_12("canvas");_2j("mousemove", _8);_2t(_b);}
+function _8(_9){_4=_9.offsetX;_5=_9.offsetY;}
+function _b(_c){_21(_3, _4, _5);_2t(_b);}
+function _12(_13){_10=document.getElementById(_13);_11=_10.getContext('2d');}
+function _15(){}
+function _17(_18, _19, _1a, _1b){_11.fillStyle='rgba('+_19+','+_1a+','+_1b+','+_18+')';_11.strokeStyle='rgba('+_19+','+_1a+','+_1b+','+_18+')';}
+function _1d(_1e){_11.lineWidth=_1e;}
+function _1g(_1h){_11.font=_1h;}
+function _1j(_1k, _1l, _1m, _1n){_11.beginPath();_11.moveTo(_1k,_1l);_11.lineTo(_1m,_1n);_11.stroke();}
+function _1p(_1q, _1r, _1s, _1t){_11.beginPath();_11.rect(_1q,_1r,_1s,_1t);_11.stroke();}
+function _1v(_1w, _1x, _1y, _1z){_11.fillRect(_1w,_1x,_1y,_1z);}
+function _21(_22, _23, _24){_11.drawImage(_22,_23,_24);}
+function _26(_27, _28, _29){_11.fillText(_27,_28,_29);}
+function _2b(_2c, _2d){}
+function _2f(_2g, _2h){}
+function _2j(_2k, _2l){_10.addEventListener(_2k,_2l);}
+function _2p(){return _10.width;}
+function _2r(){return _10.height;}
+function _2t(_2u){window.requestAnimationFrame(_2u);}
+function _31(_32){let _34=new Image();_34.onload=function(){};_34.src=_32;return _34;}
+function _3h(){}
+function _3k(_3l){console.log(_3l);}
+function _3n(_3o){}
 _6()

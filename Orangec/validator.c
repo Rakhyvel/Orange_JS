@@ -543,8 +543,8 @@ char* validateExpressionAST(struct astNode* node) {
 
         struct symbolNode* symbol = symbol_findExplicitSymbol(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
         if(symbol != NULL) {
+            rightAST->scope = map_get(program->children, leftAST->data);
             if (rightAST->type == AST_CALL) { // Validate that the call is well formed
-                rightAST->scope = map_get(program->children, leftAST->data);
                 validateExpressionAST(rightAST);
             }
             return symbol->type;

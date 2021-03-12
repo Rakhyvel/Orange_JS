@@ -61,21 +61,6 @@ static void assertRemove(struct list*, enum tokenType);
 static void assertOperator(enum astType, const char*, int);
 
 /*
-    Allocates and initializes the program struct */
-struct symbolNode* parser_createSymbolNode(enum symbolType symbolType, struct symbolNode* parent, const char* filename, int line) {
-    struct symbolNode* retval = (struct symbolNode*)calloc(1, sizeof(struct symbolNode));
-
-    retval->symbolType = symbolType;
-    retval->parent = parent;
-    retval->children = map_create();
-    retval->filename = filename;
-    retval->line = line;
-    retval->id = num_ids++;
-
-    return retval;
-}
-
-/*
     Removes tokens from a list that are surrounded by comments */
 void parser_removeComments(struct list* tokenQueue) {
     struct listElem* elem;
@@ -148,7 +133,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // MODULE
     else if(matchTokens(tokenQueue, MODULE, 2)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_MODULE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_MODULE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isStatic = isStatic;
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_LBRACE);
@@ -161,7 +146,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // STRUCT
     else if(matchTokens(tokenQueue, STRUCT, 3)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_STRUCT, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_STRUCT, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isStatic = 1;
         assertRemove(tokenQueue, TOKEN_STRUCT);
@@ -176,7 +161,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // ENUM
     else if(matchTokens(tokenQueue, ENUM, 3)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_ENUM, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_ENUM, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isStatic = 1;
         symbolNode->isConstant = 1;
@@ -192,7 +177,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     }
     // VARIABLE DEFINITION
     else if(matchTokens(tokenQueue, VARDEFINE, 3) || matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -204,7 +189,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -215,7 +200,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     // PARAM DECLARATION
     } else if(matchTokens(tokenQueue, PARAM_DECLARE, 3) || matchTokens(tokenQueue, ENDPARAM_DECLARE, 3) ||
             matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 3) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
@@ -224,7 +209,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         LOG("Variable %s created", symbolNode->name);    
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
-        symbolNode = parser_createSymbolNode(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        symbolNode = symbol_createSymbolNode(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
@@ -239,7 +224,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             symbolNode->code = parser_createAST(tokenQueue, symbolNode);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
-            struct symbolNode* anon = parser_createSymbolNode(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+            struct symbolNode* anon = symbol_createSymbolNode(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
             strcpy(anon->name, "_block_anon"); // put here so that parameter length cmp is easy
             map_put(symbolNode->children, anon->name, anon);
         }
@@ -263,7 +248,7 @@ struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* sco
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
         retval = createAST(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        retval->data = parser_createSymbolNode(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        retval->data = symbol_createSymbolNode(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
         strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
@@ -537,7 +522,7 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
     // Parse enum names for enums
     while(!topMatches(tokenQueue, TOKEN_RPAREN)) {
-        struct symbolNode* num = parser_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        struct symbolNode* num = symbol_createSymbolNode(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         num->isConstant = 1;
         copyNextTokenString(tokenQueue, num->name);
         strcpy(num->type, parent->type);

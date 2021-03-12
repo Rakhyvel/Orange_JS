@@ -24,6 +24,23 @@
 #include "../util/list.h"
 #include "../util/debug.h"
 
+static int num_ids = 0;
+
+/*
+    Allocates and initializes the program struct */
+struct symbolNode* symbol_createSymbolNode(enum symbolType symbolType, struct symbolNode* parent, const char* filename, int line) {
+    struct symbolNode* retval = (struct symbolNode*)calloc(1, sizeof(struct symbolNode));
+
+    retval->symbolType = symbolType;
+    retval->parent = parent;
+    retval->children = map_create();
+    retval->filename = filename;
+    retval->line = line;
+    retval->id = num_ids++;
+
+    return retval;
+}
+
 /*
     Returns the symbol with the given name relative to a given starting scope.
     

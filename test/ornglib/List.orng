@@ -1,0 +1,8 @@
+List {
+    struct ListElem(ListElem next, ListElem prev, Any data)
+    struct List(ListElem head, ListElem tail, int size)
+
+    void insert() {
+        
+    }
+}

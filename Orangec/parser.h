@@ -50,9 +50,6 @@ struct astNode {
 	int line;
 };
 
-// Init functions
-struct symbolNode* parser_createSymbolNode(enum symbolType, struct symbolNode*, const char*, int);
-
 // Pre-processing
 void parser_removeComments(struct list*);
 void parser_condenseArrayIdentifiers(struct list*);

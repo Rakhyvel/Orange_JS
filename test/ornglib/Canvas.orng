@@ -51,7 +51,7 @@ static Canvas {
 
     }
     int addMouseListener(char[] event, void callback(MouseEvent e)){
-        verbatim(   ctx, ".addEventListener(", event, ",", callback, ")");
+        verbatim(   canvas, ".addEventListener(", event, ",", callback, ")");
     }
     int width(){
         return canvas.width;
