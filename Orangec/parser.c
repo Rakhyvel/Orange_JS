@@ -257,6 +257,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
 /*
     Returns whether or not the top of the tokenQueue has the specified type. */
 static bool topMatches(struct list* tokenQueue, enum tokenType type) {
+    ASSERT(!list_isEmpty(tokenQueue));
     return ((struct token*)queue_peek(tokenQueue))->type == type;
 }
 
@@ -280,12 +281,14 @@ static bool matchTokens(struct list* tokenQueue, const enum tokenType sig[], int
 /*
     Returns the filename of token at the front of the tokenQueue */
 static const char* getTopFilename(struct list* tokenQueue) {
+    ASSERT(!list_isEmpty(tokenQueue));
     return ((struct token*)queue_peek(tokenQueue))->filename;
 }
 
 /*
     Returns the line number of the token at the front of the tokenQueue */
 static int getTopLine(struct list* tokenQueue) {
+    ASSERT(!list_isEmpty(tokenQueue));
     return ((struct token*)queue_peek(tokenQueue))->line;
 }
 
@@ -525,10 +528,10 @@ static struct astNode* parseExpression(struct list* tokenQueue, struct symbolNod
             stack_push(argStack, astNode);
             break;
         default: // Assume operator
+            assertOperator(astNode->type, token->filename, token->line);
             charData = (char*)malloc(sizeof(char) * 255);
             strncpy(charData, token->data, 254);
             astNode->data = charData;
-            assertOperator(astNode->type, token->filename, token->line);
             ASSERT(!list_isEmpty(argStack)); // if fails, can indicate token was not put onto argstack
             queue_push(astNode->children, stack_pop(argStack)); // Right
             if(astNode->type != AST_CAST && astNode->type != AST_NEW && astNode->type != AST_FREE) { // Don't do left side for unary operators
@@ -556,6 +559,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
 
     // Go through tokens, pick out the first expression. Stop when state determines expression is over
     while(!list_isEmpty(tokenQueue)) {
+        ASSERT(!list_isEmpty(tokenQueue));
         nextType = ((struct token*)queue_peek(tokenQueue))->type;
         if(nextType == TOKEN_LPAREN || nextType == TOKEN_LSQUARE) {
             depth++;
@@ -582,6 +586,7 @@ static struct list* nextExpression(struct list* tokenQueue) {
         if(depth < 0) {
             break;
         }
+        ASSERT(!list_isEmpty(tokenQueue));
         LOG("%s %s", token_toString(nextType), ((struct token*)queue_peek(tokenQueue))->data);
         queue_push(retval, queue_pop(tokenQueue));
     }
@@ -653,6 +658,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
         } 
         // INDEX
         else if(topMatches(tokenQueue, TOKEN_LSQUARE)) {
+        ASSERT(!list_isEmpty(tokenQueue));
             queue_push(retval, token_create(TOKEN_INDEX, "", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
             queue_push(retval, token_create(TOKEN_LPAREN, "(", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
             assertRemove(tokenQueue, TOKEN_LSQUARE);
@@ -664,8 +670,10 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
                 queue_push(retval, elem->data);
             }
 
-            assertRemove(tokenQueue, TOKEN_RSQUARE);
-            queue_push(retval, token_create(TOKEN_RPAREN, ")", getTopFilename(tokenQueue), getTopLine(tokenQueue)));
+            assertPeek(tokenQueue, TOKEN_RSQUARE);
+            struct token* rsquare = queue_pop(tokenQueue); // don't use topFilename/topLine here, expression could be empty, would crash
+            queue_push(retval, token_create(TOKEN_RPAREN, ")", rsquare->filename, rsquare->line));
+            free(rsquare);
         }
         // CAST
         else if(topMatches(tokenQueue, TOKEN_CAST)) {
@@ -751,6 +759,7 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
     Verifies that the next token is what is expected, and removes it. Errors
     otherwise */
 static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
+    ASSERT(!list_isEmpty(tokenQueue));
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
     enum tokenType actual = topToken->type;
     if(actual == expected) {
@@ -763,6 +772,7 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
 /*
     Verifies that the next token is what is expected. Errors otherwise */
 static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
+    ASSERT(!list_isEmpty(tokenQueue));
     struct token* topToken = (struct token*) queue_peek(tokenQueue);
     enum tokenType actual = topToken->type;
     if(actual != expected) {

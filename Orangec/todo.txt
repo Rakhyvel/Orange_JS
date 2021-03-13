@@ -82,6 +82,6 @@ x finish commenting
 x change int returns to bool where appropriate
 x error checking for map_put(duplicates) and map_get(null)
 x error checking for ifs with no elses
-- fix @fix's
+x fix @fix's
 - port to Windows
 - vs code .orng file ext icon

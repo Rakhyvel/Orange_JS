@@ -19,11 +19,7 @@ static Main {
     void loop(real timestep) {      
         Canvas:drawImage(orange, x, y);
         Canvas:requestAnimationFrame(loop);
-        // int[] i = new int[4]; @fix me!
-        Lang:Error err;
-    }
-
-    Lang:Error getError() {
+        int[] i = new int[4];
         Lang:Error err;
     }
 }
