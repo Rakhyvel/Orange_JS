@@ -79,7 +79,7 @@ x clean up function order
 x clean up enum order
 x clean up includes
 x finish commenting
-- change int returns to bool where appropriate
+x change int returns to bool where appropriate
 - error checking for map_put(duplicates) and map_get(null)
 - memory management
 - fix @fix's

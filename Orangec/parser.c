@@ -12,6 +12,7 @@
     Date: 2/3/21 
 */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,8 +42,8 @@ static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TO
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VERBATIM[] = {TOKEN_VERBATIM, TOKEN_LPAREN};
 
-static int topMatches(struct list*, enum tokenType);
-static int matchTokens(struct list*, const enum tokenType[], int);
+static bool topMatches(struct list*, enum tokenType);
+static bool matchTokens(struct list*, const enum tokenType[], int);
 static const char* getTopFilename(struct list*);
 static int getTopLine(struct list*);
 static void copyNextTokenString(struct list*, char*);
@@ -253,7 +254,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
 
 /*
     Returns whether or not the top of the tokenQueue has the specified type. */
-static int topMatches(struct list* tokenQueue, enum tokenType type) {
+static bool topMatches(struct list* tokenQueue, enum tokenType type) {
     return ((struct token*)queue_peek(tokenQueue))->type == type;
 }
 
@@ -262,13 +263,13 @@ static int topMatches(struct list* tokenQueue, enum tokenType type) {
     tokenQueue.
     
     Does NOT overrun off edge of tokenQueue, instead returns false. */
-static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
+static bool matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
     int i = 0;
     struct listElem* elem;
     for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue) && i < nTokens; elem = list_next(elem), i++) {
         struct token* token = (struct token*) (elem->data);
         if(token->type != sig[i]) {
-            return 0;
+            return false;
         }
     }
     return i == nTokens;

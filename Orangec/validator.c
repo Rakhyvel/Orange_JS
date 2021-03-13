@@ -7,7 +7,8 @@
     Date: 2/19/21
 */
 
-#include <stdio.h>
+#include <stdbool.h>
+#include <stdio.h>s
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,12 +26,12 @@ static void validateAST(struct astNode*);
 static char* validateExpressionAST(struct astNode*);
 static void validateBinaryOp(struct list*, char*, char*);
 static int findTypeEnd(const char*);
-static int isPrimitive(const char*);
+static bool isPrimitive(const char*);
 static void removeArray(char*);
-static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
-static int validateType(const char*, const struct symbolNode*);
+static bool typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
+static bool validateType(const char*, const struct symbolNode*);
 static int validateFunctionTypesMatch(struct map*, struct map*, struct symbolNode*, const char*, int);
-static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
+static bool validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
 
@@ -568,14 +569,14 @@ static int findTypeEnd(const char* type) {
 
 /*
     Checks to see if a type is a primitive, built in type*/
-static int isPrimitive(const char* type) {
+static bool isPrimitive(const char* type) {
     if(!strcmp(type,  "int") || !strcmp(type, "char") ||
         !strcmp(type, "boolean") || !strcmp(type, "void") || 
         !strcmp(type, "real") || !strcmp(type, "byte") || 
         !strcmp(type, "struct")) {
-        return 1;
+        return true;
     } else {
-        return 0;
+        return false;
     }
 }
 
@@ -598,18 +599,18 @@ static void removeArray(char* str) {
     
     USE THIS FUNCTION for comapring two unknown types. Use strcmp ONLY if the 
     expected type is fixed and known. */
-static int typesMatch(const char* expected, const char* actual, const struct symbolNode* scope, const char* filename, int line) {
+static bool typesMatch(const char* expected, const char* actual, const struct symbolNode* scope, const char* filename, int line) {
     if(isPrimitive(expected) || isPrimitive(actual)) {
         return !strcmp(expected, actual);
     } else if (!isPrimitive(expected) && !strcmp(actual, "None")) {
-        return 1;
+        return true;
     } else if (!strcmp(expected, "Any") && !isPrimitive(actual)) {
-        return 1;
+        return true;
     } else if(strstr(expected, " array")){
         char expectedBase[255];
         char actualBase[255];
         if(strcmp(expected, actual)){
-            return 0;
+            return false;
         }
         strcpy(expectedBase, expected);
         strcpy(actualBase, actual);
@@ -628,12 +629,12 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
             return !strcmp(expected, dataStruct->type);
         }
     }
-    return 1;
+    return true;
 }
 
 /*
     Checks to see if a given type, for a given scope, is valid */
-static int validateType(const char* type, const struct symbolNode* scope) {
+static bool validateType(const char* type, const struct symbolNode* scope) {
     // Check primitives
     int end = findTypeEnd(type);
     char temp[255];
@@ -643,10 +644,10 @@ static int validateType(const char* type, const struct symbolNode* scope) {
     if(!isPrimitive(temp) && strcmp(temp, "Any")) {
         struct symbolNode* dataStruct = map_get(typeMap, temp);
         if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
-            return 0;
+            return false;
         }
     }
-    return 1;
+    return true;
 }
 
 /*
@@ -684,7 +685,7 @@ static int validateFunctionTypesMatch(struct map* paramMap1, struct map* paramMa
 
 /*
     Validates that all types in an array literal are the expected type */
-static int validateArrayType(struct list* args, char* expected, struct symbolNode* scope, const char* filename, int line) {
+static bool validateArrayType(struct list* args, char* expected, struct symbolNode* scope, const char* filename, int line) {
     struct listElem* argElem;
     for(argElem = list_begin(args); argElem != list_end(args); argElem = list_next(argElem)) {
         char* argType = validateExpressionAST((struct astNode*)argElem->data);
@@ -692,7 +693,7 @@ static int validateArrayType(struct list* args, char* expected, struct symbolNod
             error(filename, line, "Value type mismatch when creating array. Expected \"%s\" type, actual type was \"%s\" ", argType, expected);
         }
     }
-    return 1;
+    return true;
 }
 
 /*

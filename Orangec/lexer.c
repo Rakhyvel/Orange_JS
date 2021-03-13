@@ -32,7 +32,7 @@ static const char punctuationChars[] = {'<', '>', '=', '[', ']', '&', '|', '!', 
 // Private functions
 static int nextToken(const char*, int);
 static void copyToken(const char* src, char* dst, int start, int end);
-static int numIsFloat(const char*);
+static bool numIsFloat(const char*);
 static void removeQuotes(char* str);
 static int nextNonWhitespace(const char*, int);
 static bool charIsToken(char);
@@ -318,13 +318,13 @@ static void copyToken(const char* src, char* dst, int start, int end) {
 
 /*
     Determines if a given string is a float */
-static int numIsFloat(const char* test) {
+static bool numIsFloat(const char* test) {
     for(int i = 0; test[i] != '\0'; i++) {
         if(test[i] == '.') {
-            return 1;
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
 /*
