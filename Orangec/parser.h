@@ -7,9 +7,6 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include <stdbool.h>
-
-#include "./main.h"
 #include "./symbol.h"
 
 #include "../util/list.h"

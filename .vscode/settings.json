@@ -13,6 +13,8 @@
         "system_error": "c",
         "validator.h": "c",
         "map.h": "c",
-        "token.h": "c"
+        "token.h": "c",
+        "lexer.h": "c",
+        "parser.h": "c"
     }
 }

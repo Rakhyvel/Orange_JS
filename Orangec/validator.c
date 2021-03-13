@@ -9,12 +9,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 
 #include "./ast.h"
 #include "./main.h"
-#include "./symbol.h"
 #include "./validator.h"
 
 #include "../util/map.h"
@@ -424,7 +422,7 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Cannot cast %s to None", oldType);
         }
         if(strcmp(oldType, newType)) {
-            struct symbolNode* symbol = map_get(structMap, oldType);
+            struct symbolNode* symbol = map_get(typeMap, oldType);
             if((symbol == NULL && !strcmp(newType, "int")) && (strcmp(oldType, "Any") && strcmp(newType, "Any"))) {
                 error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
             }
@@ -587,7 +585,7 @@ static int typesMatch(const char* expected, const char* actual, const struct sym
         return typesMatch(expectedBase, actualBase, scope, filename, line);
     } else {
         // here type must be struct
-        struct symbolNode* dataStruct = map_get(structMap, actual);
+        struct symbolNode* dataStruct = map_get(typeMap, actual);
         if(dataStruct == NULL) {
             dataStruct = symbol_find(actual, scope);
         }
@@ -610,7 +608,7 @@ static int validateType(const char* type, const struct symbolNode* scope) {
     strncpy(temp, type, end);
     // If the type isn't private, check to see if there is a struct defined with the name
     if(!isPrimitive(temp) && strcmp(temp, "Any")) {
-        struct symbolNode* dataStruct = map_get(structMap, temp);
+        struct symbolNode* dataStruct = map_get(typeMap, temp);
         if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
             return 0;
         }
@@ -705,7 +703,7 @@ static int validateParamType(struct list* args, struct map* paramMap, struct sym
 /*
     Checks to see if a struct contains a field, or if a super struct contains the field. */
 static char* validateStructField(char* structName, char* fieldName, const char* filename, int line) {
-    struct symbolNode* dataStruct = map_get(structMap, structName);
+    struct symbolNode* dataStruct = map_get(typeMap, structName);
     if(dataStruct == NULL) {
         error(filename, line, "Unknown struct \"%s\" ", structName);
     }

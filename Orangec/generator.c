@@ -9,11 +9,11 @@
     Date: 3/6/21
 */
 
-#include "./generator.h"
 #include <stdlib.h>
 #include <string.h>
 
 #include "./ast.h"
+#include "./generator.h"
 #include "./main.h"
 #include "./symbol.h"
 
@@ -265,7 +265,7 @@ static void generateExpression(FILE* out, struct astNode* node) {
             LOG("%s", (char*)node->data);
             struct symbolNode* symbol = symbol_find(node->data, node->scope);
             if(symbol == NULL) {
-                symbol = map_get(structMap, node->data);
+                symbol = map_get(typeMap, node->data);
             }
             fprintb(out, symbol->id);
             fprintf(out, "(");

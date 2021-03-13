@@ -13,16 +13,15 @@
     Date: 2/3/21
 */
 
+#include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <ctype.h>
 #include <string.h>
 
 #include "./lexer.h"
 #include "./token.h"
 
-#include "../util/list.h"
 #include "../util/debug.h"
 
 /* These characters are whole tokens themselves */

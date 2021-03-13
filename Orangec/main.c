@@ -19,8 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Each module, in order of execution
-#include "./main.h"
+#include "./main.h" // Each module, in order of execution
 #include "./lexer.h"
 #include "./parser.h"
 #include "./validator.h"
@@ -53,7 +52,7 @@ int main(int argn, char** argv) {
     enum argState state = NORMAL;
     program = symbol_create(SYMBOL_PROGRAM, NULL, NULL, -1);
     fileMap = map_create();
-    structMap = map_create();
+    typeMap = map_create();
 
     for(int i = 1; i < argn; i++) {
         switch(state) {

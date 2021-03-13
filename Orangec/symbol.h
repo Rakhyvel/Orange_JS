@@ -6,6 +6,13 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
+#include "./ast.h"
+
+#include "../util/map.h"
+
+struct map* typeMap;      // maps: struct#id -> symbolNode* struct  // @fix maybe this isn't holistic. 
+                                                                    //      Was done for struct_type->struct_symbol
+
 enum symbolType {
     SYMBOL_PROGRAM,
     SYMBOL_MODULE,

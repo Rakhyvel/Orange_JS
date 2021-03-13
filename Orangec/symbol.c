@@ -14,13 +14,11 @@
     Date: 3/10/21
 */
 
-#include "./symbol.h"
-
 #include <stdlib.h>
 
 #include "./main.h"
+#include "./symbol.h"
 
-#include "../util/map.h"
 #include "../util/list.h"
 #include "../util/debug.h"
 

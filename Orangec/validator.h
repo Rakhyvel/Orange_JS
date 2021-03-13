@@ -7,7 +7,7 @@
 #ifndef VALIDATOR_H
 #define VALIDATOR_H
 
-#include "./parser.h"
+#include "./symbol.h"
 
 void validator_updateStructType(struct symbolNode*);
 void validator_validate(struct symbolNode*);

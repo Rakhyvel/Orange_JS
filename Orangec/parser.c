@@ -13,16 +13,16 @@
 */
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "./ast.h"
 #include "./main.h"
 #include "./parser.h"
-#include "./lexer.h"
-#include "../util/list.h"
-#include "../util/map.h"
+#include "./token.h"
+
 #include "../util/debug.h"
+#include "../util/map.h"
 
 // Higher level token signatures
 static const enum tokenType MODULE[] = {TOKEN_IDENTIFIER, TOKEN_LBRACE};
@@ -155,7 +155,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         char* buf = itoa(symbolNode->id);
         strcat(symbolNode->type, "#");
         strcat(symbolNode->type, buf);
-        map_put(structMap, symbolNode->type, symbolNode);
+        map_put(typeMap, symbolNode->type, symbolNode);
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }
@@ -171,7 +171,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         char* buf = itoa(symbolNode->id);
         strcat(symbolNode->type, "#");
         strcat(symbolNode->type, buf);
-        map_put(structMap, symbolNode->type, symbolNode);
+        map_put(typeMap, symbolNode->type, symbolNode);
         parseEnums(tokenQueue, symbolNode);
         LOG("Enum %s created", symbolNode->name);
     }

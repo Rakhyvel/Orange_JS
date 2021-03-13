@@ -76,7 +76,7 @@ x remove parser_symbolCreate from parser.c and put it into symbol.c
 x remove AST code from parser, add to new ast.c file
 x remove Token code from lexer, add to new token.c file
 x clean up function order
-- clean up enum order
+x clean up enum order
 - clean up includes
 - comment! You're done!
 - port to Windows

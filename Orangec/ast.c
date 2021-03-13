@@ -11,7 +11,6 @@
 #include <stdlib.h>
 
 #include "./ast.h"
-#include "./lexer.h"
 
 #include "../util/debug.h"
 

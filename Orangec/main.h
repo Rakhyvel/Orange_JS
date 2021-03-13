@@ -7,8 +7,6 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-#include "./parser.h"
-
 /*
     Represents a file, holds an array of lines, and the number of lines.
     
@@ -22,8 +20,6 @@ struct file {
 
 struct symbolNode* program;
 struct map* fileMap;
-struct map* structMap;      // maps: struct#id -> symbolNode* struct    // @fix maybe this isn't holistic. 
-                                                                        //      Was done for struct_type->struct_symbol
 
 void error(const char* filename, int line, const char* msg, ...);
 
