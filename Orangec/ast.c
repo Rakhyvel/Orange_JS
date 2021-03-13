@@ -31,6 +31,58 @@ struct astNode* ast_create(enum astType type, const char* filename, int line, st
     Converts an AST type to a string */
 char* ast_toString(enum astType type) {
     switch(type) {
+    case AST_VAR: 
+        return "astType.VAR";
+    case AST_INTLITERAL: 
+        return "astType:INTLITERAL";
+    case AST_REALLITERAL: 
+        return "astType:REALLITERAL";
+    case AST_CHARLITERAL: 
+        return "astType.CHARLITERAL";
+    case AST_STRINGLITERAL: 
+        return "astType.STRINGLITERAL";
+    case AST_TRUE: 
+        return "astType:TRUE";
+    case AST_FALSE: 
+        return "astType:FALSE";
+    case AST_NULL: 
+        return "astType:NULL";
+    case AST_CALL:
+        return "astType.CALL";
+    case AST_VERBATIM:
+        return "astType.VERBATIM";
+    case AST_ADD: 
+        return "astType:PLUS";
+    case AST_SUBTRACT: 
+        return "astType:MINUS";
+    case AST_MULTIPLY: 
+        return "astType:MULTIPLY";
+    case AST_DIVIDE: 
+        return "astType:DIVIDE";
+    case AST_ASSIGN: 
+        return "astType:ASSIGN";
+    case AST_IS:
+        return "astType.IS";
+    case AST_ISNT: 
+        return "astType.ISNT";
+    case AST_GREATER: 
+        return "astType.GREATER";
+    case AST_LESSER: 
+        return "astType.LESSER";
+    case AST_GREATEREQUAL: 
+        return "astType.GREATEREQUAL";
+    case AST_LESSEREQUAL: 
+        return "astType.LESSEREQUAL";
+    case AST_AND: 
+        return "astType.AND";
+    case AST_OR: 
+        return "astType.OR";
+    case AST_CAST: 
+        return "astType.CAST";
+    case AST_NEW: 
+        return "astType.NEW";
+    case AST_FREE: 
+        return "astType.FREE";
     case AST_BLOCK: 
         return "astType:BLOCK";
     case AST_SYMBOLDEFINE: 
@@ -43,64 +95,10 @@ char* ast_toString(enum astType type) {
         return "astType.WHILE";
     case AST_RETURN: 
         return "astType.RETURN";
-    case AST_ADD: 
-        return "astType:PLUS";
-    case AST_SUBTRACT: 
-        return "astType:MINUS";
-    case AST_MULTIPLY: 
-        return "astType:MULTIPLY";
-    case AST_DIVIDE: 
-        return "astType:DIVIDE";
-    case AST_AND: 
-        return "astType.AND";
-    case AST_OR: 
-        return "astType.OR";
-    case AST_CAST: 
-        return "astType.CAST";
-    case AST_NEW: 
-        return "astType.NEW";
-    case AST_FREE: 
-        return "astType.FREE";
-    case AST_GREATER: 
-        return "astType.GREATER";
-    case AST_LESSER: 
-        return "astType.LESSER";
-    case AST_GREATEREQUAL: 
-        return "astType.GREATEREQUAL";
-    case AST_LESSEREQUAL: 
-        return "astType.LESSEREQUAL";
-    case AST_IS:
-        return "astType.IS";
-    case AST_ISNT: 
-        return "astType.ISNT";
-    case AST_ASSIGN: 
-        return "astType:ASSIGN";
-    case AST_INDEX: 
-        return "astType.INDEX";
-    case AST_INTLITERAL: 
-        return "astType:INTLITERAL";
-    case AST_REALLITERAL: 
-        return "astType:REALLITERAL";
-    case AST_ARRAYLITERAL: 
-        return "astType:ARRAYLITERAL";
-    case AST_TRUE: 
-        return "astType:TRUE";
-    case AST_FALSE: 
-        return "astType:FALSE";
-    case AST_NULL: 
-        return "astType:NULL";
-    case AST_CALL:
-        return "astType.CALL";
-    case AST_VERBATIM:
-        return "astType.VERBATIM";
-    case AST_VAR: 
-        return "astType.VAR";
-    case AST_STRINGLITERAL: 
-        return "astType.STRINGLITERAL";
-    case AST_CHARLITERAL: 
-        return "astType.CHARLITERAL";
     case AST_DOT: 
         return "astType.DOT";
+    case AST_INDEX: 
+        return "astType.INDEX";
     case AST_MODULEACCESS: 
         return "astType.MODULEACCESS";
     case AST_NOP:

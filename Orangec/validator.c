@@ -254,6 +254,14 @@ char* validateExpressionAST(struct astNode* node) {
     LOG("Validating expression \"%s\" ", ast_toString(node->type));
     switch(node->type){
     // BASE CASES
+    case AST_VAR: {
+        struct symbolNode* var = symbol_find(node->data, node->scope);
+        if(var == NULL) {
+            error(node->filename, node->line, "Unknown symbol %s", node->data);
+        }
+        strcpy(retval, var->type);
+        return retval;
+    }
     case AST_INTLITERAL:
         strcpy(retval, "int");
         return retval;
@@ -273,15 +281,62 @@ char* validateExpressionAST(struct astNode* node) {
     case AST_NULL:
         strcpy(retval, "None");
         return retval;
-    case AST_VAR: {
-        struct symbolNode* var = symbol_find(node->data, node->scope);
-        if(var == NULL) {
-            error(node->filename, node->line, "Unknown symbol %s", node->data);
+    // RECURSIVE CASES
+    case AST_CALL: {
+        // ARRAY LITERAL
+        if(strstr(node->data, " array")){
+            LOG("Array literal call");
+            char base[255];
+            strcpy(base, node->data);
+            removeArray(base);
+            validateArrayType(node->children, base, node->scope, node->filename, node->line);
+            strcpy(retval, node->data);
+            return retval;
         }
-        strcpy(retval, var->type);
+        
+        struct symbolNode* symbol = symbol_find(node->data, node->scope);
+        if(symbol == NULL) {
+            error(node->filename, node->line, "Unknown symbol %s", node->data);
+        // STRUCT INIT
+        } else if(symbol->symbolType == SYMBOL_STRUCT) {
+            LOG("Struct init call");
+            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
+            
+            if(!err || list_isEmpty(node->children)) {
+                strcpy(retval, symbol->type);
+                return retval;
+            } else if(err > 0){
+                error(node->filename, node->line, "Too many arguments for struct \"%s\" initialization", symbol->name);
+            } else if(err < 0){
+                error(node->filename, node->line, "Too few arguments for struct \"%s\" initialization", symbol->name);
+            }
+        } 
+        // FUNCTION CALL
+        else if(symbol->symbolType == SYMBOL_FUNCTION || symbol->symbolType == SYMBOL_FUNCTIONPTR) {
+            LOG("Function call");
+            if(!node->scope->isStatic && symbol->isStatic) {
+                error(node->filename, node->line, "Cannot call a static function from global scope");
+            }
+            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
+            
+            if(err == -1) {
+                strcpy(retval, symbol->type);
+                return retval;
+            } else if(err > -1){
+                error(node->filename, node->line, "Too many arguments for function call");
+            } else if(err < -1){
+                error(node->filename, node->line, "Too few arguments for function call");
+            }
+        }
+    }
+    case AST_VERBATIM: {
+        struct listElem* elem;
+        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
+            validateAST((struct astNode*)elem->data);
+        }
+        strcpy(retval, "Any");
         return retval;
     }
-    // RECURSIVE CASES
     case AST_ADD:
     case AST_SUBTRACT:
     case AST_MULTIPLY:
@@ -332,15 +387,11 @@ char* validateExpressionAST(struct astNode* node) {
         strcpy(retval, left);
         return retval;
     }
-    case AST_OR:
-    case AST_AND:
+    case AST_IS:
+    case AST_ISNT:
         validateBinaryOp(node->children, left, right);
-         if(!strcmp(left, "boolean") && !strcmp(right, "boolean")) {
-            strcpy(retval, "boolean");
-            return retval;
-        } else {
-            error(node->filename, node->line, "Value type mismatch. Expected boolean type, actual types were \"%s\" and \"%s\" ", left, right);
-        }
+        strcpy(retval, "boolean");
+        return retval;
     case AST_GREATER:
     case AST_LESSER:
     case AST_GREATEREQUAL:
@@ -356,57 +407,43 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Value type mismatch. Expected int or real type, actual types were \"%s\" and \"%s\" ", left, right);
         }
     }
-    case AST_IS:
-    case AST_ISNT:
+    case AST_AND:
+    case AST_OR:
         validateBinaryOp(node->children, left, right);
-        strcpy(retval, "boolean");
-        return retval;
-    case AST_CALL: {
-        // ARRAY LITERAL
-        if(strstr(node->data, " array")){
-            LOG("Array literal call");
-            char base[255];
-            strcpy(base, node->data);
-            removeArray(base);
-            validateArrayType(node->children, base, node->scope, node->filename, node->line);
-            strcpy(retval, node->data);
+         if(!strcmp(left, "boolean") && !strcmp(right, "boolean")) {
+            strcpy(retval, "boolean");
             return retval;
+        } else {
+            error(node->filename, node->line, "Value type mismatch. Expected boolean type, actual types were \"%s\" and \"%s\" ", left, right);
         }
-        
-        struct symbolNode* symbol = symbol_find(node->data, node->scope);
-        if(symbol == NULL) {
-            error(node->filename, node->line, "Unknown symbol %s", node->data);
-        // STRUCT INIT
-        } else if(symbol->symbolType == SYMBOL_STRUCT) {
-            LOG("Struct init call");
-            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
-            
-            if(!err || list_isEmpty(node->children)) {
-                strcpy(retval, symbol->type);
-                return retval;
-            } else if(err > 0){
-                error(node->filename, node->line, "Too many arguments for struct \"%s\" initialization", symbol->name);
-            } else if(err < 0){
-                error(node->filename, node->line, "Too few arguments for struct \"%s\" initialization", symbol->name);
-            }
-        } 
-        // FUNCTION CALL
-        else if(symbol->symbolType == SYMBOL_FUNCTION || symbol->symbolType == SYMBOL_FUNCTIONPTR) {
-            LOG("Function call");
-            if(!node->scope->isStatic && symbol->isStatic) {
-                error(node->filename, node->line, "Cannot call a static function from global scope");
-            }
-            int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
-            
-            if(err == -1) {
-                strcpy(retval, symbol->type);
-                return retval;
-            } else if(err > -1){
-                error(node->filename, node->line, "Too many arguments for function call");
-            } else if(err < -1){
-                error(node->filename, node->line, "Too few arguments for function call");
+    case AST_CAST: {
+        struct astNode* rightAST = node->children->head.next->data;
+        char* oldType = validateExpressionAST(rightAST);
+        char* newType = node->data;
+        if(!strcmp(newType, "None")) {
+            error(node->filename, node->line, "Cannot cast %s to None", oldType);
+        }
+        if(strcmp(oldType, newType)) {
+            struct symbolNode* symbol = map_get(structMap, oldType);
+            if((symbol == NULL && !strcmp(newType, "int")) && (strcmp(oldType, "Any") && strcmp(newType, "Any"))) {
+                error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
             }
         }
+        strcpy(retval, node->data);
+        return retval;
+    }
+    case AST_NEW: {
+        struct astNode* rightAST = node->children->head.next->data;
+        if(rightAST->type != AST_CALL && rightAST->type != AST_INDEX && rightAST->type != AST_MODULEACCESS) {
+            error(node->filename, node->line, "New operand must be a struct call");
+        }
+        char* oldType = validateExpressionAST(rightAST);
+        strcpy(retval, oldType);
+        return retval;
+    }
+    case AST_FREE: {
+        strcpy(retval, "None");
+        return retval;
     }
     case AST_DOT: {
         struct astNode* leftAST = node->children->head.next->next->data;
@@ -469,43 +506,6 @@ char* validateExpressionAST(struct astNode* node) {
         } else if(rightAST->type == AST_VAR) {
             error(node->filename, node->line, "Module \"%s\" does not contain variable \"%s\"", leftAST->data, rightAST->data);
         }
-    }
-    case AST_CAST: {
-        struct astNode* rightAST = node->children->head.next->data;
-        char* oldType = validateExpressionAST(rightAST);
-        char* newType = node->data;
-        if(!strcmp(newType, "None")) {
-            error(node->filename, node->line, "Cannot cast %s to None", oldType);
-        }
-        if(strcmp(oldType, newType)) {
-            struct symbolNode* symbol = map_get(structMap, oldType);
-            if((symbol == NULL && !strcmp(newType, "int")) && (strcmp(oldType, "Any") && strcmp(newType, "Any"))) {
-                error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
-            }
-        }
-        strcpy(retval, node->data);
-        return retval;
-    }
-    case AST_NEW: {
-        struct astNode* rightAST = node->children->head.next->data;
-        if(rightAST->type != AST_CALL && rightAST->type != AST_INDEX && rightAST->type != AST_MODULEACCESS) {
-            error(node->filename, node->line, "New operand must be a struct call");
-        }
-        char* oldType = validateExpressionAST(rightAST);
-        strcpy(retval, oldType);
-        return retval;
-    }
-    case AST_FREE: {
-        strcpy(retval, "None");
-        return retval;
-    }
-    case AST_VERBATIM: {
-        struct listElem* elem;
-        for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-            validateAST((struct astNode*)elem->data);
-        }
-        strcpy(retval, "Any");
-        return retval;
     }
     default:
         PANIC("AST \"%s\" validation is not implemented yet", ast_toString(node->type));
