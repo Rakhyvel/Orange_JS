@@ -186,7 +186,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         assertRemove(tokenQueue, TOKEN_EQUALS);
         symbolNode->code = parseAST(tokenQueue, symbolNode);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
-        LOG("Variable %s created", symbolNode->name);
+        LOG("Variable definition %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
         symbolNode = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
@@ -196,17 +196,17 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
-        LOG("Variable %s created", symbolNode->name);
+        LOG("Variable declaration %s created", symbolNode->name);
     // PARAM DECLARATION
     } else if(matchTokens(tokenQueue, PARAM_DECLARE, 3) || matchTokens(tokenQueue, ENDPARAM_DECLARE, 3) ||
-            matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 3) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
+            matchTokens(tokenQueue, EXTERN_PARAM_DECLARE, 5) || matchTokens(tokenQueue, EXTERN_ENDPARAM_DECLARE, 5)) {
         symbolNode = symbol_create(SYMBOL_VARIABLE, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
-        LOG("Variable %s created", symbolNode->name);    
+        LOG("Param %s created", symbolNode->name);    
     // FUNCTION DECLARATION
     } else if(matchTokens(tokenQueue, FUNCTION, 3) || matchTokens(tokenQueue, EXTERN_FUNCTION, 5)) {
         symbolNode = symbol_create(SYMBOL_FUNCTION, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));

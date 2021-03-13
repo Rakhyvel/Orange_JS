@@ -1,7 +1,7 @@
 /*  ast.c
 
     An Abstract Syntax Tree is a way to represent the syntax and higher level
-    relationships in code.
+    relationships in code in a tree-like structure.
 
     Author: Joseph Shimel
     Date: 3/12/21

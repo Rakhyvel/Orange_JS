@@ -19,7 +19,6 @@
 #include "../util/list.h"
 #include "../util/debug.h"
 
-// Private functions
 static void updateType(char*, struct symbolNode*);
 static void updateStruct(struct symbolNode*);
 static void validateAST(struct astNode*);
@@ -35,7 +34,30 @@ static int validateArrayType(struct list*, char*, struct symbolNode*, const char
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
 
+/*
+    Goes through the symbol tree, updates the types of symbols from the 
+    written plain type to a "true" type, that is relates specifically to a type.
+    
+    Consider the following code:
+        Mod1 {
+            struct Example(int i)
+        }
+        Mod2 {
+            struct Example{int i}
+            void ex() {
+                Mod1:Example example;
+            }
+        }
+
+    To the parser, the variable example will have the type Example, as 
+    specified by the programmer. However, there are multiple types with that
+    name, and the validator cannot be sure which is which.
+    
+    To resolve the issue, orangec assigns every symbol a UID, and types
+    are resolved using their type name, concatenated with the $ symbol, and 
+    their UID represented in base-36. */
 void validator_updateStructType(struct symbolNode* symbolNode) {
+    ASSERT(symbolNode != NULL);
     struct list* children = symbolNode->children->keyList;
     struct listElem* elem = list_begin(children);
     // Correct struct type, if exists
@@ -46,10 +68,9 @@ void validator_updateStructType(struct symbolNode* symbolNode) {
     case SYMBOL_BLOCK:
         if(strstr(symbolNode->type, "$")) {
             updateType(symbolNode->type, symbolNode);
-            break;
         } else {
             updateStruct(symbolNode);
-        }
+        } // rollover to default ->
     default: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
@@ -60,9 +81,17 @@ void validator_updateStructType(struct symbolNode* symbolNode) {
 }
 
 /*
-    Takes in a program, looks through structures, modules, globals, and 
-    functions, and validates that they make sense as an Orange program */
+    Takes in a symbol, and evaluates it according to the symbol type. 
+    
+    - All symbols must have valid children.
+    - Programs cannot have children that are not modules.
+    - Modules cannot have children that are blocks.
+    - Variable delcarations must have a valid type, and a valid AST, if they have 
+      one. 
+      
+    If all of these conditions are met, the symbol is valid. */
 void validator_validate(struct symbolNode* symbolNode) {
+    ASSERT(symbolNode != NULL);
     struct list* children = symbolNode->children->keyList;
     struct listElem* elem = list_begin(children);
     LOG("Validating %s", symbolNode->name);
@@ -71,19 +100,21 @@ void validator_validate(struct symbolNode* symbolNode) {
     case SYMBOL_PROGRAM: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
-            if(child->symbolType != SYMBOL_MODULE) {
+            if(child->symbolType == SYMBOL_MODULE) {
+                validator_validate(child);
+            } else {
                 error(child->filename, child->line, "Must be defined inside a module\n");
             }
-            validator_validate(child);
         }
     } break;
     case SYMBOL_MODULE: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
-            if(child->symbolType == SYMBOL_BLOCK) {
+            if(child->symbolType != SYMBOL_BLOCK) {
+                validator_validate(child);
+            } else {
                 error(child->filename, child->line, "Module members must be structs, variables, or functions\n");
             }
-            validator_validate(child);
         }
     } break;
     case SYMBOL_FUNCTIONPTR:
@@ -96,24 +127,6 @@ void validator_validate(struct symbolNode* symbolNode) {
         if(symbolNode->code != NULL) {
             char* actual = validateExpressionAST(symbolNode->code);
             if(!typesMatch(symbolNode->type, actual, symbolNode->parent, symbolNode->filename, symbolNode->line)) {
-                error(symbolNode->filename, symbolNode->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", symbolNode->type, actual);
-            }
-        }
-        // All children must be valid
-        for(;elem != list_end(children); elem = list_next(elem)) {
-            validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
-        }
-    } break;
-    case SYMBOL_EXTERN_VARIABLE: {
-        struct symbolNode* module = symbol_find(symbolNode->path, program);
-        // Valid type
-        if(!validateType(symbolNode->type, symbolNode->parent)) {
-            error(symbolNode->filename, symbolNode->line, "Unknown type %s", symbolNode->type);
-        }
-        // Valid AST
-        if(symbolNode->code != NULL) {
-            char* actual = validateExpressionAST(symbolNode->code);
-            if(!typesMatch(symbolNode->type, actual, module, symbolNode->filename, symbolNode->line)) {
                 error(symbolNode->filename, symbolNode->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", symbolNode->type, actual);
             }
         }
@@ -147,16 +160,18 @@ void validator_validate(struct symbolNode* symbolNode) {
     }
 }
 
+/*
+    Splits specific type into two */
 static void updateType(char* type, struct symbolNode* scope) {
     char mod[255];
-    char member[255];
-    int end = findTypeEnd(type);
     memset(mod, 0, 254);
+    char member[255];
     memset(member, 0, 254);
+    int end = findTypeEnd(type);
     strncpy(mod, type, end);
     strcpy(member, type + end + 1);
     struct symbolNode* symbol = symbol_findExplicit(mod, member, scope->parent, scope->filename, scope->line);
-    if(symbol != NULL && symbol->symbolType == SYMBOL_STRUCT) {
+    if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
         strcpy(scope->type, symbol->type);
     }
 }

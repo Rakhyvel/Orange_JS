@@ -77,7 +77,7 @@ x remove AST code from parser, add to new ast.c file
 x remove Token code from lexer, add to new token.c file
 x clean up function order
 x clean up enum order
-- clean up includes
+x clean up includes
 - comment! You're done!
 - port to Windows
 - vs code .orng file ext icon
