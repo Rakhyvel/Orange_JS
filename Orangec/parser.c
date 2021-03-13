@@ -50,7 +50,7 @@ static void copyNextTokenString(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
 static void parseEnums(struct list*, struct symbolNode*);
 static void expectType(struct list*, char*);
-static struct astNode* parseAST(struct list*, struct symbolNode*);
+static struct astNode* parseAST(struct list*, struct symbolNode*, struct astNode*);
 static struct astNode* parseExpression(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
 static struct list* simplifyTokens(struct list*, struct symbolNode*);
@@ -196,10 +196,11 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic;
+        symbolNode->isDeclared = parent->symbolType == SYMBOL_MODULE;
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_EQUALS);
-        symbolNode->code = parseAST(tokenQueue, symbolNode);
+        symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable definition %s created", symbolNode->name);
     // VARIABLE DECLARATION
@@ -208,6 +209,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         symbolNode->isPrivate = isPrivate;
         symbolNode->isConstant = isConstant;
         symbolNode->isStatic = parent->isStatic || parent->symbolType == SYMBOL_MODULE;
+        symbolNode->isDeclared = parent->symbolType == SYMBOL_MODULE;
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
@@ -234,11 +236,11 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         if(topMatches(tokenQueue, TOKEN_EQUALS)) {
             symbolNode->isDeclared = 1;
             assertRemove(tokenQueue, TOKEN_EQUALS);
-            symbolNode->code = parseAST(tokenQueue, symbolNode);
+            symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
         } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
             symbolNode->isDeclared = 1;
-            symbolNode->code = parseAST(tokenQueue, symbolNode);
+            symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
             struct symbolNode* anon = symbol_create(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
@@ -369,14 +371,14 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
     instruction per call. 
     
     Will return NULL on empty semicolon statements */
-static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scope) {
+static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scope, struct astNode* parent) {
     ASSERT(tokenQueue != NULL);
     ASSERT(scope != NULL);
     struct astNode* retval = NULL;
 
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-        retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope, parent);
         struct symbolNode* symbolNode = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         retval->data = symbolNode;
         symbolNode->isStatic = scope->isStatic;
@@ -386,7 +388,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         ASSERT(!map_put(scope->children, symbolNode->name, symbolNode));
         assertRemove(tokenQueue, TOKEN_LBRACE);
         while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
-            struct astNode* child = parseAST(tokenQueue, retval->data); // Can sometimes be NULL from semicolon statements, gaurd against
+            struct astNode* child = parseAST(tokenQueue, retval->data, retval); // Can sometimes be NULL from semicolon statements, gaurd against
             if(child != NULL) {
                 queue_push(retval->children, child);
             }
@@ -401,7 +403,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
              matchTokens(tokenQueue, ENUM, 3) || 
              matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
              matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope, parent);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
         if(map_put(scope->children, symbolNode->name, symbolNode)) {
@@ -410,10 +412,10 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
-        retval = ast_create(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope, parent);
         assertRemove(tokenQueue, TOKEN_IF);
-        struct astNode* expression = parseAST(tokenQueue, scope);
-        struct astNode* body = parseAST(tokenQueue, scope);
+        struct astNode* expression = parseAST(tokenQueue, scope, retval);
+        struct astNode* body = parseAST(tokenQueue, scope, retval);
         if(body == NULL || body->type != AST_BLOCK) {
             error(retval->filename, retval->line, "If statements must be followed by block statements");
         }
@@ -423,18 +425,18 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
             assertRemove(tokenQueue, TOKEN_ELSE);
             retval->type = AST_IFELSE;
             if(topMatches(tokenQueue, TOKEN_IF)) {
-                queue_push(retval->children, parseAST(tokenQueue, scope));
+                queue_push(retval->children, parseAST(tokenQueue, scope, retval));
             } else {
-                queue_push(retval->children, parseAST(tokenQueue, scope));
+                queue_push(retval->children, parseAST(tokenQueue, scope, retval));
             }
         }
     }
     // WHILE
     else if (topMatches(tokenQueue, TOKEN_WHILE)) {
-        retval = ast_create(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope, parent);
         assertRemove(tokenQueue, TOKEN_WHILE);
-        struct astNode* expression = parseAST(tokenQueue, scope);
-        struct astNode* body = parseAST(tokenQueue, scope);
+        struct astNode* expression = parseAST(tokenQueue, scope, retval);
+        struct astNode* body = parseAST(tokenQueue, scope, retval);
         if(body == NULL || body->type != AST_BLOCK) {
             error(retval->filename, retval->line, "While statements must be followed by block statements");
         }
@@ -443,7 +445,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
     }
     // RETURN
     else if (topMatches(tokenQueue, TOKEN_RETURN)) {
-        retval = ast_create(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval = ast_create(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope, parent);
         assertRemove(tokenQueue, TOKEN_RETURN);
         struct astNode* expression = parseExpression(tokenQueue, scope);
         queue_push(retval->children, expression);
@@ -491,7 +493,7 @@ static struct astNode* parseExpression(struct list* tokenQueue, struct symbolNod
     while (!list_isEmpty(expression)) {
         struct listElem* elem = NULL;
         token = (struct token*)queue_pop(expression);
-        astNode = ast_create(AST_NOP, token->filename, token->line, scope);
+        astNode = ast_create(AST_NOP, token->filename, token->line, scope, NULL);
         int* intData;
         float* realData;
         char* charData;
@@ -533,9 +535,13 @@ static struct astNode* parseExpression(struct list* tokenQueue, struct symbolNod
             strncpy(charData, token->data, 254);
             astNode->data = charData;
             ASSERT(!list_isEmpty(argStack)); // if fails, can indicate token was not put onto argstack
-            queue_push(astNode->children, stack_pop(argStack)); // Right
+            struct astNode* rightAST = stack_pop(argStack);
+            rightAST->parent = astNode;
+            queue_push(astNode->children, rightAST); // Right
             if(astNode->type != AST_CAST && astNode->type != AST_NEW && astNode->type != AST_FREE) { // Don't do left side for unary operators
-                queue_push(astNode->children, stack_pop(argStack)); // Left
+                struct astNode* leftAST = stack_pop(argStack);
+                leftAST->parent = astNode;
+                queue_push(astNode->children, leftAST); // left
             }
             stack_push(argStack, astNode);
             break;

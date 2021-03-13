@@ -16,13 +16,14 @@
 
 /*
     Allocates and initializes an Abstract Syntax Tree node, with the proper type */
-struct astNode* ast_create(enum astType type, const char* filename, int line, struct symbolNode* scope) {
+struct astNode* ast_create(enum astType type, const char* filename, int line, struct symbolNode* scope, struct astNode* parent) {
     struct astNode* retval = (struct astNode*) calloc(1, sizeof(struct astNode));
     retval->type = type;
     retval->children = list_create();
     retval->filename = filename;
     retval->line = line;
     retval->scope = scope;
+    retval->parent = parent;
     return retval;
 }
 

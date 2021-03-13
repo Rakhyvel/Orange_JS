@@ -39,6 +39,7 @@ enum astType {
     efficient way. */
 struct astNode {
     enum astType type;
+    struct astNode* parent;
     struct list* children; // list of OTHER AST's ONLY!
     void* data;
     struct symbolNode* scope;
@@ -47,7 +48,7 @@ struct astNode {
 	int line;
 };
 
-struct astNode* ast_create(enum astType, const char*, int, struct symbolNode*);
+struct astNode* ast_create(enum astType, const char*, int, struct symbolNode*, struct astNode*);
 char* ast_toString(enum astType);
 char* itoa(int);
 enum astType ast_tokenToAST(enum tokenType);

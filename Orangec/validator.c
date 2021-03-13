@@ -135,7 +135,6 @@ void validator_validate(struct symbolNode* symbolNode) {
             }
             symbolNode->isDefined = 1;
         }
-        symbolNode->isDeclared = 1;
         // All children must be valid
         for(;elem != list_end(children); elem = list_next(elem)) {
             validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
@@ -222,6 +221,7 @@ static void validateAST(struct astNode* node) {
     case AST_SYMBOLDEFINE: {
         struct symbolNode* var = (struct symbolNode*) node->data;
         LOG("%p", node->scope);
+        var->isDeclared = 1;
         validator_validate(var);
     } break;
     case AST_IF: {
@@ -320,6 +320,9 @@ char* validateExpressionAST(struct astNode* node) {
         // ARRAY LITERAL
         if(strstr(node->data, " array")){
             LOG("Array literal call");
+            if(node->parent == NULL || node->parent->type != AST_NEW) {
+                error(node->filename, node->line, "Arrays must be allocated with \"new\" operator");
+            }
             char base[255];
             strcpy(base, node->data);
             removeArray(base);
@@ -335,6 +338,9 @@ char* validateExpressionAST(struct astNode* node) {
         } else if(symbol->symbolType == SYMBOL_STRUCT) {
             LOG("Struct init call");
             int err = validateParamType(node->children, symbol->children, node->scope, node->filename, node->line);
+            if(node->parent == NULL || node->parent->type != AST_NEW) {
+                error(node->filename, node->line, "Structs must be allocated with \"new\" operator");
+            }
             
             if(!err || list_isEmpty(node->children)) {
                 strcpy(retval, symbol->type);
@@ -506,6 +512,9 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // SIZE ARRAY INIT
         if(leftAST->type == AST_VAR && validateType(leftAST->data, node->scope)){
+            if(node->parent == NULL || node->parent->type != AST_NEW) {
+                error(node->filename, node->line, "Arrays must be allocated with \"new\" operator");
+            }
             strcpy(retval, leftAST->data);
             strcat(retval, " array");
             return retval;

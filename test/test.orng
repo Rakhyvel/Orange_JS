@@ -1,13 +1,14 @@
 static Main {
-    char[] test = "Hello, world!";
-    Image:Image orange;
     int x = 0;
     int y = 0;
+    boolean[] keys = new boolean[256];
+    struct Lol(int i)
 
     void start() {
-        orange = Image:create("http://josephs-projects.com/src/image1.jpeg");
         Canvas:init("canvas");
         Canvas:addMouseListener("mousemove", mouseListener);
+        Canvas:addKeyListener("keydown", keyDownListener);
+        Canvas:addKeyListener("keyup", keyUpListener);
         Canvas:requestAnimationFrame(loop);
     }
 
@@ -15,11 +16,17 @@ static Main {
         x = e.offsetX;
         y = e.offsetY;
     }
+    
+    void keyDownListener(Canvas:KeyEvent e) {
+        keys[e.keycode] = true;
+        System:println(e);
+    }
 
-    void loop(real timestep) {      
-        Canvas:drawImage(orange, x, y);
+    void keyUpListener(Canvas:KeyEvent e) {
+        keys[e.keycode] = false;
+    }
+
+    void loop(real timestep) {
         Canvas:requestAnimationFrame(loop);
-        int[] i = new int[](3, 4, 5);
-        Lang:Error err;
     }
 }

@@ -5,6 +5,7 @@ static Canvas {
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
     struct MouseEvent(int offsetX, int offsetY)
+    struct KeyEvent(int keycode)
 
     Canvas canvas;
     Context ctx;
@@ -52,6 +53,9 @@ static Canvas {
     }
     int addMouseListener(char[] event, void callback(MouseEvent e)){
         verbatim(   canvas, ".addEventListener(", event, ",", callback, ")");
+    }
+    int addKeyListener(char[] event, void callback(KeyEvent e)){
+        verbatim(   "document.addEventListener(", event, ",", callback, ")");
     }
     int width(){
         return canvas.width;
