@@ -80,7 +80,8 @@ x clean up enum order
 x clean up includes
 x finish commenting
 x change int returns to bool where appropriate
-- error checking for map_put(duplicates) and map_get(null)
+x error checking for map_put(duplicates) and map_get(null)
+x error checking for ifs with no elses
 - memory management
 - fix @fix's
 - port to Windows

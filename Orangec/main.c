@@ -132,7 +132,9 @@ static void readInputFile(char* filename) {
         struct symbolNode* node = parser_parseTokens(tokenQueue, program);
         if(node == NULL) break;
         LOG("%s", node->name);
-        map_put(program->children, node->name, node);
+        if(map_put(program->children, node->name, node)) {
+            error(node->filename, node->line, "Module %s already defined in program", node->name);
+        }
     }
     LOG("\nEnd Parsing.\n");
 }

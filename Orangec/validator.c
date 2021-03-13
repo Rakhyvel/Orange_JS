@@ -8,7 +8,7 @@
 */
 
 #include <stdbool.h>
-#include <stdio.h>s
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -75,6 +75,7 @@ void validator_updateStructType(struct symbolNode* symbolNode) {
     default: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
+            ASSERT(child != NULL);
             validator_updateStructType(child);
         }
     } break;
@@ -101,6 +102,7 @@ void validator_validate(struct symbolNode* symbolNode) {
     case SYMBOL_PROGRAM: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
+            ASSERT(child != NULL);
             if(child->symbolType == SYMBOL_MODULE) {
                 validator_validate(child);
             } else {
@@ -111,6 +113,7 @@ void validator_validate(struct symbolNode* symbolNode) {
     case SYMBOL_MODULE: {
         for(;elem != list_end(children); elem = list_next(elem)) {
             struct symbolNode* child = (struct symbolNode*)map_get(symbolNode->children, (char*)elem->data);
+            ASSERT(child != NULL);
             if(child->symbolType != SYMBOL_BLOCK) {
                 validator_validate(child);
             } else {
@@ -241,10 +244,8 @@ static void validateAST(struct astNode* node) {
             error(condition->filename, condition->line, "If expected boolean type, actual type was \"%s\" ", conditionType);
         }
         validateAST(block);
-        if(node->children->head.next->next != list_end(node->children)) {
-            struct astNode* elseBlock = node->children->head.next->next->next->data;
-            validateAST(elseBlock);
-        }
+        struct astNode* elseBlock = node->children->head.next->next->next->data;
+        validateAST(elseBlock);
         break;
     }
     case AST_WHILE: {
@@ -408,7 +409,8 @@ char* validateExpressionAST(struct astNode* node) {
                 error(node->filename, node->line, "Left side of assignment must be a location");
             }
             var = symbol_findExplicit(moduleIdent->data, nameIdent->data, leftAST->scope, leftAST->filename, leftAST->line);
-        }
+        } // else {leftAST is index}
+
         // Indexing is not checked, you can change the contents of an array if it is constant
         if(var != NULL && var->isConstant) {
             error(node->filename, node->line, "Cannot assign to constant \"%s\" ", var->name);
@@ -463,7 +465,8 @@ char* validateExpressionAST(struct astNode* node) {
         }
         if(strcmp(oldType, newType)) {
             struct symbolNode* symbol = map_get(typeMap, oldType);
-            if((symbol == NULL && !strcmp(newType, "int")) && (strcmp(oldType, "Any") && strcmp(newType, "Any"))) {
+            if((symbol == NULL && !strcmp(newType, "int")) && // Converting enum should be legal
+            (strcmp(oldType, "Any") && strcmp(newType, "Any"))) { // Converting anything to/from Any is legal
                 error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
             }
         }

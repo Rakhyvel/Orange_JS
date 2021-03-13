@@ -50,8 +50,9 @@ struct symbolNode* symbol_find(const char* symbolName, const struct symbolNode* 
         return symbol;
     } else if(scope->parent != NULL) {
         return symbol_find(symbolName, scope->parent);
+    } else {
+        return NULL;
     }
-    return NULL;
 }
 
 /*

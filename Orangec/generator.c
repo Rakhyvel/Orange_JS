@@ -82,6 +82,7 @@ static void constructLists(struct symbolNode* node, struct list* enumList, struc
     struct listElem* elem = list_begin(node->children->keyList);
     for(;elem != list_end(node->children->keyList); elem = list_next(elem)) {
         struct symbolNode* child = (struct symbolNode*)map_get(node->children, (char*)elem->data);
+        ASSERT(child != NULL);
 
         if(child->symbolType == SYMBOL_STRUCT) {
             queue_push(structList, child);
@@ -196,6 +197,7 @@ static void generateFunction(FILE* out, struct symbolNode* function) {
             continue;
         }
         struct symbolNode* symbol = (struct symbolNode*)map_get(function->children, paramElem->data);
+        ASSERT(symbol != NULL);
         fprintb(out, symbol->id);
         if(!(paramElem->next == list_end(params) || strstr((char*)paramElem->next->data, "_block"))){
             fprintf(out, ", ");
@@ -301,6 +303,7 @@ static void generateExpression(FILE* out, struct astNode* node) {
             if(symbol == NULL) {
                 symbol = map_get(typeMap, node->data);
             }
+            ASSERT(symbol != NULL);
             fprintb(out, symbol->id);
             fprintf(out, "(");
         }

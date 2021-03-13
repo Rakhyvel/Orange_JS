@@ -152,7 +152,9 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         assertRemove(tokenQueue, TOKEN_LBRACE);
         struct symbolNode* child;
         while((child = parser_parseTokens(tokenQueue, symbolNode)) != NULL) {
-            map_put(symbolNode->children, child->name, child);
+            if(map_put(symbolNode->children, child->name, child)) {
+                error(child->filename, child->line, "%s already defined in module %s", child->name, symbolNode->name);
+            }
         }
         assertRemove(tokenQueue, TOKEN_RBRACE);
         LOG("Module %s created %d", symbolNode->name, symbolNode->symbolType);
@@ -168,7 +170,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         char* buf = itoa(symbolNode->id);
         strcat(symbolNode->type, "#");
         strcat(symbolNode->type, buf);
-        map_put(typeMap, symbolNode->type, symbolNode);
+        ASSERT(!map_put(typeMap, symbolNode->type, symbolNode));
         parseParams(tokenQueue, symbolNode);
         LOG("Struct %s created", symbolNode->name);
     }
@@ -184,7 +186,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         char* buf = itoa(symbolNode->id);
         strcat(symbolNode->type, "#");
         strcat(symbolNode->type, buf);
-        map_put(typeMap, symbolNode->type, symbolNode);
+        ASSERT(!map_put(typeMap, symbolNode->type, symbolNode)); // impossible for collision to happen
         parseEnums(tokenQueue, symbolNode);
         LOG("Enum %s created", symbolNode->name);
     }
@@ -241,7 +243,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
             struct symbolNode* anon = symbol_create(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
             strcpy(anon->name, "_block_anon"); // put here so that parameter length cmp is easy
-            map_put(symbolNode->children, anon->name, anon);
+            ASSERT(!map_put(symbolNode->children, anon->name, anon));
         }
         LOG("Function %s created", symbolNode->name);
     } else if(topMatches(tokenQueue, TOKEN_EOF)){
@@ -327,7 +329,7 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
         if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
         } else if(!topMatches(tokenQueue, TOKEN_RPAREN)){
-            error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Bad syntax in parameters");
+            error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s in parameter list", ((struct token*)queue_peek(tokenQueue))->data);
         }
         LOG("New arg: %s %s", param->type, param->name);
     }
@@ -352,6 +354,8 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
     
         if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
+        } else if(!topMatches(tokenQueue, TOKEN_RPAREN)){
+            error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s in enum", ((struct token*)queue_peek(tokenQueue))->data);
         }
     }
     assertRemove(tokenQueue, TOKEN_RPAREN);
@@ -368,11 +372,13 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
     // BLOCK
     if(topMatches(tokenQueue, TOKEN_LBRACE)) {
         retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        retval->data = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
-        ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
-        strcpy(((struct symbolNode*)retval->data)->name, "_block");
-        strcpy(((struct symbolNode*)retval->data)->type, scope->type); // blocks have same type as parent, to aid in validating return values
-        map_put(scope->children, ((struct symbolNode*)retval->data)->name, retval->data);
+        struct symbolNode* symbolNode = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        retval->data = symbolNode;
+        symbolNode->isStatic = scope->isStatic;
+        strcpy(symbolNode->name, "_block");
+        strcat(symbolNode->name, itoa(symbolNode->id)); // done to prevent collisions with other blocks in scope
+        strcpy(symbolNode->type, scope->type); // blocks have same type as parent, to aid in validating return values
+        ASSERT(!map_put(scope->children, symbolNode->name, symbolNode));
         assertRemove(tokenQueue, TOKEN_LBRACE);
         while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
             queue_push(retval->children, parseAST(tokenQueue, retval->data));
@@ -390,7 +396,9 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
         struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
         retval->data = symbolNode;
-        map_put(scope->children, symbolNode->name, symbolNode);
+        if(map_put(scope->children, symbolNode->name, symbolNode)) {
+            error(symbolNode->filename, symbolNode->line, "Symbol %s already defined in this scope", symbolNode->name);
+        }
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
@@ -466,7 +474,7 @@ static struct astNode* parseExpression(struct list* tokenQueue, struct symbolNod
     struct token* token = NULL;
     struct list* rawExpression = nextExpression(tokenQueue);
     if(list_isEmpty(rawExpression)) {
-        return NULL;
+        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Expected expression");
     }
 
     struct list* expression = infixToPostfix(simplifyTokens(rawExpression, scope));
