@@ -456,7 +456,7 @@ char* validateExpressionAST(struct astNode* node) {
             strcpy(retval, node->data);
             return retval;
         }
-
+        
         struct symbolNode* symbol = symbol_find(node->data, node->scope);
         if(symbol == NULL) {
             error(node->filename, node->line, "Unknown symbol %s", node->data);

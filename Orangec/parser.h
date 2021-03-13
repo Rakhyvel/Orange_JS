@@ -14,14 +14,8 @@
 
 #include "../util/list.h"
 
-// Pre-processing
 void parser_removeComments(struct list*);
 void parser_condenseArrayIdentifiers(struct list*);
-
-// Symbol tree functions
 struct symbolNode* parser_parseTokens(struct list*, struct symbolNode*);
-
-// AST functions
-struct astNode* parser_createAST(struct list*, struct symbolNode*);
 
 #endif

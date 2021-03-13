@@ -45,18 +45,19 @@ static int num_ids = 0;
 // Private functions
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
-static void copyNextTokenString(struct list*, char*);
 static const char* getTopFilename(struct list*);
 static int getTopLine(struct list*);
-static void expectType(struct list*, char*);
+static void copyNextTokenString(struct list*, char*);
 static void parseParams(struct list*, struct symbolNode*);
 static void parseEnums(struct list*, struct symbolNode*);
-static struct astNode* createExpressionAST(struct list*, struct symbolNode*);
+static void expectType(struct list*, char*);
+static struct astNode* parseAST(struct list*, struct symbolNode*);
+static struct astNode* parseExpression(struct list*, struct symbolNode*);
 static struct list* nextExpression(struct list*);
 static struct list* simplifyTokens(struct list*, struct symbolNode*);
 static struct list* infixToPostfix(struct list*);
-static void assertPeek(struct list*, enum tokenType);
 static void assertRemove(struct list*, enum tokenType);
+static void assertPeek(struct list*, enum tokenType);
 static void assertOperator(enum astType, const char*, int);
 
 /*
@@ -183,7 +184,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_EQUALS);
-        symbolNode->code = parser_createAST(tokenQueue, symbolNode);
+        symbolNode->code = parseAST(tokenQueue, symbolNode);
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable %s created", symbolNode->name);
     // VARIABLE DECLARATION
@@ -217,10 +218,10 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         parseParams(tokenQueue, symbolNode);
         if(topMatches(tokenQueue, TOKEN_EQUALS)) {
             assertRemove(tokenQueue, TOKEN_EQUALS);
-            symbolNode->code = parser_createAST(tokenQueue, symbolNode);
+            symbolNode->code = parseAST(tokenQueue, symbolNode);
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
         } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-            symbolNode->code = parser_createAST(tokenQueue, symbolNode);
+            symbolNode->code = parseAST(tokenQueue, symbolNode);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
             struct symbolNode* anon = symbol_create(SYMBOL_BLOCK, parent, getTopFilename(tokenQueue), getTopLine(tokenQueue));
@@ -236,94 +237,33 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     return symbolNode;
 }
 
-/*
-    Creates an AST for code given a queue of tokens. Only parses one 
-    instruction per call. */
-struct astNode* parser_createAST(struct list* tokenQueue, struct symbolNode* scope) {
-    ASSERT(tokenQueue != NULL);
-    ASSERT(scope != NULL);
-    struct astNode* retval = NULL;
-
-    // BLOCK
-    if(topMatches(tokenQueue, TOKEN_LBRACE)) {
-        retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        retval->data = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
-        ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
-        strcpy(((struct symbolNode*)retval->data)->name, "_block");
-        strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
-        strcpy(((struct symbolNode*)retval->data)->type, scope->type);
-        map_put(scope->children, ((struct symbolNode*)retval->data)->name, retval->data);
-        assertRemove(tokenQueue, TOKEN_LBRACE);
-        while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
-            queue_push(retval->children, parser_createAST(tokenQueue, retval->data));
-        }
-        assertRemove(tokenQueue, TOKEN_RBRACE);
-    }
-    // SYMBOL DEFINITION/DECLARATION
-    else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
-             matchTokens(tokenQueue, VARDEFINE, 3) || 
-             matchTokens(tokenQueue, FUNCTION, 3) || 
-             matchTokens(tokenQueue, STRUCT, 3) || 
-             matchTokens(tokenQueue, ENUM, 3) || 
-             matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
-             matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
-        retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
-        retval->data = symbolNode;
-        map_put(scope->children, symbolNode->name, symbolNode);
-    }
-    // IF
-    else if (topMatches(tokenQueue, TOKEN_IF)) {
-        retval = ast_create(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        assertRemove(tokenQueue, TOKEN_IF);
-        struct astNode* expression = parser_createAST(tokenQueue, scope);
-        struct astNode* body = parser_createAST(tokenQueue, scope);
-        if(body == NULL || body->type != AST_BLOCK) {
-            error(retval->filename, retval->line, "If statements must be followed by block statements");
-        }
-        queue_push(retval->children, expression);
-        queue_push(retval->children, body);
-        if(topMatches(tokenQueue, TOKEN_ELSE)) {
-            assertRemove(tokenQueue, TOKEN_ELSE);
-            retval->type = AST_IFELSE;
-            if(topMatches(tokenQueue, TOKEN_IF)) {
-                queue_push(retval->children, parser_createAST(tokenQueue, scope));
-            } else {
-                queue_push(retval->children, parser_createAST(tokenQueue, scope));
-            }
-        }
-    }
-    // WHILE
-    else if (topMatches(tokenQueue, TOKEN_WHILE)) {
-        retval = ast_create(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        assertRemove(tokenQueue, TOKEN_WHILE);
-        struct astNode* expression = parser_createAST(tokenQueue, scope);
-        struct astNode* body = parser_createAST(tokenQueue, scope);
-        if(body == NULL || body->type != AST_BLOCK) {
-            error(retval->filename, retval->line, "While statements must be followed by block statements");
-        }
-        queue_push(retval->children, expression);
-        queue_push(retval->children, body);
-    }
-    // RETURN
-    else if (topMatches(tokenQueue, TOKEN_RETURN)) {
-        retval = ast_create(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
-        assertRemove(tokenQueue, TOKEN_RETURN);
-        struct astNode* expression = createExpressionAST(tokenQueue, scope);
-        queue_push(retval->children, expression);
-    }
-    else if (topMatches(tokenQueue, TOKEN_SEMICOLON)) {
-        assertRemove(tokenQueue, TOKEN_SEMICOLON);
-    }
-    // EXPRESSION
-    else {
-        retval = createExpressionAST(tokenQueue, scope);
-    }
-    return retval;
-}
-
 static int topMatches(struct list* tokenQueue, enum tokenType type) {
     return ((struct token*)queue_peek(tokenQueue))->type == type;
+}
+
+/*
+    Determines if a given token signature matches what is at the front of a 
+    tokenQueue.
+    
+    Does NOT run off edge of tokenQueue, instead returns false. */
+static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
+    int i = 0;
+    struct listElem* elem;
+    for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue) && i < nTokens; elem = list_next(elem), i++) {
+        struct token* token = (struct token*) (elem->data);
+        if(token->type != sig[i]) {
+            return 0;
+        }
+    }
+    return i == nTokens;
+}
+
+static const char* getTopFilename(struct list* tokenQueue) {
+    return ((struct token*)queue_peek(tokenQueue))->filename;
+}
+
+static int getTopLine(struct list* tokenQueue) {
+    return ((struct token*)queue_peek(tokenQueue))->line;
 }
 
 /*
@@ -336,14 +276,6 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
     free(nextToken);
 }
 
-static const char* getTopFilename(struct list* tokenQueue) {
-    return ((struct token*)queue_peek(tokenQueue))->filename;
-}
-
-static int getTopLine(struct list* tokenQueue) {
-    return ((struct token*)queue_peek(tokenQueue))->line;
-}
-
 /*
     Implementation from http://www.strudel.org.uk/itoa/ */
 char* itoa(int val) {
@@ -352,16 +284,6 @@ char* itoa(int val) {
 	for(; val && i ; --i, val /= 36)
 		buf[i] = "0123456789abcdefghijklmnopqrstuvwxyz"[val % 36];
 	return &buf[i+1];
-}
-
-static void expectType(struct list* tokenQueue, char* dst) {
-    copyNextTokenString(tokenQueue, dst);
-    if(topMatches(tokenQueue, TOKEN_COLON)) {
-        assertRemove(tokenQueue, TOKEN_COLON);
-        strcat(dst, "$");    // The dollar sign is a special char
-                                // signifies that the type is a composite, and should be updated later
-        copyNextTokenString(tokenQueue, dst);
-    }
 }
 
 /*
@@ -408,26 +330,105 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
 }
 
 /*
-    Determines if a given token signature matches what is at the front of a 
-    tokenQueue.
-    
-    Does NOT run off edge of tokenQueue, instead returns false. */
-static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
-    int i = 0;
-    struct listElem* elem;
-    for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue) && i < nTokens; elem = list_next(elem), i++) {
-        struct token* token = (struct token*) (elem->data);
-        if(token->type != sig[i]) {
-            return 0;
+    Creates an AST for code given a queue of tokens. Only parses one 
+    instruction per call. */
+static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scope) {
+    ASSERT(tokenQueue != NULL);
+    ASSERT(scope != NULL);
+    struct astNode* retval = NULL;
+
+    // BLOCK
+    if(topMatches(tokenQueue, TOKEN_LBRACE)) {
+        retval = ast_create(AST_BLOCK, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        retval->data = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
+        ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
+        strcpy(((struct symbolNode*)retval->data)->name, "_block");
+        strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
+        strcpy(((struct symbolNode*)retval->data)->type, scope->type);
+        map_put(scope->children, ((struct symbolNode*)retval->data)->name, retval->data);
+        assertRemove(tokenQueue, TOKEN_LBRACE);
+        while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
+            queue_push(retval->children, parseAST(tokenQueue, retval->data));
+        }
+        assertRemove(tokenQueue, TOKEN_RBRACE);
+    }
+    // SYMBOL DEFINITION/DECLARATION
+    else if (matchTokens(tokenQueue, VARDECLARE, 3) || 
+             matchTokens(tokenQueue, VARDEFINE, 3) || 
+             matchTokens(tokenQueue, FUNCTION, 3) || 
+             matchTokens(tokenQueue, STRUCT, 3) || 
+             matchTokens(tokenQueue, ENUM, 3) || 
+             matchTokens(tokenQueue, EXTERN_VARDECLARE, 5) || 
+             matchTokens(tokenQueue, EXTERN_VARDEFINE, 5)) {
+        retval = ast_create(AST_SYMBOLDEFINE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        struct symbolNode* symbolNode = parser_parseTokens(tokenQueue, scope);
+        retval->data = symbolNode;
+        map_put(scope->children, symbolNode->name, symbolNode);
+    }
+    // IF
+    else if (topMatches(tokenQueue, TOKEN_IF)) {
+        retval = ast_create(AST_IF, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        assertRemove(tokenQueue, TOKEN_IF);
+        struct astNode* expression = parseAST(tokenQueue, scope);
+        struct astNode* body = parseAST(tokenQueue, scope);
+        if(body == NULL || body->type != AST_BLOCK) {
+            error(retval->filename, retval->line, "If statements must be followed by block statements");
+        }
+        queue_push(retval->children, expression);
+        queue_push(retval->children, body);
+        if(topMatches(tokenQueue, TOKEN_ELSE)) {
+            assertRemove(tokenQueue, TOKEN_ELSE);
+            retval->type = AST_IFELSE;
+            if(topMatches(tokenQueue, TOKEN_IF)) {
+                queue_push(retval->children, parseAST(tokenQueue, scope));
+            } else {
+                queue_push(retval->children, parseAST(tokenQueue, scope));
+            }
         }
     }
-    return i == nTokens;
+    // WHILE
+    else if (topMatches(tokenQueue, TOKEN_WHILE)) {
+        retval = ast_create(AST_WHILE, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        assertRemove(tokenQueue, TOKEN_WHILE);
+        struct astNode* expression = parseAST(tokenQueue, scope);
+        struct astNode* body = parseAST(tokenQueue, scope);
+        if(body == NULL || body->type != AST_BLOCK) {
+            error(retval->filename, retval->line, "While statements must be followed by block statements");
+        }
+        queue_push(retval->children, expression);
+        queue_push(retval->children, body);
+    }
+    // RETURN
+    else if (topMatches(tokenQueue, TOKEN_RETURN)) {
+        retval = ast_create(AST_RETURN, getTopFilename(tokenQueue), getTopLine(tokenQueue), scope);
+        assertRemove(tokenQueue, TOKEN_RETURN);
+        struct astNode* expression = parseExpression(tokenQueue, scope);
+        queue_push(retval->children, expression);
+    }
+    else if (topMatches(tokenQueue, TOKEN_SEMICOLON)) {
+        assertRemove(tokenQueue, TOKEN_SEMICOLON);
+    }
+    // EXPRESSION
+    else {
+        retval = parseExpression(tokenQueue, scope);
+    }
+    return retval;
+}
+
+static void expectType(struct list* tokenQueue, char* dst) {
+    copyNextTokenString(tokenQueue, dst);
+    if(topMatches(tokenQueue, TOKEN_COLON)) {
+        assertRemove(tokenQueue, TOKEN_COLON);
+        strcat(dst, "$");    // The dollar sign is a special char
+                             // signifies that the type is a composite, and should be updated later by validator_updateStructType
+        copyNextTokenString(tokenQueue, dst);
+    }
 }
 
 /*
     Given a token queue, extracts the front expression, parses it into an
     Abstract Syntax Tree. */
-static struct astNode* createExpressionAST(struct list* tokenQueue, struct symbolNode* scope) {
+static struct astNode* parseExpression(struct list* tokenQueue, struct symbolNode* scope) {
     LOG("Create Expression AST");
     ASSERT(tokenQueue != NULL);
     struct astNode* astNode = NULL;
@@ -565,7 +566,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             
             // Go through each argument, create AST representing it
             while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
-                struct astNode* argAST = createExpressionAST(tokenQueue, scope);
+                struct astNode* argAST = parseExpression(tokenQueue, scope);
                 queue_push(call->list, argAST);
 
                 if(topMatches(tokenQueue, TOKEN_COMMA)) {
@@ -586,7 +587,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             
             // Go through each argument, create AST representing it
             while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
-                struct astNode* argAST = createExpressionAST(tokenQueue, scope);
+                struct astNode* argAST = parseExpression(tokenQueue, scope);
                 queue_push(call->list, argAST);
 
                 if(topMatches(tokenQueue, TOKEN_COMMA)) {
@@ -685,16 +686,6 @@ static struct list* infixToPostfix(struct list* tokenQueue) {
 }
 
 /*
-    Verifies that the next token is what is expected. Errors otherwise */
-static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
-    struct token* topToken = (struct token*) queue_peek(tokenQueue);
-    enum tokenType actual = topToken->type;
-    if(actual != expected) {
-        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", token_toString(actual), token_toString(expected));
-    }
-}
-
-/*
     Verifies that the next token is what is expected, and removes it. Errors
     otherwise */
 static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
@@ -703,6 +694,16 @@ static void assertRemove(struct list* tokenQueue, enum tokenType expected) {
     if(actual == expected) {
         free(queue_pop(tokenQueue));
     } else {
+        error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", token_toString(actual), token_toString(expected));
+    }
+}
+
+/*
+    Verifies that the next token is what is expected. Errors otherwise */
+static void assertPeek(struct list* tokenQueue, enum tokenType expected) {
+    struct token* topToken = (struct token*) queue_peek(tokenQueue);
+    enum tokenType actual = topToken->type;
+    if(actual != expected) {
         error(topToken->filename, topToken->line, "Unexpected token %s, expected %s", token_toString(actual), token_toString(expected));
     }
 }

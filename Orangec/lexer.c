@@ -31,14 +31,13 @@ static const char oneCharTokens[] = {'{', '}', '(', ')', ';', ',',
 static const char punctuationChars[] = {'<', '>', '=', '[', ']', '&', '|', '!', '/', '*'};
 
 // Private functions
-char* readLine(FILE* file);
+static int nextToken(const char*, int);
+static void copyToken(const char* src, char* dst, int start, int end);
+static int numIsFloat(const char*);
+static void removeQuotes(char* str);
+static int nextNonWhitespace(const char*, int);
 static bool charIsToken(char);
 static bool charIsPunctuation(char c);
-static int nextToken(const char*, int);
-static int numIsFloat(const char*);
-static int nextNonWhitespace(const char*, int);
-static void copyToken(const char* src, char* dst, int start, int end);
-static void removeQuotes(char* str);
 
 /*
  * Read in a file given a filename, and extracts the characters to a single string
@@ -219,37 +218,6 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
     return tokenQueue;
 }
 
-/* Determines if the given character is a token all on it's own */
-static bool charIsToken(char c) {
-    for(int i = 0; i < sizeof(oneCharTokens); i++) {
-        if(c == oneCharTokens[i]) return true;
-    }
-    return false;
-}
-
-/* Determines if the given character is a token all on it's own */
-static bool charIsPunctuation(char c) {
-    for(int i = 0; i < sizeof(punctuationChars); i++) {
-        if(c == punctuationChars[i]) return true;
-    }
-    return false;
-}
-
-/*
-    Advances the start of the character stream until a non-whitespace 
-    character is found */
-static int nextNonWhitespace(const char* file, int start) {
-    char nextChar = file[start];
-    while (nextChar != '\0') {
-        nextChar = file[start];
-        if(!isspace(nextChar) || nextChar == '\n') {
-            return start;
-        }
-        start++;
-    }
-    return start;
-}
-
 /*
     Runs a basic state machine.
 
@@ -340,6 +308,16 @@ static int nextToken(const char* file, int start) {
 }
 
 /*
+    Copies a substring from src into destination */
+static void copyToken(const char* src, char* dst, int start, int end) {
+    int i;
+    for(i = 0; i < end-start; i++) {
+        dst[i] = src[i + start];
+    }
+    dst[i] = '\0';
+}
+
+/*
     Determines if a given string is a float */
 static int numIsFloat(const char* test) {
     for(int i = 0; test[i] != '\0'; i++) {
@@ -348,16 +326,6 @@ static int numIsFloat(const char* test) {
         }
     }
     return 0;
-}
-
-/*
-    Copies a substring from src into destination */
-static void copyToken(const char* src, char* dst, int start, int end) {
-    int i;
-    for(i = 0; i < end-start; i++) {
-        dst[i] = src[i + start];
-    }
-    dst[i] = '\0';
 }
 
 static void removeQuotes(char* str) {
@@ -375,4 +343,35 @@ static void removeQuotes(char* str) {
         i++;
     }
     strcpy(str, temp);
+}
+
+/*
+    Advances the start of the character stream until a non-whitespace 
+    character is found */
+static int nextNonWhitespace(const char* file, int start) {
+    char nextChar = file[start];
+    while (nextChar != '\0') {
+        nextChar = file[start];
+        if(!isspace(nextChar) || nextChar == '\n') {
+            return start;
+        }
+        start++;
+    }
+    return start;
+}
+
+/* Determines if the given character is a token all on it's own */
+static bool charIsToken(char c) {
+    for(int i = 0; i < sizeof(oneCharTokens); i++) {
+        if(c == oneCharTokens[i]) return true;
+    }
+    return false;
+}
+
+/* Determines if the given character is a token all on it's own */
+static bool charIsPunctuation(char c) {
+    for(int i = 0; i < sizeof(punctuationChars); i++) {
+        if(c == punctuationChars[i]) return true;
+    }
+    return false;
 }

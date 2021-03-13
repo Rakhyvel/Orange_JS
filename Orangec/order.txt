@@ -1,0 +1,14 @@
+updateType
+updateStruct
+validateAST
+validateExpressionAST
+validateBinaryOp
+findTypeEnd
+isPrimitive
+removeArray
+typesMatch
+validateType
+validateFunctionTypesMatch
+validateArrayType
+validateParamType
+validateStructField
