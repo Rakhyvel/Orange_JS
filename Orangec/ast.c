@@ -119,6 +119,28 @@ char* ast_toString(enum astType type) {
     Called by createExpression to convert operator tokens into ASTs */
 enum astType ast_tokenToAST(enum tokenType type) {
     switch(type) {
+    case TOKEN_DOT:
+        return AST_DOT;
+    case TOKEN_COLON:
+        return AST_MODULEACCESS;
+    case TOKEN_IDENTIFIER:
+        return AST_VAR;
+    case TOKEN_INTLITERAL:
+        return AST_INTLITERAL;
+    case TOKEN_REALLITERAL:
+        return AST_REALLITERAL;
+    case TOKEN_CHARLITERAL:
+        return AST_CHARLITERAL;
+    case TOKEN_STRINGLITERAL:
+        return AST_STRINGLITERAL;
+    case TOKEN_TRUE:
+        return AST_FALSE;
+    case TOKEN_FALSE:
+        return AST_FALSE;
+    case TOKEN_NULL:
+        return AST_NULL;
+    case TOKEN_VERBATIM:
+        return AST_VERBATIM;
     case TOKEN_PLUS:
         return AST_ADD;
     case TOKEN_MINUS: 
@@ -151,32 +173,10 @@ enum astType ast_tokenToAST(enum tokenType type) {
         return AST_NEW;
     case TOKEN_FREE:
         return AST_FREE;
-    case TOKEN_IDENTIFIER:
-        return AST_VAR;
     case TOKEN_CALL:
         return AST_CALL;
-    case TOKEN_VERBATIM:
-        return AST_VERBATIM;
-    case TOKEN_DOT:
-        return AST_DOT;
     case TOKEN_INDEX:
         return AST_INDEX;
-    case TOKEN_COLON:
-        return AST_MODULEACCESS;
-    case TOKEN_INTLITERAL:
-        return AST_INTLITERAL;
-    case TOKEN_REALLITERAL:
-        return AST_REALLITERAL;
-    case TOKEN_CHARLITERAL:
-        return AST_CHARLITERAL;
-    case TOKEN_STRINGLITERAL:
-        return AST_STRINGLITERAL;
-    case TOKEN_TRUE:
-        return AST_FALSE;
-    case TOKEN_FALSE:
-        return AST_FALSE;
-    case TOKEN_NULL:
-        return AST_NULL;
     default:
         printf("Cannot directly convert %s to AST\n", token_toString(type));
         NOT_REACHED();

@@ -36,8 +36,8 @@ int token_precedence(enum tokenType type) {
 			return 2;
 		case TOKEN_AND:
 			return 3;
-		case TOKEN_ISNT:
 		case TOKEN_IS:
+		case TOKEN_ISNT:
 			return 4;
 		case TOKEN_GREATER:
 		case TOKEN_LESSER:
@@ -86,8 +86,8 @@ char* token_toString(enum tokenType type) {
         return "token:DOT";
     case TOKEN_SEMICOLON:
         return "token:SEMICOLON";
-    case TOKEN_EOF:
-        return "token:EOF";
+    case TOKEN_COLON:
+        return "token:COLON";
     case TOKEN_IDENTIFIER:
         return "token:IDENTFIER";
     case TOKEN_INTLITERAL:
@@ -104,6 +104,8 @@ char* token_toString(enum tokenType type) {
         return "token:FALSE";
     case TOKEN_NULL:
         return "token:NULL";
+    case TOKEN_VERBATIM:
+        return "token:VERBATIM";
     case TOKEN_PLUS:
         return "token:PLUS";
     case TOKEN_MINUS: 
@@ -136,22 +138,20 @@ char* token_toString(enum tokenType type) {
         return "token:NEW";
     case TOKEN_FREE:
         return "token:FREE";
-    case TOKEN_VERBATIM:
-        return "token:VERBATIM";
     case TOKEN_MODULE:
         return "token:MODULE";
     case TOKEN_STRUCT:
         return "token:STRUCT";
     case TOKEN_ENUM:
         return "token:ENUM";
-    case TOKEN_ARRAY:
-        return "token:ARRAY";
+    case TOKEN_PRIVATE:
+        return "token:PRIVATE";
     case TOKEN_STATIC:
         return "token:STATIC";
     case TOKEN_CONST:
         return "token:CONST";
-    case TOKEN_PRIVATE:
-        return "token:PRIVATE";
+    case TOKEN_ARRAY:
+        return "token:ARRAY";
     case TOKEN_IF:
         return "token:IF";
     case TOKEN_ELSE:
@@ -160,12 +160,10 @@ char* token_toString(enum tokenType type) {
         return "token:WHILE";
     case TOKEN_RETURN:
         return "token:RETURN";
+    case TOKEN_EOF:
+        return "token:EOF";
     case TOKEN_CALL:
         return "token:CALL";
-    case TOKEN_TILDE:
-        return "token:TILDE";
-    case TOKEN_COLON:
-        return "token:COLON";
     case TOKEN_INDEX:
         return "token:INDEX";
     case TOKEN_LBLOCK:

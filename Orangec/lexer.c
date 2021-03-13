@@ -114,82 +114,14 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
             tempType = TOKEN_LBRACE;
         } else if(strcmp("}", tokenBuffer) == 0) {
             tempType = TOKEN_RBRACE;
-        } else if(strcmp("/*", tokenBuffer) == 0) {
-            tempType = TOKEN_LBLOCK;
-        } else if(strcmp("*/", tokenBuffer) == 0) {
-            tempType = TOKEN_RBLOCK;
-        } else if(strcmp("//", tokenBuffer) == 0) {
-            tempType = TOKEN_DSLASH;
         } else if(strcmp(",", tokenBuffer) == 0) {
             tempType = TOKEN_COMMA;
-        } else if(strcmp(";", tokenBuffer) == 0) {
-            tempType = TOKEN_SEMICOLON;
         } else if(strcmp(".", tokenBuffer) == 0) {
             tempType = TOKEN_DOT;
+        } else if(strcmp(";", tokenBuffer) == 0) {
+            tempType = TOKEN_SEMICOLON;
         } else if(strcmp(":", tokenBuffer) == 0) {
             tempType = TOKEN_COLON;
-        } else if(strcmp("+", tokenBuffer) == 0) {
-            tempType = TOKEN_PLUS;
-        } else if(strcmp("-", tokenBuffer) == 0) {
-            tempType = TOKEN_MINUS;
-        } else if(strcmp("/", tokenBuffer) == 0) {
-            tempType = TOKEN_SLASH;
-        } else if(strcmp("*", tokenBuffer) == 0) {
-            tempType = TOKEN_STAR;
-        } else if(strcmp("=", tokenBuffer) == 0) {
-            tempType = TOKEN_EQUALS;
-        } else if(strcmp("==", tokenBuffer) == 0) {
-            tempType = TOKEN_IS;
-        } else if(strcmp("!=", tokenBuffer) == 0) {
-            tempType = TOKEN_ISNT;
-        } else if(strcmp("<", tokenBuffer) == 0) {
-            tempType = TOKEN_LESSER;
-        } else if(strcmp(">", tokenBuffer) == 0) {
-            tempType = TOKEN_GREATER;
-        } else if(strcmp("<=", tokenBuffer) == 0) {
-            tempType = TOKEN_LESSEREQUAL;
-        } else if(strcmp(">=", tokenBuffer) == 0) {
-            tempType = TOKEN_GREATEREQUAL;
-        } else if(strcmp("&&", tokenBuffer) == 0) {
-            tempType = TOKEN_AND;
-        } else if(strcmp("||", tokenBuffer) == 0) {
-            tempType = TOKEN_OR;
-        } else if(strcmp("cast", tokenBuffer) == 0) {
-            tempType = TOKEN_CAST;
-        } else if(strcmp("new", tokenBuffer) == 0) {
-            tempType = TOKEN_NEW;
-        } else if(strcmp("free", tokenBuffer) == 0) {
-            tempType = TOKEN_FREE;
-        } else if(strcmp("verbatim", tokenBuffer) == 0) {
-            tempType = TOKEN_VERBATIM;
-        } else if(strcmp("true", tokenBuffer) == 0) {
-            tempType = TOKEN_TRUE;
-        } else if(strcmp("false", tokenBuffer) == 0) {
-            tempType = TOKEN_FALSE;
-        } else if(strcmp("null", tokenBuffer) == 0) {
-            tempType = TOKEN_NULL;
-        } else if(strcmp("module", tokenBuffer) == 0) {
-            tempType = TOKEN_MODULE;
-        } else if(strcmp("struct", tokenBuffer) == 0) {
-            tempType = TOKEN_STRUCT;
-        } else if(strcmp("enum", tokenBuffer) == 0) {
-            tempType = TOKEN_ENUM;
-        } else if(strcmp("return", tokenBuffer) == 0) {
-            tempType = TOKEN_RETURN;
-        } else if(strcmp("[]", tokenBuffer) == 0) {
-            tempType = TOKEN_ARRAY;
-        } else if(strcmp("static", tokenBuffer) == 0) {
-            tempType = TOKEN_STATIC;
-        } else if(strcmp("const", tokenBuffer) == 0) {
-            tempType = TOKEN_CONST;
-        } else if(strcmp("private", tokenBuffer) == 0) {
-            tempType = TOKEN_PRIVATE;
-        } else if(strcmp("if", tokenBuffer) == 0) {
-            tempType = TOKEN_IF;
-        } else if(strcmp("else", tokenBuffer) == 0) {
-            tempType = TOKEN_ELSE;
-        } else if(strcmp("while", tokenBuffer) == 0) {
-            tempType = TOKEN_WHILE;
         } else if(isdigit(tokenBuffer[0])) {
             if(numIsFloat(tokenBuffer)) {
                 tempType = TOKEN_REALLITERAL;
@@ -202,6 +134,74 @@ struct list* lexer_tokenize(const char *file, const char* filename) {
         } else if(tokenBuffer[0] == '"'){
             tempType = TOKEN_STRINGLITERAL;
             removeQuotes(tokenBuffer);
+        } else if(strcmp("true", tokenBuffer) == 0) {
+            tempType = TOKEN_TRUE;
+        } else if(strcmp("false", tokenBuffer) == 0) {
+            tempType = TOKEN_FALSE;
+        } else if(strcmp("null", tokenBuffer) == 0) {
+            tempType = TOKEN_NULL;
+        } else if(strcmp("verbatim", tokenBuffer) == 0) {
+            tempType = TOKEN_VERBATIM;
+        } else if(strcmp("+", tokenBuffer) == 0) {
+            tempType = TOKEN_PLUS;
+        } else if(strcmp("-", tokenBuffer) == 0) {
+            tempType = TOKEN_MINUS;
+        } else if(strcmp("*", tokenBuffer) == 0) {
+            tempType = TOKEN_STAR;
+        } else if(strcmp("/", tokenBuffer) == 0) {
+            tempType = TOKEN_SLASH;
+        } else if(strcmp("=", tokenBuffer) == 0) {
+            tempType = TOKEN_EQUALS;
+        } else if(strcmp("==", tokenBuffer) == 0) {
+            tempType = TOKEN_IS;
+        } else if(strcmp("!=", tokenBuffer) == 0) {
+            tempType = TOKEN_ISNT;
+        } else if(strcmp(">", tokenBuffer) == 0) {
+            tempType = TOKEN_GREATER;
+        } else if(strcmp("<", tokenBuffer) == 0) {
+            tempType = TOKEN_LESSER;
+        } else if(strcmp(">=", tokenBuffer) == 0) {
+            tempType = TOKEN_GREATEREQUAL;
+        } else if(strcmp("<=", tokenBuffer) == 0) {
+            tempType = TOKEN_LESSEREQUAL;
+        } else if(strcmp("&&", tokenBuffer) == 0) {
+            tempType = TOKEN_AND;
+        } else if(strcmp("||", tokenBuffer) == 0) {
+            tempType = TOKEN_OR;
+        } else if(strcmp("cast", tokenBuffer) == 0) {
+            tempType = TOKEN_CAST;
+        } else if(strcmp("new", tokenBuffer) == 0) {
+            tempType = TOKEN_NEW;
+        } else if(strcmp("free", tokenBuffer) == 0) {
+            tempType = TOKEN_FREE;
+        } else if(strcmp("module", tokenBuffer) == 0) {
+            tempType = TOKEN_MODULE;
+        } else if(strcmp("struct", tokenBuffer) == 0) {
+            tempType = TOKEN_STRUCT;
+        } else if(strcmp("enum", tokenBuffer) == 0) {
+            tempType = TOKEN_ENUM;
+        } else if(strcmp("private", tokenBuffer) == 0) {
+            tempType = TOKEN_PRIVATE;
+        } else if(strcmp("static", tokenBuffer) == 0) {
+            tempType = TOKEN_STATIC;
+        } else if(strcmp("const", tokenBuffer) == 0) {
+            tempType = TOKEN_CONST;
+        } else if(strcmp("[]", tokenBuffer) == 0) {
+            tempType = TOKEN_ARRAY;
+        } else if(strcmp("if", tokenBuffer) == 0) {
+            tempType = TOKEN_IF;
+        } else if(strcmp("else", tokenBuffer) == 0) {
+            tempType = TOKEN_ELSE;
+        } else if(strcmp("while", tokenBuffer) == 0) {
+            tempType = TOKEN_WHILE;
+        } else if(strcmp("return", tokenBuffer) == 0) {
+            tempType = TOKEN_RETURN;
+        } else if(strcmp("/*", tokenBuffer) == 0) {
+            tempType = TOKEN_LBLOCK;
+        } else if(strcmp("*/", tokenBuffer) == 0) {
+            tempType = TOKEN_RBLOCK;
+        } else if(strcmp("//", tokenBuffer) == 0) {
+            tempType = TOKEN_DSLASH;
         } else {
             tempType = TOKEN_IDENTIFIER;
         }
