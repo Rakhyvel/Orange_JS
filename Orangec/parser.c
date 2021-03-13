@@ -363,7 +363,9 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
 
 /*
     Creates an AST for code given a queue of tokens. Only parses one 
-    instruction per call. */
+    instruction per call. 
+    
+    Will return NULL on empty semicolon statements */
 static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scope) {
     ASSERT(tokenQueue != NULL);
     ASSERT(scope != NULL);
@@ -381,7 +383,10 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         ASSERT(!map_put(scope->children, symbolNode->name, symbolNode));
         assertRemove(tokenQueue, TOKEN_LBRACE);
         while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
-            queue_push(retval->children, parseAST(tokenQueue, retval->data));
+            struct astNode* child = parseAST(tokenQueue, retval->data); // Can sometimes be NULL from semicolon statements, gaurd against
+            if(child != NULL) {
+                queue_push(retval->children, child);
+            }
         }
         assertRemove(tokenQueue, TOKEN_RBRACE);
     }
@@ -441,7 +446,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         queue_push(retval->children, expression);
     }
     else if (topMatches(tokenQueue, TOKEN_SEMICOLON)) {
-        assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        assertRemove(tokenQueue, TOKEN_SEMICOLON); // will cause retval to be NULL
     }
     // EXPRESSION
     else {
@@ -606,7 +611,6 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
 
     // Go through each token in given expression token queue, add/reject/parse to retval
     while(!list_isEmpty(tokenQueue)) {
-        // @fix unify call arg parsing and verbatim arg parsing
         // CALL
         if(matchTokens(tokenQueue, CALL, 2)) {
             struct token* callName = ((struct token*)queue_pop(tokenQueue));

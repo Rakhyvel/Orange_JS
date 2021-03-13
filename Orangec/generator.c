@@ -107,7 +107,7 @@ static void constructLists(struct symbolNode* node, struct list* enumList, struc
 static void fprintb(FILE* out, int num) {
     char* buf = itoa(num);
     fprintf(out, "_%s", buf);
-    // free(buf); @fix why does this causes a "free(): invalid pointer" error
+    //free(buf); //@fix why does this causes a "free(): invalid pointer" error
 }
 
 /*
@@ -218,7 +218,6 @@ static void generateAST(FILE* out, int tabs, struct astNode* node) {
         fprintf(out, "{");
         struct listElem* elem;
         for(elem = list_begin(node->children); elem != list_end(node->children); elem = list_next(elem)) {
-            if(elem->data == NULL) continue; // @fix why would child be null here?
             generateAST(out, tabs + 1, (struct astNode*)elem->data);
         }
         fprintf(out, "}");

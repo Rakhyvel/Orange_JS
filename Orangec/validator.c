@@ -210,8 +210,6 @@ static void updateStruct(struct symbolNode* symbolNode) {
     This function takes in an AST node, and checks it's data, like it's type, 
     children's type, children's validity. */
 static void validateAST(struct astNode* node) {
-    if(node == NULL) return; // @fix why is this here?
-
     struct listElem* elem;
     LOG("Validating AST \"%s\" ", ast_toString(node->type));
 
@@ -663,7 +661,6 @@ static int validateFunctionTypesMatch(struct map* paramMap1, struct map* paramMa
     for(paramElem1 = list_begin(paramMap1->keyList), paramElem2 = list_begin(paramMap2->keyList); 
         paramElem1 != list_end(paramMap1->keyList) && paramElem2 != list_end(paramMap2->keyList); 
         paramElem1 = list_next(paramElem1), paramElem2 = list_next(paramElem2), i++) {
-        // @fix this whole thing is clunky
         if(strstr(paramElem1->data, "_block")) {
             paramElem1 = list_next(paramElem1);
             if(paramElem1 == list_end(paramMap1->keyList)) {
