@@ -327,6 +327,8 @@ static int numIsFloat(const char* test) {
     return 0;
 }
 
+/*
+    Takes in a string or char literal, strips off the quotes from the given string */
 static void removeQuotes(char* str) {
     char temp[255];
     memset(temp, 0, 255);

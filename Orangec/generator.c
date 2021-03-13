@@ -25,11 +25,13 @@ static void constructLists(struct symbolNode*, struct list*, struct list*, struc
 static void fprintb(FILE*, int);
 static void generateEnum(FILE*, struct symbolNode*);
 static void generateStruct(FILE*, struct symbolNode*);
-static void generateGlobal(FILE*, struct symbolNode*);
+static void generateVariable(FILE*, struct symbolNode*);
 static void generateFunction(FILE*, struct symbolNode*);
 static void generateAST(FILE*, int, struct astNode*);
 static void generateExpression(FILE*, struct astNode*);
 
+/*
+    Writes a JavaScript file to the given file according to the program structure. */
 void generator_generate(FILE* out) {
     fprintf(out, "/*\n\tGenerated with Orange compiler\n\tWritten and developed by Joseph Shimel\n\thttps://github.com/rakhyvel/Orange\n*/\n");
     struct list* enumList = list_create();
@@ -51,7 +53,7 @@ void generator_generate(FILE* out) {
     }
     elem = list_begin(globalList);
     for(;elem != list_end(globalList); elem = list_next(elem)) {
-        generateGlobal(out, elem->data);
+        generateVariable(out, elem->data);
         fprintf(out, "\n");
     }
     elem = list_begin(functionList);
@@ -69,6 +71,13 @@ void generator_generate(FILE* out) {
     }
 }
 
+/*
+    Pulls out all enums, structs, globals, and functions into their own special 
+    list.
+    
+    This is done because JavaScript reads files in order, whereas in Orange, 
+    symbols like enums, structs, and functions can be written anywhere, and are 
+    still legal as long as they are within scope. */
 static void constructLists(struct symbolNode* node, struct list* enumList, struct list* structList, struct list* globalList, struct list* functionList) {
     struct listElem* elem = list_begin(node->children->keyList);
     for(;elem != list_end(node->children->keyList); elem = list_next(elem)) {
@@ -90,27 +99,30 @@ static void constructLists(struct symbolNode* node, struct list* enumList, struc
     }
 }
 
+/*
+    Prints out a base 36 representation of a number to a stream.
+    
+    Used to print out UID's to the output file */ 
 static void fprintb(FILE* out, int num) {
     char* buf = itoa(num);
     fprintf(out, "_%s", buf);
-    // free(buf);
+    // free(buf); @fix why does this causes a "free(): invalid pointer" error
 }
 
 /*
-_6 = {
-    WINTER: 0,
-    SPRING: 1,
-}
-*/
+    Writes a JavaScript version of an enum
+    
+    Representation:
+        enumUID = {field:ordinal, field:ordinal, ...}; */
 static void generateEnum(FILE* out, struct symbolNode* num) {
     LOG("Generate enum");
     fprintb(out, num->id);
     fprintf(out, "={");
-    int val = 0;
+    int ordinal = 0;
     struct list* nums = num->children->keyList;
     struct listElem* numElem;
     for(numElem = list_begin(nums); numElem != list_end(nums); numElem = list_next(numElem)) {
-        fprintf(out, "%s:%d", (char*)numElem->data, val++);
+        fprintf(out, "%s:%d", (char*)numElem->data, ordinal++);
         if(numElem->next != list_end(nums)){
             fprintf(out, ", ");
         }
@@ -118,6 +130,13 @@ static void generateEnum(FILE* out, struct symbolNode* num) {
     fprintf(out, "};");
 }
 
+/*
+    Writes a struct in JavaScript to a file. The fields are written as their 
+    ascii names, rather than their UID, to better aid in cross compatibility 
+    with JavaScript classes.
+
+    Representation:
+        class structUID { constructor(field, field, ...) {this.field = field; this.field = field; ...} }  */
 static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
     LOG("Generate struct");
     fprintf(out, "class ");
@@ -139,7 +158,13 @@ static void generateStruct(FILE* out, struct symbolNode* dataStruct) {
     fprintf(out, "}\n}");
 }
 
-static void generateGlobal(FILE* out, struct symbolNode* variable) {
+/*
+    Writes a variable in Javascript to a file.
+    
+    Representations:
+        let varUID; 
+        let varUID = varExpr; */
+static void generateVariable(FILE* out, struct symbolNode* variable) {
     LOG("Generate global");
     if(variable->code != NULL) {
         fprintf(out, "let ");
@@ -154,6 +179,11 @@ static void generateGlobal(FILE* out, struct symbolNode* variable) {
     }
 }
 
+/*
+    Writes a function in Javascript to a file.
+    
+    Representation:
+        function functionUID(param, param, ...){ ...code... } */
 static void generateFunction(FILE* out, struct symbolNode* function) {
     LOG("Generate function");
     fprintf(out, "function ");
@@ -175,6 +205,8 @@ static void generateFunction(FILE* out, struct symbolNode* function) {
     generateAST(out, 0, function->code);
 }
 
+/*
+    Writes out an AST in Javascript to a file. */
 static void generateAST(FILE* out, int tabs, struct astNode* node) {
     LOG("Generate AST %s", ast_toString(node->type));
     if(node == NULL) return;
@@ -192,8 +224,8 @@ static void generateAST(FILE* out, int tabs, struct astNode* node) {
     }
     case AST_SYMBOLDEFINE: {
         struct symbolNode* symbol = (struct symbolNode*) node->data;
-        if(symbol->symbolType == SYMBOL_VARIABLE) {
-            generateGlobal(out, node->data);
+        if(symbol->symbolType == SYMBOL_VARIABLE) { // Don't write to functions, structs, or enums. They are written elsewhere
+            generateVariable(out, node->data);
         }
     } break;
     case AST_IF:
@@ -228,6 +260,8 @@ static void generateAST(FILE* out, int tabs, struct astNode* node) {
     }
 }
 
+/*
+    Writes out an AST expression in Javascript to a file. */
 static void generateExpression(FILE* out, struct astNode* node) {
     LOG("Generate expression %s", ast_toString(node->type));
 

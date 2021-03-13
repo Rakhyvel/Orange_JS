@@ -54,6 +54,10 @@ struct symbolNode* symbol_find(const char* symbolName, const struct symbolNode* 
     return NULL;
 }
 
+/*
+    Searches a given module for a given member.
+    
+    Does not return null, instead errors itself for finer grain errors */
 struct symbolNode* symbol_findExplicit(char* moduleName, char* memberName, const struct symbolNode* scope, const char* filename, int line) {
     struct symbolNode* module = map_get(program->children, moduleName);
     if(module == NULL) {

@@ -40,9 +40,7 @@ static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, 
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VERBATIM[] = {TOKEN_VERBATIM, TOKEN_LPAREN};
-static int num_ids = 0;
 
-// Private functions
 static int topMatches(struct list*, enum tokenType);
 static int matchTokens(struct list*, const enum tokenType[], int);
 static const char* getTopFilename(struct list*);
@@ -61,7 +59,7 @@ static void assertPeek(struct list*, enum tokenType);
 static void assertOperator(enum astType, const char*, int);
 
 /*
-    Removes tokens from a list that are surrounded by comments */
+    Removes tokens from a list that are within comments */
 void parser_removeComments(struct list* tokenQueue) {
     struct listElem* elem;
     int withinComment = 0;
@@ -101,6 +99,17 @@ void parser_removeComments(struct list* tokenQueue) {
     }
 }
 
+/*
+    Goes through the token queue as a list, checks for array type 
+    modifiers "[]". Once found, concatonates the array modifier with 
+    a space and the token before it. The space is used because a legal identiier
+    cannot contain spaces, thus avoiding name collisions.
+    
+    This is used to make array type parsing easier. For example, the type the
+    variable i:
+        int[] i;
+    would be "int array". The brackets can be detected by the validator, and
+    reasoned with. */
 void parser_condenseArrayIdentifiers(struct list* tokenQueue) {
     struct listElem* elem;
     for(elem = list_begin(tokenQueue); elem != list_end(tokenQueue); elem = list_next(elem)) {
@@ -114,6 +123,9 @@ void parser_condenseArrayIdentifiers(struct list* tokenQueue) {
     }
 }
 
+/*
+    Goes through a token queue, parses out the first symbol off the front of 
+    the queue, and assigns its parent to the given parent */
 struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode* parent) {
     struct symbolNode* symbolNode;
     int isPrivate = topMatches(tokenQueue, TOKEN_PRIVATE);
@@ -217,10 +229,12 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         copyNextTokenString(tokenQueue, symbolNode->name);
         parseParams(tokenQueue, symbolNode);
         if(topMatches(tokenQueue, TOKEN_EQUALS)) {
+            symbolNode->isDeclared = 1;
             assertRemove(tokenQueue, TOKEN_EQUALS);
             symbolNode->code = parseAST(tokenQueue, symbolNode);
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
         } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
+            symbolNode->isDeclared = 1;
             symbolNode->code = parseAST(tokenQueue, symbolNode);
         } else {
             symbolNode->symbolType = SYMBOL_FUNCTIONPTR;
@@ -237,6 +251,8 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     return symbolNode;
 }
 
+/*
+    Returns whether or not the top of the tokenQueue has the specified type. */
 static int topMatches(struct list* tokenQueue, enum tokenType type) {
     return ((struct token*)queue_peek(tokenQueue))->type == type;
 }
@@ -245,7 +261,7 @@ static int topMatches(struct list* tokenQueue, enum tokenType type) {
     Determines if a given token signature matches what is at the front of a 
     tokenQueue.
     
-    Does NOT run off edge of tokenQueue, instead returns false. */
+    Does NOT overrun off edge of tokenQueue, instead returns false. */
 static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int nTokens) {
     int i = 0;
     struct listElem* elem;
@@ -258,10 +274,14 @@ static int matchTokens(struct list* tokenQueue, const enum tokenType sig[], int 
     return i == nTokens;
 }
 
+/*
+    Returns the filename of token at the front of the tokenQueue */
 static const char* getTopFilename(struct list* tokenQueue) {
     return ((struct token*)queue_peek(tokenQueue))->filename;
 }
 
+/*
+    Returns the line number of the token at the front of the tokenQueue */
 static int getTopLine(struct list* tokenQueue) {
     return ((struct token*)queue_peek(tokenQueue))->line;
 }
@@ -277,6 +297,8 @@ static void copyNextTokenString(struct list* tokenQueue, char* dest) {
 }
 
 /*
+    Converts integers to base 36 ascii. Used for text representation of UID's
+
     Implementation from http://www.strudel.org.uk/itoa/ */
 char* itoa(int val) {
 	char* buf = (char*)calloc(1, 32);
@@ -287,8 +309,8 @@ char* itoa(int val) {
 }
 
 /*
-    Takes in a token queue, reads in the parameters and adds both the types and
-    names to lists. The lists are ordered and pairs are in the same indices.
+    Takes in a token queue, reads in the parameters and them as the children 
+    to a parent symbol. Used for function parameters and struct fields.
     
     Parenthesis are removed in this function as well.*/
 static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
@@ -299,6 +321,7 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
         if(map_put(parent->children, param->name, param)) {
             error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Parameter \"%s\" defined in more than one place", param->name);
         }
+        param->isDeclared = 1;
     
         if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
@@ -310,6 +333,9 @@ static void parseParams(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_RPAREN);
 }
 
+/*
+    Takes in a token queue, reads in a list of enumerations, and adds them as
+    children symbols to a parent symbol. */
 static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
     assertRemove(tokenQueue, TOKEN_LPAREN);
     // Parse enum names for enums
@@ -321,6 +347,7 @@ static void parseEnums(struct list* tokenQueue, struct symbolNode* parent) {
         if(map_put(parent->children, num->name, num)) {
             error(num->filename, num->line, "Enum \"%s\" defined in more than one place", num->name);
         }
+        num->isDeclared = 1;
     
         if(topMatches(tokenQueue, TOKEN_COMMA)) {
             free(queue_pop(tokenQueue));
@@ -343,8 +370,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         retval->data = symbol_create(SYMBOL_BLOCK, scope, getTopFilename(tokenQueue), getTopLine(tokenQueue));
         ((struct symbolNode*)retval->data)->isStatic = scope->isStatic;
         strcpy(((struct symbolNode*)retval->data)->name, "_block");
-        strcat(((struct symbolNode*)retval->data)->name, itoa(num_ids++));
-        strcpy(((struct symbolNode*)retval->data)->type, scope->type);
+        strcpy(((struct symbolNode*)retval->data)->type, scope->type); // blocks have same type as parent, to aid in validating return values
         map_put(scope->children, ((struct symbolNode*)retval->data)->name, retval->data);
         assertRemove(tokenQueue, TOKEN_LBRACE);
         while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RBRACE)) {
@@ -415,6 +441,10 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
     return retval;
 }
 
+/*
+    Copies the type at the front of the tokenQueue to a given string. If the 
+    type is external (IE contains the : operator), the type will have the 
+    form module$type. */
 static void expectType(struct list* tokenQueue, char* dst) {
     copyNextTokenString(tokenQueue, dst);
     if(topMatches(tokenQueue, TOKEN_COLON)) {
@@ -547,7 +577,20 @@ static struct list* nextExpression(struct list* tokenQueue) {
 
 /*
     Takes in a queue representing an expression, and if it can, transforms 
-    function calls/index token structures into proper call/index tokens */
+    function calls/index token structures into proper call/index tokens 
+    
+    This is useful later, infix->postfix translation is done. For expressions
+    that taken more than one token, such as calls, indexes, and casts, its 
+    easier to convert them to a single anonymous token, and then convert to
+    postfix as normal. 
+    
+    Calls:      IDENT ( ARG , ARG , ... )       ->      CALL(name) : {AST_ARG, AST_ARG, ... } 
+    Verbatim:   VERBATIM ( ARG , ARG , ... )    ->      VERBATIM : {AST_ARG, AST_ARG, ... } 
+    Indexes:    IDENT [ EXPR. ]                 ->      IDENT INDEX ( EXPR. )
+    Cast:       CAST ( IDENT )                  ->      CAST(type)
+
+    Other tokens are just added to the retval queue
+    */
 static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* scope) {
     LOG("Simplify Tokens");
     struct list* retval = list_create();
@@ -578,17 +621,14 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             queue_push(retval, call);
         // VERBATIM
         } else if(matchTokens(tokenQueue, VERBATIM, 2)) {
-            struct token* callName = ((struct token*)queue_pop(tokenQueue));
-            struct token* call = token_create(TOKEN_VERBATIM, callName->data, callName->filename, callName->line);
-            call->line = callName->line;
-            free(callName);
+            struct token* verbatim = ((struct token*)queue_pop(tokenQueue));
 
             assertRemove(tokenQueue, TOKEN_LPAREN);
             
             // Go through each argument, create AST representing it
             while(!list_isEmpty(tokenQueue) && !topMatches(tokenQueue, TOKEN_RPAREN)) {
                 struct astNode* argAST = parseExpression(tokenQueue, scope);
-                queue_push(call->list, argAST);
+                queue_push(verbatim->list, argAST);
 
                 if(topMatches(tokenQueue, TOKEN_COMMA)) {
                     free(queue_pop(tokenQueue));
@@ -596,7 +636,7 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
             }
             assertRemove(tokenQueue, TOKEN_RPAREN);
 
-            queue_push(retval, call);
+            queue_push(retval, verbatim);
         } 
         // INDEX
         else if(topMatches(tokenQueue, TOKEN_LSQUARE)) {
@@ -635,7 +675,16 @@ static struct list* simplifyTokens(struct list* tokenQueue, struct symbolNode* s
 
 /*
     Consumes a queue of tokens representing an expression in infix order, 
-    converts it to postfix order */
+    converts it to postfix order.
+    
+    Tokens are read in as they are in the file, which is in infix order. It is 
+    easier to parse out the AST from a postfix queue of tokens than an infix 
+    queue of tokens. 
+    
+    Example infix to posftix translation:
+        Infix:   4 * 5 + (3 - 9) 
+        Postfix: 3 9 - 4 5 * +
+    */
 static struct list* infixToPostfix(struct list* tokenQueue) {
     LOG("Infix to Postfix");
     struct list* retval = list_create();

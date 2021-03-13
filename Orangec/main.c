@@ -98,6 +98,9 @@ int main(int argn, char** argv) {
     return 0;
 }
 
+/*
+    Reads in a file with the given filename, adds the modules from the file 
+    to the program structure. */
 static void readInputFile(char* filename) {
     LOG("Reading file %s", filename);
     FILE* file = fopen(filename, "r");

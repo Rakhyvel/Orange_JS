@@ -1,4 +1,5 @@
-/*
+/*  symbol.h
+
     Author: Joseph Shimel
     Date: 3/10/21
 */
@@ -50,7 +51,8 @@ struct symbolNode {
     int isPrivate;  // only accessed by direct descendants (ie not root access operator ":")
     int isStatic;   // can access other static symbols
     int isConstant; // value cannot change
-    int isDeclared; // has value been set or not
+    int isDefined; // has value been given
+    int isDeclared; // has value been stated
 
     // Metadata
     const char* filename;

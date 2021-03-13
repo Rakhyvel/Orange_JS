@@ -19,7 +19,7 @@
 #include "../util/list.h"
 #include "../util/debug.h"
 
-static void updateType(char*, struct symbolNode*);
+static void updateType(struct symbolNode*);
 static void updateStruct(struct symbolNode*);
 static void validateAST(struct astNode*);
 static char* validateExpressionAST(struct astNode*);
@@ -67,7 +67,7 @@ void validator_updateStructType(struct symbolNode* symbolNode) {
     case SYMBOL_FUNCTION:
     case SYMBOL_BLOCK:
         if(strstr(symbolNode->type, "$")) {
-            updateType(symbolNode->type, symbolNode);
+            updateType(symbolNode);
         } else {
             updateStruct(symbolNode);
         } // rollover to default ->
@@ -129,7 +129,9 @@ void validator_validate(struct symbolNode* symbolNode) {
             if(!typesMatch(symbolNode->type, actual, symbolNode->parent, symbolNode->filename, symbolNode->line)) {
                 error(symbolNode->filename, symbolNode->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", symbolNode->type, actual);
             }
+            symbolNode->isDefined = 1;
         }
+        symbolNode->isDeclared = 1;
         // All children must be valid
         for(;elem != list_end(children); elem = list_next(elem)) {
             validator_validate((struct symbolNode*)map_get(symbolNode->children, (char*)elem->data));
@@ -161,35 +163,52 @@ void validator_validate(struct symbolNode* symbolNode) {
 }
 
 /*
-    Splits specific type into two */
-static void updateType(char* type, struct symbolNode* scope) {
+    This function is called before validation when a function or variable has 
+    a $ character as part of its type. The $ symbol indicate that the type is
+    defined in another module, either an enum or a struct.
+    
+    Takes in a symbol, whose type is in the form module$type, and converts it 
+    so that the type is in the form type#uid. This prevents type name clashing. */
+static void updateType(struct symbolNode* symbolNode) {
     char mod[255];
     memset(mod, 0, 254);
     char member[255];
     memset(member, 0, 254);
-    int end = findTypeEnd(type);
-    strncpy(mod, type, end);
-    strcpy(member, type + end + 1);
-    struct symbolNode* symbol = symbol_findExplicit(mod, member, scope->parent, scope->filename, scope->line);
-    if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
-        strcpy(scope->type, symbol->type);
-    }
-}
-
-static void updateStruct(struct symbolNode* symbolNode) {
-    struct symbolNode* symbol = symbol_find(symbolNode->type, symbolNode->parent);
-    if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
+    int end = findTypeEnd(symbolNode->type);
+    strncpy(mod, symbolNode->type, end);
+    strcpy(member, symbolNode->type + end + 1);
+    struct symbolNode* symbol = symbol_findExplicit(mod, member, symbolNode->parent, symbolNode->filename, symbolNode->line);
+    if(symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM) {
         strcpy(symbolNode->type, symbol->type);
-    }
+    } // findExplicit throws its own errors
 }
 
 /*
-    Takes in an AST and checks to make sure that it is correct */
+    This function is called before validation on a symbol node that does not 
+    have a $ character in its type. This indicates that the type is local to 
+    the module the symbol is in.
+    
+    However, to prevent type clashes when combining modules, types are given a
+    unique ID that they are referenced by, meaning that the plaintext type is
+    not valid. 
+    
+    This function converts the plaintext type to the full type, in the form
+    type#UID */
+static void updateStruct(struct symbolNode* symbolNode) {
+    struct symbolNode* symbol = symbol_find(symbolNode->type, symbolNode->parent);
+    if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
+        LOG("%s", symbol->type);
+        strcpy(symbolNode->type, symbol->type);
+    } // type may not be valid here, but that will be checked later
+}
+
+/*
+    This function takes in an AST node, and checks it's data, like it's type, 
+    children's type, children's validity. */
 static void validateAST(struct astNode* node) {
-    if(node == NULL) return;
+    if(node == NULL) return; // @fix why is this here?
 
     struct listElem* elem;
-    struct symbolNode* var;
     LOG("Validating AST \"%s\" ", ast_toString(node->type));
 
     switch(node->type) {
@@ -199,8 +218,7 @@ static void validateAST(struct astNode* node) {
         }
         break;
     case AST_SYMBOLDEFINE: {
-        var = (struct symbolNode*) node->data;
-        var->isDeclared = 1;
+        struct symbolNode* var = (struct symbolNode*) node->data;
         LOG("%p", node->scope);
         validator_validate(var);
     } break;
@@ -271,9 +289,12 @@ char* validateExpressionAST(struct astNode* node) {
         struct symbolNode* var = symbol_find(node->data, node->scope);
         if(var == NULL) {
             error(node->filename, node->line, "Unknown symbol %s", node->data);
+        } else if(!var->isDeclared) {
+            error(node->filename, node->line, "Symbol %s is undeclared", node->data);
+        } else {
+            strcpy(retval, var->type);
+            return retval;
         }
-        strcpy(retval, var->type);
-        return retval;
     }
     case AST_INTLITERAL:
         strcpy(retval, "int");
@@ -393,6 +414,9 @@ char* validateExpressionAST(struct astNode* node) {
         }
         // Left/right type matching
         validateBinaryOp(node->children, left, right);
+        if(var != NULL) {
+            var->isDefined = 1;
+        }
         LOG("%s == %s", left, right);
         if(!typesMatch(left, right, node->scope, node->filename, node->line)) {
             error(node->filename, node->line, "Value type mismatch. Expected \"%s\" type, actual type was \"%s\" ", left, right);
@@ -507,18 +531,12 @@ char* validateExpressionAST(struct astNode* node) {
             error(node->filename, node->line, "Right side of module access operator must be varibale or function name");
         }
 
-        struct symbolNode* symbol = symbol_findExplicit(leftAST->data, rightAST->data, node->scope, node->filename, node->line);
-        if(symbol != NULL) {
-            rightAST->scope = map_get(program->children, leftAST->data);
-            if (rightAST->type == AST_CALL) { // Validate that the call is well formed
-                validateExpressionAST(rightAST);
-            }
-            return symbol->type;
-        } else if(rightAST->type == AST_CALL) {
-            error(node->filename, node->line, "Module \"%s\" does not contain function \"%s\"", leftAST->data, rightAST->data);
-        } else if(rightAST->type == AST_VAR) {
-            error(node->filename, node->line, "Module \"%s\" does not contain variable \"%s\"", leftAST->data, rightAST->data);
+        struct symbolNode* symbol = symbol_findExplicit(leftAST->data, rightAST->data, node->scope, node->filename, node->line); // findExplicit throws errors itself, no need to check for NULL
+        rightAST->scope = map_get(program->children, leftAST->data);
+        if (rightAST->type == AST_CALL) { // Validate that the call is well formed
+            validateExpressionAST(rightAST);
         }
+        return symbol->type;
     }
     default:
         PANIC("AST \"%s\" validation is not implemented yet", ast_toString(node->type));
@@ -631,6 +649,9 @@ static int validateType(const char* type, const struct symbolNode* scope) {
     return 1;
 }
 
+/*
+    Validates that the parameter map of one function matches that of another 
+    function. Used to check if a function pointer fits a function */
 static int validateFunctionTypesMatch(struct map* paramMap1, struct map* paramMap2, struct symbolNode* scope, const char* filename, int line) {
     struct listElem* paramElem1;
     struct listElem* paramElem2;
