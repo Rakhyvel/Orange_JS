@@ -22,19 +22,20 @@
 #include "../util/debug.h"
 
 // Private functions
-static int findTypeEnd(const char*);
-static int validateType(const char*, const struct symbolNode*);
+static void updateType(char*, struct symbolNode*);
+static void updateStruct(struct symbolNode*);
+static void validateAST(struct astNode*);
+static char* validateExpressionAST(struct astNode*);
 static void validateBinaryOp(struct list*, char*, char*);
+static int findTypeEnd(const char*);
+static int isPrimitive(const char*);
+static void removeArray(char*);
+static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
+static int validateType(const char*, const struct symbolNode*);
 static int validateFunctionTypesMatch(struct map*, struct map*, struct symbolNode*, const char*, int);
 static int validateArrayType(struct list*, char*, struct symbolNode*, const char*, int);
 static int validateParamType(struct list*, struct map*, struct symbolNode*, const char*, int);
 static char* validateStructField(char*, char*, const char*, int);
-static char* validateExpressionAST(struct astNode* node);
-static void removeArray(char*);
-static int typesMatch(const char*, const char*, const struct symbolNode*, const char*, int);
-static void validateAST(struct astNode*);
-static void updateStruct(struct symbolNode*);
-static void updateType(char*, struct symbolNode*);
 
 void validator_updateStructType(struct symbolNode* symbolNode) {
     struct list* children = symbolNode->children->keyList;
@@ -167,91 +168,6 @@ static void updateStruct(struct symbolNode* symbolNode) {
     if(symbol != NULL && (symbol->symbolType == SYMBOL_STRUCT || symbol->symbolType == SYMBOL_ENUM)) {
         strcpy(symbolNode->type, symbol->type);
     }
-}
-
-/*
-    Returns the position where a type ends, used to find array's base type 
-    
-    Ex:
-    "int"             -> findTypeEnd -> "int|"
-    "int array"       -> findTypeEnd -> "int| array"
-    "int array array" -> findTypeEnd -> "int| array array"
-    where | represents the index returned
-*/
-static int findTypeEnd(const char* type) {
-    int i = 0;
-    while (type[i] != '\0' && type[i] != ' ' && type[i] != '$') i++;
-    return i;
-}
-
-/*
-    Checks to see if a type is a primitive, built in type*/
-static int isPrimitive(const char* type) {
-    if(!strcmp(type,  "int") || !strcmp(type, "char") ||
-        !strcmp(type, "boolean") || !strcmp(type, "void") || 
-        !strcmp(type, "real") || !strcmp(type, "byte") || 
-        !strcmp(type, "struct")) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-/*
-    Checks to see if a given type, for a given scope, is valid */
-static int validateType(const char* type, const struct symbolNode* scope) {
-    // Check primitives
-    int end = findTypeEnd(type);
-    char temp[255];
-    memset(temp, 0, 254);
-    strncpy(temp, type, end);
-    // If the type isn't private, check to see if there is a struct defined with the name
-    if(!isPrimitive(temp) && strcmp(temp, "Any")) {
-        struct symbolNode* dataStruct = map_get(structMap, temp);
-        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-/*
-    Determines if two types are the same. For structs, the expected type may 
-    be a parent struct of the actual struct 
-    
-    USE THIS FUNCTION for comapring two unknown types. Use strcmp ONLY if the 
-    expected type is fixed and known. */
-static int typesMatch(const char* expected, const char* actual, const struct symbolNode* scope, const char* filename, int line) {
-    if(isPrimitive(expected) || isPrimitive(actual)) {
-        return !strcmp(expected, actual);
-    } else if (!isPrimitive(expected) && !strcmp(actual, "None")) {
-        return 1;
-    } else if (!strcmp(expected, "Any") && !isPrimitive(actual)) {
-        return 1;
-    } else if(strstr(expected, " array")){
-        char expectedBase[255];
-        char actualBase[255];
-        if(strcmp(expected, actual)){
-            return 0;
-        }
-        strcpy(expectedBase, expected);
-        strcpy(actualBase, actual);
-        removeArray(expectedBase);
-        removeArray(actualBase);
-        return typesMatch(expectedBase, actualBase, scope, filename, line);
-    } else {
-        // here type must be struct
-        struct symbolNode* dataStruct = map_get(structMap, actual);
-        if(dataStruct == NULL) {
-            dataStruct = symbol_find(actual, scope);
-        }
-        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
-            error(filename, line, "Unknown struct \"%s\" ", actual);
-        } else {
-            return !strcmp(expected, dataStruct->type);
-        }
-    }
-    return 1;
 }
 
 /*
@@ -605,6 +521,34 @@ static void validateBinaryOp(struct list* children, char* leftType, char* rightT
 }
 
 /*
+    Returns the position where a type ends, used to find array's base type 
+    
+    Ex:
+    "int"             -> findTypeEnd -> "int|"
+    "int array"       -> findTypeEnd -> "int| array"
+    "int array array" -> findTypeEnd -> "int| array array"
+    where | represents the index returned
+*/
+static int findTypeEnd(const char* type) {
+    int i = 0;
+    while (type[i] != '\0' && type[i] != ' ' && type[i] != '$') i++;
+    return i;
+}
+
+/*
+    Checks to see if a type is a primitive, built in type*/
+static int isPrimitive(const char* type) {
+    if(!strcmp(type,  "int") || !strcmp(type, "char") ||
+        !strcmp(type, "boolean") || !strcmp(type, "void") || 
+        !strcmp(type, "real") || !strcmp(type, "byte") || 
+        !strcmp(type, "struct")) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*
     Takes in an array type, returns the lower level type (the type without the "array" modifier) */
 static void removeArray(char* str) {
     ASSERT(strstr(str, " array"));
@@ -618,44 +562,60 @@ static void removeArray(char* str) {
 }
 
 /*
-    Takes in a list of AST's representing expressions for arguments, checks each of their types against a map of given
-    parameters, represented as symbolNodes.
+    Determines if two types are the same. For structs, the expected type may 
+    be a parent struct of the actual struct 
     
-    Returns: 1 when too many args, 
-            -1 when too few args,
-             0 when okay args. */
-static int validateParamType(struct list* args, struct map* paramMap, struct symbolNode* scope, const char* filename, int line) {
-    struct list* params = map_getKeyList(paramMap);
-    struct listElem* paramElem;
-    struct listElem* argElem;
-    for(paramElem = list_begin(params), argElem = list_begin(args); 
-        paramElem != list_end(params) && argElem != list_end(args); 
-        paramElem = list_next(paramElem), argElem = list_next(argElem)) {
-        struct symbolNode* symbol = (struct symbolNode*)map_get(paramMap, ((char*)paramElem->data));
-        if(symbol->symbolType == SYMBOL_BLOCK) { // functions store blocks along with parameters, this excludes checking that
-            continue;
+    USE THIS FUNCTION for comapring two unknown types. Use strcmp ONLY if the 
+    expected type is fixed and known. */
+static int typesMatch(const char* expected, const char* actual, const struct symbolNode* scope, const char* filename, int line) {
+    if(isPrimitive(expected) || isPrimitive(actual)) {
+        return !strcmp(expected, actual);
+    } else if (!isPrimitive(expected) && !strcmp(actual, "None")) {
+        return 1;
+    } else if (!strcmp(expected, "Any") && !isPrimitive(actual)) {
+        return 1;
+    } else if(strstr(expected, " array")){
+        char expectedBase[255];
+        char actualBase[255];
+        if(strcmp(expected, actual)){
+            return 0;
         }
-        char* paramType = symbol->type;
-        char* argType = validateExpressionAST((struct astNode*)argElem->data);
-        if(!typesMatch(paramType, argType, scope, filename, line)) {
-            error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
+        strcpy(expectedBase, expected);
+        strcpy(actualBase, actual);
+        removeArray(expectedBase);
+        removeArray(actualBase);
+        return typesMatch(expectedBase, actualBase, scope, filename, line);
+    } else {
+        // here type must be struct
+        struct symbolNode* dataStruct = map_get(structMap, actual);
+        if(dataStruct == NULL) {
+            dataStruct = symbol_find(actual, scope);
         }
-        if(symbol->symbolType == SYMBOL_FUNCTIONPTR) {
-            struct astNode* node = (struct astNode*)argElem->data;
-            struct symbolNode* fnptr = symbol_find(node->data, node->scope);
-            if(fnptr == NULL) {
-                LOG("Here");
-            }
-            int err = validateFunctionTypesMatch(fnptr->children, symbol->children, scope, filename, line);
-            if(err > 0){
-                error(filename, line, "Passed pointer to function with more arguments than expected");
-            } else if(err < 0){
-                error(filename, line, "Passed pointer to function with fewer arguments than expected");
-            }
+        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
+            error(filename, line, "Unknown struct \"%s\" ", actual);
+        } else {
+            return !strcmp(expected, dataStruct->type);
         }
     }
-    // count the parameters, arguments. Check that sizes match excluding function's block
-    return args->size - paramMap->size;
+    return 1;
+}
+
+/*
+    Checks to see if a given type, for a given scope, is valid */
+static int validateType(const char* type, const struct symbolNode* scope) {
+    // Check primitives
+    int end = findTypeEnd(type);
+    char temp[255];
+    memset(temp, 0, 254);
+    strncpy(temp, type, end);
+    // If the type isn't private, check to see if there is a struct defined with the name
+    if(!isPrimitive(temp) && strcmp(temp, "Any")) {
+        struct symbolNode* dataStruct = map_get(structMap, temp);
+        if(dataStruct == NULL || (dataStruct->symbolType != SYMBOL_STRUCT && dataStruct->symbolType != SYMBOL_ENUM)) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 static int validateFunctionTypesMatch(struct map* paramMap1, struct map* paramMap2, struct symbolNode* scope, const char* filename, int line) {
@@ -699,6 +659,47 @@ static int validateArrayType(struct list* args, char* expected, struct symbolNod
         }
     }
     return 1;
+}
+
+/*
+    Takes in a list of AST's representing expressions for arguments, checks each of their types against a map of given
+    parameters, represented as symbolNodes.
+    
+    Returns: 1 when too many args, 
+            -1 when too few args,
+             0 when okay args. */
+static int validateParamType(struct list* args, struct map* paramMap, struct symbolNode* scope, const char* filename, int line) {
+    struct list* params = map_getKeyList(paramMap);
+    struct listElem* paramElem;
+    struct listElem* argElem;
+    for(paramElem = list_begin(params), argElem = list_begin(args); 
+        paramElem != list_end(params) && argElem != list_end(args); 
+        paramElem = list_next(paramElem), argElem = list_next(argElem)) {
+        struct symbolNode* symbol = (struct symbolNode*)map_get(paramMap, ((char*)paramElem->data));
+        if(symbol->symbolType == SYMBOL_BLOCK) { // functions store blocks along with parameters, this excludes checking that
+            continue;
+        }
+        char* paramType = symbol->type;
+        char* argType = validateExpressionAST((struct astNode*)argElem->data);
+        if(!typesMatch(paramType, argType, scope, filename, line)) {
+            error(filename, line, "Value type mismatch when passing argument. Expected \"%s\" type, actual type was \"%s\" ", paramType, argType);
+        }
+        if(symbol->symbolType == SYMBOL_FUNCTIONPTR) {
+            struct astNode* node = (struct astNode*)argElem->data;
+            struct symbolNode* fnptr = symbol_find(node->data, node->scope);
+            if(fnptr == NULL) {
+                LOG("Here");
+            }
+            int err = validateFunctionTypesMatch(fnptr->children, symbol->children, scope, filename, line);
+            if(err > 0){
+                error(filename, line, "Passed pointer to function with more arguments than expected");
+            } else if(err < 0){
+                error(filename, line, "Passed pointer to function with fewer arguments than expected");
+            }
+        }
+    }
+    // count the parameters, arguments. Check that sizes match excluding function's block
+    return args->size - paramMap->size;
 }
 
 /*
