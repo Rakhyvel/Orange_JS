@@ -27,6 +27,7 @@ static Main {
             keys[i] = false;
             i = i + 1;
         }
+        // Hello!
         Canvas:init("canvas");
         Canvas:addMouseListener("mousemove", mouseListener);
         Canvas:addKeyListener("keydown", keyDownListener);
