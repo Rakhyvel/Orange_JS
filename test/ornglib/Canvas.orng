@@ -5,7 +5,7 @@ static Canvas {
     struct Point(int x, int y)
     struct Color(int a, int r, int g, int b)
     struct MouseEvent(int offsetX, int offsetY)
-    struct KeyEvent(int keycode)
+    struct KeyEvent(int keyCode)
 
     Canvas canvas;
     Context ctx;

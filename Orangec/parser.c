@@ -29,16 +29,20 @@
 static const enum tokenType MODULE[] = {TOKEN_IDENTIFIER, TOKEN_LBRACE};
 static const enum tokenType STRUCT[] = {TOKEN_STRUCT, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType ENUM[] = {TOKEN_ENUM, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+
 static const enum tokenType VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
-static const enum tokenType PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
-static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
 static const enum tokenType VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 static const enum tokenType EXTERN_VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_SEMICOLON};
+static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
+
+static const enum tokenType PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
+static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType EXTERN_PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
 static const enum tokenType EXTERN_ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
-static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
-static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+
 static const enum tokenType FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType EXTERN_FUNCTION[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+
 static const enum tokenType CALL[] = {TOKEN_IDENTIFIER, TOKEN_LPAREN};
 static const enum tokenType VERBATIM[] = {TOKEN_VERBATIM, TOKEN_LPAREN};
 
@@ -201,7 +205,9 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_EQUALS);
         symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
-        assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        if(topMatches(tokenQueue, TOKEN_SEMICOLON)) {
+            assertRemove(tokenQueue, TOKEN_SEMICOLON);
+        }
         LOG("Variable definition %s created", symbolNode->name);
     // VARIABLE DECLARATION
     } else if(matchTokens(tokenQueue, VARDECLARE, 3) || matchTokens(tokenQueue, EXTERN_VARDECLARE, 5)) {
@@ -251,7 +257,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
     } else if(topMatches(tokenQueue, TOKEN_EOF)){
         return NULL;
     } else {
-        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected token %s", token_toString(((struct token*) queue_peek(tokenQueue))->type));
+        error(getTopFilename(tokenQueue), getTopLine(tokenQueue), "Unexpected tokens %s", token_toString(((struct token*) queue_peek(tokenQueue))->type));
     }
     return symbolNode;
 }
@@ -409,6 +415,7 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         if(map_put(scope->children, symbolNode->name, symbolNode)) {
             error(symbolNode->filename, symbolNode->line, "Symbol %s already defined in this scope", symbolNode->name);
         }
+        assertRemove(tokenQueue, TOKEN_SEMICOLON);
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {

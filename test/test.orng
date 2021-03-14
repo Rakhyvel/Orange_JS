@@ -1,10 +1,32 @@
 static Main {
+    real oldTime = 0.0;
     int x = 0;
     int y = 0;
     boolean[] keys = new boolean[256];
-    struct Lol(int i)
+    private struct KeyCode_ (
+        const int W = 87,
+        const int A = 65,
+        const int S = 83,
+        const int D = 68
+    )
 
     void start() {
+        void mouseListener(Canvas:MouseEvent e) {
+            
+        }
+        
+        void keyDownListener(Canvas:KeyEvent e) {
+            keys[e.keyCode] = true;
+        }
+
+        void keyUpListener(Canvas:KeyEvent e) {
+            keys[e.keyCode] = false;
+        }
+        int i = 0;
+        while i < 256 {
+            keys[i] = false;
+            i = i + 1;
+        }
         Canvas:init("canvas");
         Canvas:addMouseListener("mousemove", mouseListener);
         Canvas:addKeyListener("keydown", keyDownListener);
@@ -12,21 +34,28 @@ static Main {
         Canvas:requestAnimationFrame(loop);
     }
 
-    void mouseListener(Canvas:MouseEvent e) {
-        x = e.offsetX;
-        y = e.offsetY;
-    }
     
-    void keyDownListener(Canvas:KeyEvent e) {
-        keys[e.keycode] = true;
-        System:println(e);
-    }
 
-    void keyUpListener(Canvas:KeyEvent e) {
-        keys[e.keycode] = false;
-    }
+    void loop(real time) {
+        real dt = time - oldTime;
+        oldTime = time;
 
-    void loop(real timestep) {
+        Canvas:setColor(255, 255, 255, 255);
+        Canvas:fillRect(0, 0, Canvas:width(), Canvas:height());
+        Canvas:setColor(255, 255, 128, 0);
+        if keys[W] {
+            y = cast(int)(y - dt / 16.0);
+        }
+        if keys[S] {
+            y = cast(int)(y + dt / 16.0);
+        }
+        if keys[A] {
+            x = cast(int)(x - dt / 16.0);
+        }
+        if keys[D] {
+            x = cast(int)(x + dt / 16.0);
+        }
+        Canvas:fillRect(x, y, 50, 50);
         Canvas:requestAnimationFrame(loop);
     }
 }

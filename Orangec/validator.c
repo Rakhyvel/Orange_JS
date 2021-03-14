@@ -469,8 +469,9 @@ char* validateExpressionAST(struct astNode* node) {
         }
         if(strcmp(oldType, newType)) {
             struct symbolNode* symbol = map_get(typeMap, oldType);
-            if((symbol == NULL && !strcmp(newType, "int")) && // Converting enum should be legal
-            (strcmp(oldType, "Any") && strcmp(newType, "Any"))) { // Converting anything to/from Any is legal
+            if((symbol == NULL && !strcmp(newType, "int")) && // Converting enum to int
+                (strcmp(oldType, "real") && strcmp(newType, "int")) && // Converting real to int
+                (strcmp(oldType, "Any") && strcmp(newType, "Any"))) { // Converting anything to/from Any is legal
                 error(node->filename, node->line, "Cannot cast %s to %s", oldType, newType);
             }
         }
