@@ -11,7 +11,7 @@ git-commit:
 	git commit -m "$(msg)"
 
 git-push:
-	git push origin master
+	git push origin ff-fix
 
 clean:
 	rm orangec
