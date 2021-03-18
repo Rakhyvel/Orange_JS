@@ -3,12 +3,10 @@ static Main {
     int x = 0;
     int y = 0;
     boolean[] keys = new boolean[256];
-    private struct KeyCode_ (
-        const int W = 87,
-        const int A = 65,
-        const int S = 83,
-        const int D = 68
-    )
+    const int W = 87;
+    const int A = 65;
+    const int S = 83;
+    const int D = 68;
 
     void start() {
         void mouseListener(Canvas:MouseEvent e) {
