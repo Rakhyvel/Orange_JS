@@ -36,7 +36,7 @@ static const enum tokenType EXTERN_VARDECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON
 static const enum tokenType EXTERN_VARDEFINE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_EQUALS};
 
 static const enum tokenType PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
-static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_LPAREN};
+static const enum tokenType ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
 static const enum tokenType EXTERN_PARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_COMMA};
 static const enum tokenType EXTERN_ENDPARAM_DECLARE[] = {TOKEN_IDENTIFIER, TOKEN_COLON, TOKEN_IDENTIFIER, TOKEN_IDENTIFIER, TOKEN_RPAREN};
 
@@ -205,6 +205,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         copyNextTokenString(tokenQueue, symbolNode->name);
         assertRemove(tokenQueue, TOKEN_EQUALS);
         symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
+            LOG("HELLO");
         if(topMatches(tokenQueue, TOKEN_SEMICOLON)) {
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
         }
@@ -218,6 +219,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
         symbolNode->isDeclared = parent->symbolType == SYMBOL_MODULE;
         expectType(tokenQueue, symbolNode->type);
         copyNextTokenString(tokenQueue, symbolNode->name);
+            LOG("HELLO");
         assertRemove(tokenQueue, TOKEN_SEMICOLON);
         LOG("Variable declaration %s created", symbolNode->name);
     // PARAM DECLARATION
@@ -243,6 +245,7 @@ struct symbolNode* parser_parseTokens(struct list* tokenQueue, struct symbolNode
             symbolNode->isDeclared = 1;
             assertRemove(tokenQueue, TOKEN_EQUALS);
             symbolNode->code = parseAST(tokenQueue, symbolNode, NULL);
+            LOG("HELLO");
             assertRemove(tokenQueue, TOKEN_SEMICOLON);
         } else if(topMatches(tokenQueue, TOKEN_LBRACE)) {
             symbolNode->isDeclared = 1;
@@ -415,7 +418,6 @@ static struct astNode* parseAST(struct list* tokenQueue, struct symbolNode* scop
         if(map_put(scope->children, symbolNode->name, symbolNode)) {
             error(symbolNode->filename, symbolNode->line, "Symbol %s already defined in this scope", symbolNode->name);
         }
-        assertRemove(tokenQueue, TOKEN_SEMICOLON);
     }
     // IF
     else if (topMatches(tokenQueue, TOKEN_IF)) {
